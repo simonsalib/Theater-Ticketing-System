@@ -94,7 +94,9 @@
     "testEnvironment": "node"
   },
   "scripts": {
-    "build": "nest build",
-    "start:prod": "node dist/main.js"
+    "build": [
+      "nest build",
+      "start:prod": "node dist/main.js"
+    ],
   },
 }
