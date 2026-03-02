@@ -20,6 +20,46 @@ const UploadReceiptPage = () => {
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    /**
+     * Compress image using canvas to reduce base64 payload size.
+     * Resizes to max 1200px on the longest side and uses JPEG at 0.7 quality.
+     */
+    const compressImage = (file: File, maxDimension = 1200, quality = 0.7): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let { width, height } = img;
+
+                    // Scale down if needed
+                    if (width > maxDimension || height > maxDimension) {
+                        if (width > height) {
+                            height = Math.round((height * maxDimension) / width);
+                            width = maxDimension;
+                        } else {
+                            width = Math.round((width * maxDimension) / height);
+                            height = maxDimension;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d')!;
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+                    resolve(compressedDataUrl);
+                };
+                img.onerror = () => reject(new Error('Failed to load image'));
+                img.src = e.target?.result as string;
+            };
+            reader.onerror = () => reject(new Error('Failed to read file'));
+            reader.readAsDataURL(file);
+        });
+    };
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const selectedFile = e.target.files[0];
@@ -55,8 +95,12 @@ const UploadReceiptPage = () => {
 
         try {
             setIsUploading(true);
+
+            // Compress image before uploading to avoid 413 Payload Too Large
+            const compressedBase64 = await compressImage(file);
+
             const response = await api.post(`/booking/${bookingId}/receipt`, {
-                receiptBase64: previewUrl
+                receiptBase64: compressedBase64
             });
 
             if (response.data?.success) {

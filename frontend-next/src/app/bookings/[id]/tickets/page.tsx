@@ -38,6 +38,8 @@ const BookingTicketsPage = () => {
     const [eventTitle, setEventTitle] = useState('');
     const [eventDate, setEventDate] = useState('');
     const [eventLocation, setEventLocation] = useState('');
+    const [payerEmail, setPayerEmail] = useState('');
+    const [payerName, setPayerName] = useState('');
 
     useEffect(() => {
         if (!bookingId) return;
@@ -52,6 +54,10 @@ const BookingTicketsPage = () => {
                     setEventDate(data[0].eventId.date || '');
                     setEventLocation(data[0].eventId.location || '');
                 }
+                if (data.length > 0 && data[0].userId) {
+                    setPayerEmail(data[0].userId.email || '');
+                    setPayerName(data[0].userId.name || '');
+                }
             } catch (err: any) {
                 console.error('Error fetching tickets:', err);
                 toast.error(err.response?.data?.message || 'Failed to load tickets');
@@ -62,20 +68,187 @@ const BookingTicketsPage = () => {
         fetchTickets();
     }, [bookingId]);
 
-    const downloadQR = (ticket: Ticket) => {
-        const link = document.createElement('a');
-        link.href = ticket.qrCodeImage;
-        link.download = `ticket-${ticket.seatRow}${ticket.seatNumber}-${ticket.section}.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        toast.success(`QR code for seat ${ticket.seatRow}${ticket.seatNumber} downloaded!`);
+    const downloadQR = async (ticket: Ticket) => {
+        try {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d')!;
+            const width = 600;
+            const height = 960;
+            canvas.width = width;
+            canvas.height = height;
+
+            // Background
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, width, height);
+
+            // Header bar
+            ctx.fillStyle = '#6c3ce0';
+            ctx.fillRect(0, 0, width, 80);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 28px Arial, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('🎫  EVENT TICKET', width / 2, 52);
+
+            // Dashed separator
+            ctx.setLineDash([6, 4]);
+            ctx.strokeStyle = '#d1d5db';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(30, 90);
+            ctx.lineTo(width - 30, 90);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Event title
+            let y = 130;
+            ctx.fillStyle = '#1f2937';
+            ctx.font = 'bold 24px Arial, sans-serif';
+            ctx.textAlign = 'center';
+            const titleText = eventTitle || 'Event';
+            // Word-wrap the title if needed
+            const maxTitleWidth = width - 60;
+            if (ctx.measureText(titleText).width > maxTitleWidth) {
+                const words = titleText.split(' ');
+                let line = '';
+                for (const word of words) {
+                    const test = line + (line ? ' ' : '') + word;
+                    if (ctx.measureText(test).width > maxTitleWidth && line) {
+                        ctx.fillText(line, width / 2, y);
+                        y += 30;
+                        line = word;
+                    } else {
+                        line = test;
+                    }
+                }
+                if (line) ctx.fillText(line, width / 2, y);
+            } else {
+                ctx.fillText(titleText, width / 2, y);
+            }
+
+            // Event date & location
+            y += 35;
+            ctx.font = '16px Arial, sans-serif';
+            ctx.fillStyle = '#6b7280';
+            if (eventDate) {
+                ctx.fillText(`📅  ${new Date(eventDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`, width / 2, y);
+                y += 24;
+            }
+            if (eventLocation) {
+                ctx.fillText(`📍  ${eventLocation}`, width / 2, y);
+                y += 24;
+            }
+
+            // Separator
+            y += 10;
+            ctx.setLineDash([6, 4]);
+            ctx.strokeStyle = '#d1d5db';
+            ctx.beginPath();
+            ctx.moveTo(30, y);
+            ctx.lineTo(width - 30, y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            y += 25;
+
+            // Seat info grid
+            ctx.textAlign = 'left';
+            const leftCol = 50;
+            const rightCol = width / 2 + 20;
+            const drawInfoRow = (label: string, value: string, x: number, yPos: number) => {
+                ctx.font = '13px Arial, sans-serif';
+                ctx.fillStyle = '#9ca3af';
+                ctx.fillText(label, x, yPos);
+                ctx.font = 'bold 17px Arial, sans-serif';
+                ctx.fillStyle = '#1f2937';
+                ctx.fillText(value, x, yPos + 22);
+            };
+
+            drawInfoRow('Section', ticket.section, leftCol, y);
+            drawInfoRow('Seat Type', ticket.seatType, rightCol, y);
+            y += 55;
+            drawInfoRow('Row', ticket.seatRow, leftCol, y);
+            drawInfoRow('Seat Number', String(ticket.seatNumber), rightCol, y);
+            y += 55;
+            drawInfoRow('Price', `$${ticket.price.toFixed(2)}`, leftCol, y);
+            drawInfoRow('Seat', `${ticket.seatRow}${ticket.seatNumber}`, rightCol, y);
+            y += 55;
+
+            if (ticket.attendeeName) {
+                drawInfoRow('Attendee', ticket.attendeeName, leftCol, y);
+                if (ticket.attendeePhone) {
+                    drawInfoRow('Phone', ticket.attendeePhone, rightCol, y);
+                }
+                y += 55;
+            }
+
+            // Paid by info
+            if (payerEmail) {
+                drawInfoRow('Paid By', payerName || payerEmail, leftCol, y);
+                drawInfoRow('Email', payerEmail, rightCol, y);
+                y += 55;
+            }
+
+            // Separator before QR
+            ctx.setLineDash([6, 4]);
+            ctx.strokeStyle = '#d1d5db';
+            ctx.beginPath();
+            ctx.moveTo(30, y);
+            ctx.lineTo(width - 30, y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            y += 20;
+
+            // QR Code
+            const qrImg = new Image();
+            qrImg.crossOrigin = 'anonymous';
+            await new Promise<void>((resolve, reject) => {
+                qrImg.onload = () => resolve();
+                qrImg.onerror = () => reject(new Error('Failed to load QR image'));
+                qrImg.src = ticket.qrCodeImage;
+            });
+
+            const qrSize = 200;
+            const qrX = (width - qrSize) / 2;
+            ctx.drawImage(qrImg, qrX, y, qrSize, qrSize);
+            y += qrSize + 15;
+
+            // "Scan at entrance" text
+            ctx.textAlign = 'center';
+            ctx.font = '12px Arial, sans-serif';
+            ctx.fillStyle = '#9ca3af';
+            ctx.fillText('Scan this QR code at the entrance', width / 2, y);
+
+            // Footer
+            ctx.fillStyle = '#6c3ce0';
+            ctx.fillRect(0, height - 40, width, 40);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '12px Arial, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('Theater Ticketing System — Keep this ticket safe', width / 2, height - 15);
+
+            // Download
+            const dataUrl = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = `ticket-${ticket.seatRow}${ticket.seatNumber}-${ticket.section}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            toast.success(`Ticket for seat ${ticket.seatRow}${ticket.seatNumber} downloaded!`);
+        } catch (err) {
+            console.error('Error generating ticket image:', err);
+            toast.error('Failed to generate ticket image');
+        }
     };
 
-    const downloadAll = () => {
-        tickets.forEach((ticket, index) => {
-            setTimeout(() => downloadQR(ticket), index * 300);
-        });
+    const downloadAll = async () => {
+        for (let i = 0; i < tickets.length; i++) {
+            await downloadQR(tickets[i]);
+            // Small delay between downloads to avoid browser blocking
+            if (i < tickets.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 400));
+            }
+        }
     };
 
     if (loading) return (
