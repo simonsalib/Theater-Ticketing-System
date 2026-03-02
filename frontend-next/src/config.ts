@@ -16,4 +16,3 @@ const getBaseUrl = () => {
 
 export const BASE_URL = getBaseUrl();
 export const API_BASE_URL = `${BASE_URL}/api/v1`;
-
