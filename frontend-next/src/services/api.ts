@@ -7,11 +7,14 @@ const api = axios.create({
     timeout: 15000, // 15 seconds timeout
 });
 
-// Add interceptor for token if not using cookies only
+// Add interceptor to send token from localStorage (fallback for when cookies are blocked)
 api.interceptors.request.use((config) => {
-    // Optional: add token from local storage if needed
-    // const token = localStorage.getItem('token');
-    // if (token) config.headers.Authorization = `Bearer ${token}`;
+    if (typeof window !== 'undefined') {
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+    }
     return config;
 });
 

@@ -57,10 +57,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const response = await api.post<AuthResponse>("/auth/login", credentials);
 
             if (response.data && response.data.success && response.data.data) {
-                const { user } = response.data.data;
+                const { user, token } = response.data.data;
                 setUser(user);
                 setAuthenticated(true);
                 localStorage.setItem('isAuthenticated', 'true');
+                if (token) {
+                    localStorage.setItem('token', token);
+                }
                 return { success: true, user };
             }
 
@@ -102,6 +105,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setUser(null);
             setAuthenticated(false);
             localStorage.removeItem('isAuthenticated');
+            localStorage.removeItem('token');
             toast.success("Logged out successfully");
             return { success: true };
         } catch (error: any) {
