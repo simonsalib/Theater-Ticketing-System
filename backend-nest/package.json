@@ -93,4 +93,8 @@
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
   }
+  "scripts": {
+    "build": "nest build",
+    "start:prod": "node dist/main.js"
+  }
 }
