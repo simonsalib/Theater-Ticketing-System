@@ -2,7 +2,8 @@
 const getBaseUrl = () => {
     // Check for environment variable first (for production)
     if (process.env.NEXT_PUBLIC_API_URL) {
-        return process.env.NEXT_PUBLIC_API_URL;
+        // Strip /api/v1 suffix to get the server root
+        return process.env.NEXT_PUBLIC_API_URL.replace(/\/api\/v1\/?$/, '');
     }
 
     if (typeof window !== 'undefined') {
@@ -14,4 +15,5 @@ const getBaseUrl = () => {
 };
 
 export const BASE_URL = getBaseUrl();
-export const API_BASE_URL = BASE_URL.endsWith('/api/v1') ? BASE_URL : `${BASE_URL}/api/v1`;
+export const API_BASE_URL = `${BASE_URL}/api/v1`;
+

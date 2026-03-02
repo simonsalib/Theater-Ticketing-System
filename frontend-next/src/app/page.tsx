@@ -56,10 +56,6 @@ const Homepage: React.FC = () => {
       });
   }, []);
 
-  if (loading) {
-    return <div className="loading-indicator">Loading...</div>;
-  }
-
   return (
     <div className="homepage-container">
       <div className="hero-section" style={{
@@ -133,7 +129,9 @@ const Homepage: React.FC = () => {
 
       <section className="featured-section" data-aos="fade-up">
         <h2 className="section-title" data-aos="fade-down">Featured Shows</h2>
-        {error ? (
+        {loading ? (
+          <div className="loading-indicator" style={{ textAlign: 'center', padding: '2rem' }}>Loading events...</div>
+        ) : error ? (
           <div className="error-message">{error}</div>
         ) : featuredEvents.length === 0 ? (
           <div className="no-events-message">No events available at the moment.</div>
@@ -152,3 +150,4 @@ const Homepage: React.FC = () => {
 };
 
 export default Homepage;
+

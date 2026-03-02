@@ -16,15 +16,19 @@ const EventListPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const router = useRouter();
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
 
+    // Fetch events immediately — no dependency on auth state
     useEffect(() => {
-        if (user?.role === "System Admin") {
-            router.push('/admin/events');
-            return;
-        }
         fetchEvents();
-    }, [user, router]);
+    }, []);
+
+    // Admin redirect — separate from event fetching
+    useEffect(() => {
+        if (!authLoading && user?.role === "System Admin") {
+            router.push('/admin/events');
+        }
+    }, [user, authLoading, router]);
 
     const fetchEvents = async () => {
         try {
@@ -75,19 +79,21 @@ const EventListPage = () => {
 
             <div className="event-list-container">
                 <motion.div className="page-header" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}>
-                    <motion.div className="user-welcome-banner" whileHover={{ scale: 1.01 }} onClick={() => router.push('/profile')}>
-                        <div className="welcome-content">
-                            <div className="user-avatar">
-                                {user?.profilePicture ? <img src={user.profilePicture} alt="Profile" /> : <span>{user?.name?.charAt(0)?.toUpperCase() || '?'}</span>}
-                                <div className="avatar-ring"></div>
+                    {user && (
+                        <motion.div className="user-welcome-banner" whileHover={{ scale: 1.01 }} onClick={() => router.push('/profile')}>
+                            <div className="welcome-content">
+                                <div className="user-avatar">
+                                    {user?.profilePicture ? <img src={user.profilePicture} alt="Profile" /> : <span>{user?.name?.charAt(0)?.toUpperCase() || '?'}</span>}
+                                    <div className="avatar-ring"></div>
+                                </div>
+                                <div className="welcome-text">
+                                    <h2>Welcome back, <span>{user?.name || 'User'}</span></h2>
+                                    <p className="user-role">{user?.role}</p>
+                                </div>
                             </div>
-                            <div className="welcome-text">
-                                <h2>Welcome back, <span>{user?.name || 'User'}</span></h2>
-                                <p className="user-role">{user?.role}</p>
-                            </div>
-                        </div>
-                        <motion.div className="profile-arrow" whileHover={{ x: 5 }}><FiArrowRight size={20} /></motion.div>
-                    </motion.div>
+                            <motion.div className="profile-arrow" whileHover={{ x: 5 }}><FiArrowRight size={20} /></motion.div>
+                        </motion.div>
+                    )}
 
                     <div className="actions-bar">
                         <div className="search-wrapper">

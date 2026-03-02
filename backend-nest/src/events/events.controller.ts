@@ -46,6 +46,20 @@ export class EventsController {
         return { success: true, data };
     }
 
+    @Get('organizer/my-events')
+    @UseGuards(JwtAuthGuard)
+    async getMyEvents(@Req() req: any) {
+        const data = await this.eventsService.findByOrganizer(req.user._id);
+        return { success: true, data };
+    }
+
+    @Get('organizer/analytics')
+    @UseGuards(JwtAuthGuard)
+    async getOrganizerAnalytics(@Req() req: any) {
+        const data = await this.eventsService.getOrganizerAnalytics(req.user._id);
+        return { success: true, data };
+    }
+
     @Get(':id')
     async findOne(@Param('id') id: string) {
         const data = await this.eventsService.findOne(id);
@@ -84,19 +98,5 @@ export class EventsController {
     async remove(@Param('id') id: string) {
         await this.eventsService.delete(id);
         return { success: true, message: 'Event deleted successfully' };
-    }
-
-    @Get('organizer/my-events')
-    @UseGuards(JwtAuthGuard)
-    async getMyEvents(@Req() req: any) {
-        const data = await this.eventsService.findByOrganizer(req.user._id);
-        return { success: true, data };
-    }
-
-    @Get('organizer/analytics')
-    @UseGuards(JwtAuthGuard)
-    async getOrganizerAnalytics(@Req() req: any) {
-        const data = await this.eventsService.getOrganizerAnalytics(req.user._id);
-        return { success: true, data };
     }
 }
