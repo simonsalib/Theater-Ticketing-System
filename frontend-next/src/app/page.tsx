@@ -11,6 +11,7 @@ import { FaTicketAlt, FaUsers, FaCalendarAlt, FaStar, FaTheaterMasks, FaTrophy, 
 import '../app/globals.css';
 import '@/components/homepage/Homepage.css';
 import { Event } from '@/types/event';
+import { useAuth } from '@/auth/AuthContext';
 import EventCard from '@/components/Event Components/EventCard';
 
 const Homepage: React.FC = () => {
@@ -18,6 +19,7 @@ const Homepage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { isAuthenticated, loading: authLoading } = useAuth();
 
   const { ref: statsRef, inView: statsInView } = useInView({
     triggerOnce: true,
@@ -31,10 +33,6 @@ const Homepage: React.FC = () => {
       easing: 'ease-out-cubic'
     });
   }, []);
-
-  const isLoggedIn = () => {
-    return typeof window !== 'undefined' && localStorage.getItem('isAuthenticated') === 'true';
-  };
 
   useEffect(() => {
     api.get<any>('/event/approved')
@@ -69,7 +67,7 @@ const Homepage: React.FC = () => {
           <p className="hero-subtitle" data-aos="fade-up" data-aos-delay="400">Discover extraordinary events that will leave you breathless</p>
           <div className="hero-buttons" data-aos="zoom-in" data-aos-delay="600">
             <Link href="/events" className="btn-primary-hero">Browse Events</Link>
-            {!isLoggedIn() && (
+            {!authLoading && !isAuthenticated && (
               <Link href="/register" className="btn-secondary-hero">Get Started</Link>
             )}
           </div>

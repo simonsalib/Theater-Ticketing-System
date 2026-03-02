@@ -272,6 +272,8 @@ const UpdateProfilePageContent = () => {
                                     value={formData.phone}
                                     onChange={handleChange}
                                     placeholder="e.g. 01012345678"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
                                 />
                                 <div className="focus-border"></div>
                             </div>
@@ -295,6 +297,8 @@ const UpdateProfilePageContent = () => {
                                         value={formData.instapayNumber}
                                         onChange={handleChange}
                                         placeholder="e.g. 01221627432"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
                                     />
                                     <div className="focus-border"></div>
                                 </div>

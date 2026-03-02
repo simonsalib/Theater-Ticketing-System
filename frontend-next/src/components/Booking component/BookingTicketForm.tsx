@@ -427,6 +427,8 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
                                                             value={attendeeInfo[index]?.attendeePhone || ''}
                                                             onChange={(e) => handleAttendeeChange(index, 'attendeePhone', e.target.value)}
                                                             className="attendee-input"
+                                                            inputMode="numeric"
+                                                            pattern="[0-9]*"
                                                         />
                                                     </div>
                                                 </div>

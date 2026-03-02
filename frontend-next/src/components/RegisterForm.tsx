@@ -191,6 +191,8 @@ export default function RegisterForm() {
                                     className="form-input"
                                     value={form.phone}
                                     onChange={handleChange}
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
                                     required
                                 />
                                 <i className="input-icon fas fa-phone"></i>
@@ -268,6 +270,9 @@ export default function RegisterForm() {
                                             value={digit}
                                             onChange={(e) => handleOtpChange(e, index)}
                                             autoFocus={index === 0}
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
+                                            autoComplete="one-time-code"
                                         />
                                     ))}
                                 </div>

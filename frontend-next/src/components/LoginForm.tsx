@@ -221,6 +221,9 @@ export default function LoginForm() {
                                             value={digit}
                                             onChange={(e) => handleOtpChange(e, index)}
                                             autoFocus={index === 0}
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
+                                            autoComplete="one-time-code"
                                         />
                                     ))}
                                 </div>
