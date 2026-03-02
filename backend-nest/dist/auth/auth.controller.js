@@ -15,6 +15,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthController = void 0;
 const common_1 = require("@nestjs/common");
 const auth_service_1 = require("./auth.service");
+const isProduction = process.env.NODE_ENV === 'production';
+const getCookieOptions = () => ({
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    expires: new Date(Date.now() + 30 * 60 * 1000),
+});
 let AuthController = class AuthController {
     authService;
     constructor(authService) {
@@ -30,19 +37,15 @@ let AuthController = class AuthController {
     }
     async login(loginDto, res) {
         const result = await this.authService.login(loginDto);
-        res.cookie('token', result.token, {
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            expires: new Date(Date.now() + 30 * 60 * 1000),
-        });
+        res.cookie('token', result.token, getCookieOptions());
         return { success: true, data: result };
     }
     async logout(res) {
+        const opts = getCookieOptions();
         res.clearCookie('token', {
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
+            httpOnly: opts.httpOnly,
+            secure: opts.secure,
+            sameSite: opts.sameSite,
         });
         return { success: true, message: 'Logged out successfully' };
     }
@@ -64,12 +67,7 @@ let AuthController = class AuthController {
     }
     async verifyAndActivate(verifyDto, res) {
         const result = await this.authService.verifyAndActivate(verifyDto);
-        res.cookie('token', result.token, {
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            expires: new Date(Date.now() + 30 * 60 * 1000),
-        });
+        res.cookie('token', result.token, getCookieOptions());
         return { success: true, data: result };
     }
 };

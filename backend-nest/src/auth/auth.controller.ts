@@ -2,6 +2,15 @@ import { Controller, Post, Body, HttpCode, HttpStatus, Res } from '@nestjs/commo
 import { AuthService } from './auth.service';
 import type { Response } from 'express';
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+const getCookieOptions = () => ({
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' as const : 'lax' as const,
+    expires: new Date(Date.now() + 30 * 60 * 1000), // 30 mins
+});
+
 @Controller('api/v1/auth')
 export class AuthController {
     constructor(private authService: AuthService) { }
@@ -25,12 +34,7 @@ export class AuthController {
         const result = await this.authService.login(loginDto);
 
         // Set cookie
-        res.cookie('token', result.token, {
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            expires: new Date(Date.now() + 30 * 60 * 1000), // 30 mins
-        });
+        res.cookie('token', result.token, getCookieOptions());
 
         return { success: true, data: result };
     }
@@ -38,10 +42,11 @@ export class AuthController {
     @Post('logout')
     @HttpCode(HttpStatus.OK)
     async logout(@Res({ passthrough: true }) res: Response) {
+        const opts = getCookieOptions();
         res.clearCookie('token', {
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
+            httpOnly: opts.httpOnly,
+            secure: opts.secure,
+            sameSite: opts.sameSite,
         });
         return { success: true, message: 'Logged out successfully' };
     }
@@ -83,12 +88,7 @@ export class AuthController {
         const result = await this.authService.verifyAndActivate(verifyDto);
 
         // Set cookie for auto-login
-        res.cookie('token', result.token, {
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            expires: new Date(Date.now() + 30 * 60 * 1000),
-        });
+        res.cookie('token', result.token, getCookieOptions());
 
         return { success: true, data: result };
     }
