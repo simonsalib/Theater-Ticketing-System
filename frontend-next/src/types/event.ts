@@ -40,7 +40,8 @@ export interface Booking {
     totalPrice: number;
     bookingDate: string;
     createdAt?: string;
-    status: 'Confirmed' | 'Cancelled';
+    status: 'Confirmed' | 'Cancelled' | 'pending' | 'canceled' | string;
+    pendingExpiresAt?: string;
     hasTheaterSeating?: boolean;
     seats?: Array<{
         section: string;

@@ -91,7 +91,7 @@ const BookTicketPage = () => {
         // Initialize attendee info for each seat (preserve existing data)
         const newAttendeeInfo = selectedSeats.map((_seat, index) => {
             const existing = attendeeInfo[index];
-            return existing || { attendeeName: '', attendeePhone: '' };
+            return existing || { attendeeName: '', attendeePhone: '+20' };
         });
         setAttendeeInfo(newAttendeeInfo);
         setShowAttendeeForm(true);
@@ -130,10 +130,29 @@ const BookTicketPage = () => {
                     toast.error(`Please enter name for seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber}`);
                     return;
                 }
-                if (!attendeeInfo[i]?.attendeePhone?.trim()) {
+
+                const phoneField = attendeeInfo[i]?.attendeePhone?.trim() || '';
+                if (!phoneField || phoneField === '+20') {
                     toast.error(`Please enter phone for seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber}`);
                     return;
                 }
+
+                let corePhone = phoneField;
+                if (corePhone.startsWith('+20')) corePhone = corePhone.substring(3);
+                else if (corePhone.startsWith('20') && (corePhone.length === 12 || corePhone.length === 13)) corePhone = corePhone.substring(2);
+
+                // If user wrote the number without the leading zero (e.g., 10xxxx), add it back.
+                if (corePhone.length === 10 && !corePhone.startsWith('0')) {
+                    corePhone = '0' + corePhone;
+                }
+
+                if (!/^\d{11}$/.test(corePhone)) {
+                    toast.error(`Phone number for seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber} must be exactly 11 digits (e.g., 01xxxxxxxxx)`);
+                    return;
+                }
+
+                // Format directly for the payload
+                attendeeInfo[i].attendeePhone = `+20${corePhone}`;
             }
         }
 
@@ -245,7 +264,23 @@ const BookTicketPage = () => {
                                     type="button"
                                     className="copy-btn"
                                     onClick={() => {
-                                        navigator.clipboard.writeText(organizerInstapay);
+                                        if (navigator.clipboard && window.isSecureContext) {
+                                            navigator.clipboard.writeText(organizerInstapay);
+                                        } else {
+                                            const textArea = document.createElement("textarea");
+                                            textArea.value = organizerInstapay;
+                                            textArea.style.position = "absolute";
+                                            textArea.style.left = "-999999px";
+                                            document.body.prepend(textArea);
+                                            textArea.select();
+                                            try {
+                                                document.execCommand('copy');
+                                            } catch (error) {
+                                                console.error(error);
+                                            } finally {
+                                                textArea.remove();
+                                            }
+                                        }
                                         setHasCopied(true);
                                         toast.success('InstaPay number copied!');
                                     }}

@@ -6,14 +6,13 @@ import api from '@/services/api';
 import ConfirmationDialog from '@/components/AdminComponent/ConfirmationDialog';
 import { ProtectedRoute } from '@/auth/ProtectedRoute';
 import { Booking, Event } from '@/types/event';
-import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
-import { FiAlertCircle, FiArrowRight, FiTrash2 } from 'react-icons/fi';
+import { FiAlertCircle, FiArrowRight, FiTrash2, FiClock } from 'react-icons/fi';
 import '@/components/Booking component/BookingDetails.css';
-
 import { getImageUrl } from '@/utils/imageHelper';
 import SeatSelector from '@/components/Booking component/SeatSelector';
 import '@/components/Booking component/BookingTicketForm.css';
+import { toast } from 'react-toastify';
 
 const BookingDetailsPage = () => {
     const params = useParams();
@@ -25,6 +24,32 @@ const BookingDetailsPage = () => {
     const [error, setError] = useState<string | null>(null);
     const [showCancelConfirm, setShowCancelConfirm] = useState(false);
     const [theaterLayout, setTheaterLayout] = useState<any>(null);
+    const [hasCopied, setHasCopied] = useState(false);
+    const [timeLeft, setTimeLeft] = useState<string>('');
+
+    useEffect(() => {
+        if (!booking?.pendingExpiresAt || booking.status !== 'pending') return;
+
+        const updateTimer = () => {
+            const now = new Date().getTime();
+            const expires = new Date(booking.pendingExpiresAt!).getTime();
+            const distance = expires - now;
+
+            if (distance < 0) {
+                setTimeLeft('Expired');
+                setBooking({ ...booking, status: 'Cancelled' });
+                return;
+            }
+
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+            setTimeLeft(`${minutes}:${seconds < 10 ? '0' : ''}${seconds}`);
+        };
+
+        updateTimer();
+        const interval = setInterval(updateTimer, 1000);
+        return () => clearInterval(interval);
+    }, [booking?.pendingExpiresAt, booking?.status]);
 
     useEffect(() => {
         if (!id) return;
@@ -94,9 +119,11 @@ const BookingDetailsPage = () => {
     );
 
     const eventData = event || (booking.event as any) || {};
-    const isCancelled = booking.status === 'Cancelled' || (booking.status as any) === 'cancelled';
+    const isCancelled = booking.status === 'Cancelled' || booking.status === 'canceled' || (booking.status as any) === 'cancelled';
+    const isPending = booking.status === 'pending';
     const eventId = eventData._id || eventData.id || booking.eventId;
     const imageUrl = getImageUrl(eventData.image);
+    const organizerInstapay = eventData.organizerId?.instapayNumber || null;
 
     // For theater bookings, use fullpage layout like booking page
     if (booking.hasTheaterSeating && eventId) {
@@ -122,20 +149,66 @@ const BookingDetailsPage = () => {
                             </div>
                             <div className="booking-summary-compact">
                                 <span className={`booking-status ${booking.status?.toLowerCase()}`} style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600 }}>
-                                    {isCancelled ? '❌ Cancelled' : '✅ Confirmed'}
+                                    {isCancelled ? '❌ Cancelled' : isPending ? '⏳ Pending' : '✅ Confirmed'}
                                 </span>
+                                {isPending && timeLeft && timeLeft !== 'Expired' && (
+                                    <span style={{ color: '#f59e0b', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <FiClock /> Expires in {timeLeft}
+                                    </span>
+                                )}
                                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                    {booking.selectedSeats?.slice(0, 5).map((s, i) => (
-                                        <span key={i} className="seats-count" style={{ background: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa' }}>
-                                            {s.row}{s.seatNumber}
-                                        </span>
-                                    ))}
+                                    {booking.selectedSeats?.slice(0, 5).map((s, i) => {
+                                        const chipColor = isPending
+                                            ? { bg: 'rgba(251, 191, 36, 0.2)', text: '#fbbf24' }
+                                            : s.seatType === 'vip'
+                                                ? { bg: 'rgba(249, 115, 22, 0.2)', text: '#fb923c' }
+                                                : { bg: 'rgba(139, 92, 246, 0.2)', text: '#a78bfa' };
+                                        return (
+                                            <span key={i} className="seats-count" style={{ background: chipColor.bg, color: chipColor.text }}>
+                                                {s.row}{s.seatNumber}
+                                            </span>
+                                        );
+                                    })}
                                     {(booking.selectedSeats?.length || 0) > 5 && (
                                         <span className="seats-count">+{(booking.selectedSeats?.length || 0) - 5} more</span>
                                     )}
                                 </div>
                                 <span className="total-amount">${booking.totalPrice?.toFixed(2)}</span>
-                                {!isCancelled && (
+                                {organizerInstapay && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--card-bg, rgba(255,255,255,0.05))', padding: '6px 12px', borderRadius: '8px' }}>
+                                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary, #9ca3af)' }}>InstaPay:</span>
+                                        <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{organizerInstapay}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (navigator.clipboard && window.isSecureContext) {
+                                                    navigator.clipboard.writeText(organizerInstapay);
+                                                } else {
+                                                    const textArea = document.createElement("textarea");
+                                                    textArea.value = organizerInstapay;
+                                                    textArea.style.position = "absolute";
+                                                    textArea.style.left = "-999999px";
+                                                    document.body.prepend(textArea);
+                                                    textArea.select();
+                                                    try {
+                                                        document.execCommand('copy');
+                                                    } catch (error) {
+                                                        console.error(error);
+                                                    } finally {
+                                                        textArea.remove();
+                                                    }
+                                                }
+                                                setHasCopied(true);
+                                                toast.success('InstaPay number copied!');
+                                                setTimeout(() => setHasCopied(false), 2000);
+                                            }}
+                                            style={{ background: 'none', border: 'none', color: 'var(--primary-color, #8b5cf6)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+                                        >
+                                            {hasCopied ? 'Copied!' : 'Copy'}
+                                        </button>
+                                    </div>
+                                )}
+                                {!isCancelled && !isPending && (
                                     <motion.button
                                         className="cancel-booking-btn"
                                         onClick={() => setShowCancelConfirm(true)}
@@ -186,9 +259,16 @@ const BookingDetailsPage = () => {
                                 <h2>Booking Details</h2>
                                 <span className="booking-id-tag">ID: {booking._id}</span>
                             </div>
-                            <span className={`booking-status ${booking.status?.toLowerCase()}`}>
-                                {isCancelled ? 'Cancelled' : 'Confirmed'}
-                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                                <span className={`booking-status ${booking.status?.toLowerCase()}`}>
+                                    {isCancelled ? 'Cancelled' : isPending ? 'Pending' : 'Confirmed'}
+                                </span>
+                                {isPending && timeLeft && timeLeft !== 'Expired' && (
+                                    <span style={{ color: '#f59e0b', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <FiClock /> Expires in {timeLeft}
+                                    </span>
+                                )}
+                            </div>
                         </div>
 
                         <div className="event-info-section">
@@ -219,13 +299,49 @@ const BookingDetailsPage = () => {
                                 <span>Total Paid</span>
                                 <strong className="price-text">${booking.totalPrice?.toFixed(2)}</strong>
                             </div>
+                            {organizerInstapay && (
+                                <div className="financial-row" style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border-color, rgba(255,255,255,0.1))' }}>
+                                    <span>Organizer InstaPay</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <strong>{organizerInstapay}</strong>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (navigator.clipboard && window.isSecureContext) {
+                                                    navigator.clipboard.writeText(organizerInstapay);
+                                                } else {
+                                                    const textArea = document.createElement("textarea");
+                                                    textArea.value = organizerInstapay;
+                                                    textArea.style.position = "absolute";
+                                                    textArea.style.left = "-999999px";
+                                                    document.body.prepend(textArea);
+                                                    textArea.select();
+                                                    try {
+                                                        document.execCommand('copy');
+                                                    } catch (error) {
+                                                        console.error(error);
+                                                    } finally {
+                                                        textArea.remove();
+                                                    }
+                                                }
+                                                setHasCopied(true);
+                                                toast.success('InstaPay number copied!');
+                                                setTimeout(() => setHasCopied(false), 2000);
+                                            }}
+                                            style={{ background: 'var(--primary-color, #8b5cf6)', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+                                        >
+                                            {hasCopied ? 'Copied' : 'Copy'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="booking-actions">
                             <Link href="/bookings" className="back-button">
                                 <FiArrowRight style={{ transform: 'rotate(180deg)' }} /> Back to My Bookings
                             </Link>
-                            {!isCancelled && (
+                            {!isCancelled && !isPending && (
                                 <button onClick={() => setShowCancelConfirm(true)} className="cancel-booking-btn">
                                     <FiTrash2 /> Cancel Booking
                                 </button>

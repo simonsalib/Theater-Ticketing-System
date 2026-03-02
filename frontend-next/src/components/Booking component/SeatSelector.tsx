@@ -14,7 +14,7 @@ import './SeatSelector.css';
 // Match TheaterDesigner colors for consistency
 const SEAT_TYPE_COLORS: Record<string, { bg: string; border: string; label: string }> = {
     standard: { bg: '#6B7280', border: '#94A3B8', label: 'Standard' },
-    vip: { bg: '#F59E0B', border: '#FCD34D', label: 'VIP' },
+    vip: { bg: '#F97316', border: '#FB923C', label: 'VIP' },
     premium: { bg: '#6366F1', border: '#A5B4FC', label: 'Premium' },
     wheelchair: { bg: '#0EA5E9', border: '#7DD3FC', label: 'Wheelchair' }
 };
@@ -263,29 +263,31 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
         );
 
         const typeColors = SEAT_TYPE_COLORS[seat.seatType] || SEAT_TYPE_COLORS.standard;
-        const isPending = seat.isPending && !seat.isBooked && !isHighlighted;
+        // isPending takes priority over isBooked (backend marks pending seats as booked too)
+        const isPending = seat.isPending && !isHighlighted;
+        const isConfirmedBooked = seat.isBooked && !seat.isPending && !isHighlighted;
 
-        // Force inline styles for booked seats to ensure visibility
-        const bookedStyles = (seat.isBooked && !isHighlighted) ? {
-            background: '#2d1f1f',
-            borderColor: '#6b3a3a',
+        // Force inline styles for booked/pending seats to ensure visibility
+        const bookedStyles = isConfirmedBooked ? {
+            background: '#1a1a1a',
+            borderColor: '#ef4444',
             opacity: 0.7,
             cursor: 'not-allowed',
             pointerEvents: 'none' as const,
         } : isPending ? {
-            background: '#3d3520',
+            background: '#78650d',
             borderColor: '#fbbf24',
-            opacity: 0.8,
+            opacity: 0.9,
             cursor: 'not-allowed',
             pointerEvents: 'none' as const,
         } : {};
 
-        const isSeatDisabled = (seat.isBooked && !isHighlighted) || isPending || !seat.isActive || readOnly;
+        const isSeatDisabled = isConfirmedBooked || isPending || !seat.isActive || readOnly;
 
         return (
             <React.Fragment key={seatKey}>
                 <motion.button
-                    className={`seat-btn ${seat.seatType} ${isSelected ? 'selected' : ''} ${isHighlighted ? 'highlighted' : ''} ${seat.isBooked && !isHighlighted ? 'booked' : ''} ${isPending ? 'pending' : ''} ${!seat.isActive ? 'disabled' : ''}`}
+                    className={`seat-btn ${seat.seatType} ${isSelected ? 'selected' : ''} ${isHighlighted ? 'highlighted' : ''} ${isConfirmedBooked ? 'booked' : ''} ${isPending ? 'pending' : ''} ${!seat.isActive ? 'disabled' : ''}`}
                     style={{
                         '--seat-bg': typeColors.bg,
                         '--seat-border': typeColors.border,
@@ -295,12 +297,12 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                     onMouseEnter={() => !readOnly && setHoveredSeat(seat)}
                     onMouseLeave={() => setHoveredSeat(null)}
                     disabled={isSeatDisabled}
-                    whileHover={!seat.isBooked && !isPending && seat.isActive && !readOnly ? { scale: 1.15 } : {}}
-                    whileTap={!seat.isBooked && !isPending && seat.isActive && !readOnly ? { scale: 0.95 } : {}}
+                    whileHover={!isConfirmedBooked && !isPending && seat.isActive && !readOnly ? { scale: 1.15 } : {}}
+                    whileTap={!isConfirmedBooked && !isPending && seat.isActive && !readOnly ? { scale: 0.95 } : {}}
                 >
                     {(isSelected || isHighlighted) ? (
                         <FiCheck className="check-icon" />
-                    ) : seat.isBooked && !isHighlighted ? (
+                    ) : isConfirmedBooked ? (
                         <FiX style={{ color: '#ef4444', fontSize: '1rem' }} />
                     ) : isPending ? (
                         <FiLoader style={{ color: '#fbbf24', fontSize: '0.85rem' }} />
@@ -402,7 +404,8 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                         </div>
                     );
                 })}
-                <div className="legend-item"><div className="legend-color booked" /><span>Booked</span></div>
+                <div className="legend-item"><div className="legend-color booked" style={{ background: '#1a1a1a', borderColor: '#ef4444' }} /><span>Confirmed</span></div>
+                <div className="legend-item"><div className="legend-color" style={{ background: '#78650d', borderColor: '#fbbf24', border: '2px solid #fbbf24' }} /><span>Pending</span></div>
                 <div className="legend-item">
                     <div className={`legend-color ${readOnly ? 'highlighted' : 'selected-legend'}`} />
                     <span>{readOnly ? 'Your Seats' : 'Selected'}</span>

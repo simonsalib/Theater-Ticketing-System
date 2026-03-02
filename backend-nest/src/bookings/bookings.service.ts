@@ -33,6 +33,7 @@ export class BookingsService implements OnModuleInit {
             const expiredBookings = await this.bookingModel.find({
                 status: 'pending',
                 pendingExpiresAt: { $lte: new Date() },
+                isReceiptUploaded: { $ne: true }, // Don't delete if receipt is uploaded
             } as any).exec();
 
             for (const booking of expiredBookings) {
@@ -195,7 +196,13 @@ export class BookingsService implements OnModuleInit {
     async findOne(id: string): Promise<BookingDocument> {
         const booking = await this.bookingModel
             .findById(id)
-            .populate('eventId')
+            .populate({
+                path: 'eventId',
+                populate: {
+                    path: 'organizerId',
+                    select: 'name instapayNumber'
+                }
+            })
             .exec();
         if (!booking) {
             throw new NotFoundException('Booking not found');
@@ -268,6 +275,29 @@ export class BookingsService implements OnModuleInit {
         }
 
         booking.status = status;
+        return booking.save();
+    }
+
+    async uploadReceipt(bookingId: string, userId: string, receiptBase64: string): Promise<BookingDocument> {
+        const booking = await this.bookingModel.findById(bookingId).exec();
+
+        if (!booking) {
+            throw new NotFoundException('Booking not found');
+        }
+
+        if (booking.StandardId.toString() !== userId.toString()) {
+            throw new BadRequestException('You do not have permission to modify this booking');
+        }
+
+        if (booking.status !== 'pending') {
+            throw new BadRequestException('Receipts can only be uploaded for pending bookings');
+        }
+
+        booking.instapayReceipt = receiptBase64;
+        booking.isReceiptUploaded = true;
+        // Remove expiration time so it won't auto-delete
+        booking.pendingExpiresAt = null as any;
+
         return booking.save();
     }
 

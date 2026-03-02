@@ -23,7 +23,9 @@ const CreateUserPage = () => {
         email: '',
         password: '',
         confirmPassword: '',
-        role: 'Organizer'
+        role: 'Organizer',
+        phone: '',
+        instapayNumber: ''
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -63,14 +65,63 @@ const CreateUserPage = () => {
             return;
         }
 
+        // Validate phone
+        if (!formData.phone.trim()) {
+            setError('Phone is required');
+            return;
+        }
+        let corePhone = formData.phone.trim();
+        if (corePhone.startsWith('+20')) corePhone = corePhone.substring(3);
+        else if (corePhone.startsWith('20') && (corePhone.length === 12 || corePhone.length === 13)) corePhone = corePhone.substring(2);
+
+        // If user wrote the number without the leading zero (e.g., 10xxxx), add it back.
+        if (corePhone.length === 10 && !corePhone.startsWith('0')) {
+            corePhone = '0' + corePhone;
+        }
+
+        if (!/^\d{11}$/.test(corePhone)) {
+            setError('Phone number must be exactly 11 digits (e.g., 01xxxxxxxxx)');
+            return;
+        }
+        const formattedPhone = `+20${corePhone}`;
+
+        // Validate InstaPay
+        let formattedInstapay = '';
+        if (formData.role === 'Organizer') {
+            if (!formData.instapayNumber.trim()) {
+                setError('InstaPay number is required for organizers');
+                return;
+            }
+            let coreInsta = formData.instapayNumber.trim();
+            if (coreInsta.startsWith('+20')) coreInsta = coreInsta.substring(3);
+            else if (coreInsta.startsWith('20') && (coreInsta.length === 12 || coreInsta.length === 13)) coreInsta = coreInsta.substring(2);
+
+            // If user wrote the number without the leading zero (e.g., 10xxxx), add it back.
+            if (coreInsta.length === 10 && !coreInsta.startsWith('0')) {
+                coreInsta = '0' + coreInsta;
+            }
+
+            if (!/^\d{11}$/.test(coreInsta)) {
+                setError('InstaPay number must be exactly 11 digits (e.g., 01xxxxxxxxx)');
+                return;
+            }
+            formattedInstapay = `+20${coreInsta}`;
+        }
+
         try {
             setLoading(true);
-            const response = await api.post('/user/create', {
+            const payload: any = {
                 name: formData.name.trim(),
                 email: formData.email.trim(),
                 password: formData.password,
-                role: formData.role
-            });
+                role: formData.role,
+                phone: formattedPhone
+            };
+            if (formData.role === 'Organizer') {
+                payload.instapayNumber = formattedInstapay;
+            }
+
+            const response = await api.post('/user/create', payload);
 
             if (response.data.success) {
                 toast.success(`User "${formData.name}" created successfully as ${formData.role}`);
@@ -180,6 +231,56 @@ const CreateUserPage = () => {
                             }}
                         />
                     </div>
+
+                    {/* Phone Field */}
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
+                            <span style={{ marginRight: '0.5rem' }}>📞</span>
+                            Phone Number *
+                        </label>
+                        <input
+                            type="text"
+                            name="phone"
+                            value={formData.phone}
+                            onChange={handleChange}
+                            placeholder="Enter 11-digit phone number"
+                            style={{
+                                width: '100%',
+                                padding: '0.75rem 1rem',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                color: 'white',
+                                fontSize: '1rem'
+                            }}
+                        />
+                    </div>
+
+                    {/* InstaPay Field (Organizer Only) */}
+                    {formData.role === 'Organizer' && (
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
+                                <span style={{ marginRight: '0.5rem' }}>💳</span>
+                                InstaPay Number *
+                            </label>
+                            <input
+                                type="text"
+                                name="instapayNumber"
+                                value={formData.instapayNumber}
+                                onChange={handleChange}
+                                placeholder="Enter 11-digit InstaPay number"
+                                style={{
+                                    width: '100%',
+                                    padding: '0.75rem 1rem',
+                                    borderRadius: '8px',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    background: 'rgba(255, 255, 255, 0.05)',
+                                    color: 'white',
+                                    fontSize: '1rem'
+                                }}
+                            />
+                        </div>
+                    )}
 
                     {/* Password Field */}
                     <div style={{ marginBottom: '1.5rem' }}>

@@ -17,5 +17,6 @@ export declare class BookingsService implements OnModuleInit {
     delete(id: string): Promise<void>;
     findAllForEvent(eventId: string): Promise<BookingDocument[]>;
     updateBookingStatus(bookingId: string, status: string): Promise<BookingDocument>;
+    uploadReceipt(bookingId: string, userId: string, receiptBase64: string): Promise<BookingDocument>;
     getAvailableSeats(eventId: string): Promise<any>;
 }

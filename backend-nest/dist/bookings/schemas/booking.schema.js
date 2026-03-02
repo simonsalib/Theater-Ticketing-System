@@ -64,6 +64,8 @@ let Booking = class Booking {
     hasTheaterSeating;
     pendingExpiresAt;
     selectedSeats;
+    instapayReceipt;
+    isReceiptUploaded;
 };
 exports.Booking = Booking;
 __decorate([
@@ -101,6 +103,14 @@ __decorate([
     (0, mongoose_1.Prop)({ type: [SelectedSeat] }),
     __metadata("design:type", Array)
 ], Booking.prototype, "selectedSeats", void 0);
+__decorate([
+    (0, mongoose_1.Prop)(),
+    __metadata("design:type", String)
+], Booking.prototype, "instapayReceipt", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: false }),
+    __metadata("design:type", Boolean)
+], Booking.prototype, "isReceiptUploaded", void 0);
 exports.Booking = Booking = __decorate([
     (0, mongoose_1.Schema)({ timestamps: true })
 ], Booking);

@@ -5,7 +5,7 @@ import api from '@/services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     FiArrowLeft, FiCheckCircle, FiXCircle, FiClock,
-    FiUser, FiPhone, FiMail, FiAlertCircle, FiGrid
+    FiUser, FiPhone, FiMail, FiAlertCircle, FiGrid, FiEye, FiX
 } from 'react-icons/fi';
 import { ProtectedRoute } from '@/auth/ProtectedRoute';
 import { toast } from 'react-toastify';
@@ -38,6 +38,8 @@ interface Booking {
     hasTheaterSeating: boolean;
     selectedSeats: BookingSeat[];
     createdAt: string;
+    isReceiptUploaded?: boolean;
+    instapayReceipt?: string;
 }
 
 const EventBookingsPage = () => {
@@ -48,6 +50,10 @@ const EventBookingsPage = () => {
     const [eventTitle, setEventTitle] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+    // Receipt Modal State
+    const [selectedReceipt, setSelectedReceipt] = useState<string | null>(null);
+    const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
 
     useEffect(() => {
         fetchBookings();
@@ -106,6 +112,15 @@ const EventBookingsPage = () => {
             hour: '2-digit',
             minute: '2-digit',
         });
+    };
+
+    const handleViewReceipt = (receiptBase64?: string) => {
+        if (receiptBase64) {
+            setSelectedReceipt(receiptBase64);
+            setIsReceiptModalOpen(true);
+        } else {
+            toast.error('Receipt image not found.');
+        }
     };
 
     const pendingCount = bookings.filter(b => b.status === 'pending').length;
@@ -223,12 +238,32 @@ const EventBookingsPage = () => {
 
                                             {booking.status === 'pending' && (
                                                 <div className="eb-actions">
+                                                    {booking.isReceiptUploaded && (
+                                                        <motion.button
+                                                            className="eb-view-receipt-btn"
+                                                            onClick={() => handleViewReceipt(booking.instapayReceipt)}
+                                                            whileHover={{ scale: 1.03 }}
+                                                            whileTap={{ scale: 0.97 }}
+                                                            style={{
+                                                                background: 'rgba(139, 92, 246, 0.2)',
+                                                                color: '#a78bfa',
+                                                                border: '1px solid rgba(139, 92, 246, 0.4)',
+                                                                display: 'flex', alignItems: 'center', gap: '6px',
+                                                                padding: '6px 12px', borderRadius: '6px',
+                                                                fontSize: '0.85rem'
+                                                            }}
+                                                        >
+                                                            <FiEye /> View Receipt
+                                                        </motion.button>
+                                                    )}
                                                     <motion.button
                                                         className="eb-approve-btn"
                                                         onClick={() => handleStatusUpdate(booking._id, 'confirmed')}
-                                                        disabled={actionLoading === booking._id}
-                                                        whileHover={{ scale: 1.03 }}
-                                                        whileTap={{ scale: 0.97 }}
+                                                        disabled={actionLoading === booking._id || !booking.isReceiptUploaded}
+                                                        whileHover={booking.isReceiptUploaded ? { scale: 1.03 } : {}}
+                                                        whileTap={booking.isReceiptUploaded ? { scale: 0.97 } : {}}
+                                                        title={!booking.isReceiptUploaded ? 'Waiting for user to upload receipt' : 'Approve this booking'}
+                                                        style={{ opacity: !booking.isReceiptUploaded ? 0.4 : 1, cursor: !booking.isReceiptUploaded ? 'not-allowed' : 'pointer' }}
                                                     >
                                                         {actionLoading === booking._id ? '...' : <><FiCheckCircle /> Approve</>}
                                                     </motion.button>
@@ -251,6 +286,50 @@ const EventBookingsPage = () => {
                     )}
                 </motion.div>
             </div>
+
+            {/* Receipt Modal */}
+            <AnimatePresence>
+                {isReceiptModalOpen && selectedReceipt && (
+                    <div className="modal-overlay" onClick={() => setIsReceiptModalOpen(false)} style={{
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.75)', zIndex: 9999,
+                        display: 'flex', justifyContent: 'center', alignItems: 'center'
+                    }}>
+                        <motion.div
+                            className="receipt-modal-content"
+                            onClick={(e) => e.stopPropagation()}
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            style={{
+                                background: '#1e1b4b', padding: '20px', borderRadius: '12px',
+                                maxWidth: '90vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+                                border: '1px solid rgba(139, 92, 246, 0.3)'
+                            }}
+                        >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                                <h3 style={{ color: 'white', margin: 0 }}>InstaPay Receipt</h3>
+                                <button
+                                    onClick={() => setIsReceiptModalOpen(false)}
+                                    style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer' }}
+                                >
+                                    <FiX size={24} />
+                                </button>
+                            </div>
+                            <div style={{
+                                flex: 1, overflow: 'auto', display: 'flex', justifyContent: 'center',
+                                backgroundColor: '#000', borderRadius: '8px'
+                            }}>
+                                <img
+                                    src={selectedReceipt}
+                                    alt="Transaction Receipt"
+                                    style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }}
+                                />
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </ProtectedRoute>
     );
 };

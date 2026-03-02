@@ -52,11 +52,27 @@ export default function RegisterForm() {
             return;
         }
 
+        let corePhone = form.phone.trim();
+        if (corePhone.startsWith('+20')) {
+            corePhone = corePhone.substring(3);
+        } else if (corePhone.startsWith('20') && corePhone.length === 13) {
+            corePhone = corePhone.substring(2);
+        }
+
+        if (!/^\d{11}$/.test(corePhone)) {
+            setError("Phone number must be exactly 11 digits");
+            toast.error("Phone number must be exactly 11 digits");
+            setLoading(false);
+            return;
+        }
+
+        const formattedPhone = `+20${corePhone}`;
+
         try {
             await api.post("/auth/register", {
                 name: form.name,
                 email: form.email,
-                phone: form.phone,
+                phone: formattedPhone,
                 password: form.password,
             });
             toast.success("Verification code sent to your email");

@@ -1,10 +1,11 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import api from '@/services/api';
 import ConfirmationDialog from '../AdminComponent/ConfirmationDialog';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiCalendar, FiMapPin, FiClock, FiTrash2, FiEye, FiAlertCircle, FiCheckCircle } from 'react-icons/fi';
+import { FiCalendar, FiMapPin, FiClock, FiTrash2, FiEye, FiAlertCircle, FiCheckCircle, FiUploadCloud } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import './UserBookingPage.css';
 
@@ -17,6 +18,9 @@ interface Booking {
     status: 'pending' | 'confirmed' | 'cancelled';
     selectedSeats?: { section: string; row: string; seatNumber: number }[];
     createdAt: string;
+    pendingExpiresAt?: string;
+    isReceiptUploaded?: boolean;
+    instapayReceipt?: string;
 }
 
 interface EventData {
@@ -29,6 +33,7 @@ interface EventData {
 }
 
 const UserBookingsPage = () => {
+    const router = useRouter();
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [eventDetails, setEventDetails] = useState<Record<string, EventData>>({});
     const [loading, setLoading] = useState(true);
@@ -37,9 +42,40 @@ const UserBookingsPage = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [cancellationLoading, setCancellationLoading] = useState(false);
 
+    const [timers, setTimers] = useState<Record<string, string>>({});
+
     useEffect(() => {
         fetchBookings();
     }, []);
+
+    useEffect(() => {
+        const updateTimers = () => {
+            const newTimers: Record<string, string> = {};
+            const now = new Date().getTime();
+
+            bookings.forEach(booking => {
+                if (booking.status === 'pending' && booking.pendingExpiresAt) {
+                    const expires = new Date(booking.pendingExpiresAt).getTime();
+                    const distance = expires - now;
+
+                    if (distance > 0) {
+                        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+                        newTimers[booking._id] = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                    } else {
+                        newTimers[booking._id] = 'Expired';
+                        // Optionally update status locally to cancelled
+                        booking.status = 'cancelled';
+                    }
+                }
+            });
+            setTimers(newTimers);
+        };
+
+        updateTimers();
+        const interval = setInterval(updateTimers, 1000);
+        return () => clearInterval(interval);
+    }, [bookings]);
 
     const fetchBookings = async () => {
         try {
@@ -47,7 +83,7 @@ const UserBookingsPage = () => {
             const response = await api.get('/user/bookings');
 
             let bookingsData: Booking[] = [];
-            if (response.data.success) {
+            if (response.data.success !== undefined) {
                 bookingsData = response.data.data;
             } else if (Array.isArray(response.data)) {
                 bookingsData = response.data;
@@ -125,6 +161,10 @@ const UserBookingsPage = () => {
         }
     };
 
+    const handleUploadClick = (bookingId: string) => {
+        router.push(`/bookings/${bookingId}/upload-receipt`);
+    };
+
     const formatDate = (dateString: string) => {
         return new Date(dateString).toLocaleDateString('en-US', {
             weekday: 'short',
@@ -180,16 +220,28 @@ const UserBookingsPage = () => {
                             const event = eventDetails[booking.eventId];
                             const isCancelled = booking.status === 'cancelled' || (booking as any).status === 'Cancelled';
 
+                            const isPending = booking.status === 'pending';
+                            const timeLeft = timers[booking._id];
+
                             return (
                                 <motion.div
                                     key={booking._id}
-                                    className={`booking-card ${isCancelled ? 'cancelled' : ''}`}
+                                    className={`booking-card ${isCancelled ? 'cancelled' : ''} ${isPending ? 'pending' : ''}`}
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: index * 0.05 }}
                                 >
                                     <div className="booking-status-badge">
-                                        {isCancelled ? 'Cancelled' : 'Confirmed'}
+                                        {isCancelled ? 'Cancelled' : isPending ? (
+                                            <>
+                                                Pending
+                                                {timeLeft && timeLeft !== 'Expired' && !booking.isReceiptUploaded && (
+                                                    <span className="booking-timer">
+                                                        <FiClock size={12} /> {timeLeft}
+                                                    </span>
+                                                )}
+                                            </>
+                                        ) : 'Confirmed'}
                                     </div>
 
                                     <div className="booking-card-header">
@@ -244,6 +296,21 @@ const UserBookingsPage = () => {
                                                 <FiTrash2 /> Cancel
                                             </button>
                                         )}
+                                        {isPending && !booking.isReceiptUploaded && (
+                                            <button
+                                                onClick={() => handleUploadClick(booking._id)}
+                                                className="upload-receipt-btn"
+                                                style={{
+                                                    display: 'flex', alignItems: 'center', gap: '6px',
+                                                    padding: '0.5rem 1rem', borderRadius: '8px',
+                                                    background: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa',
+                                                    border: '1px solid rgba(139, 92, 246, 0.4)', cursor: 'pointer',
+                                                    fontSize: '0.85rem', fontWeight: 500, transition: 'all 0.2s'
+                                                }}
+                                            >
+                                                <FiUploadCloud /> Upload Receipt
+                                            </button>
+                                        )}
                                     </div>
                                 </motion.div>
                             );
@@ -265,6 +332,7 @@ const UserBookingsPage = () => {
                 isLoading={cancellationLoading}
                 disabled={cancellationLoading}
             />
+
         </div>
     );
 };

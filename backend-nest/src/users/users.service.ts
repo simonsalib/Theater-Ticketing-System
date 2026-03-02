@@ -78,7 +78,7 @@ export class UsersService {
 
     // Admin-only: Create user with Admin or Organizer role (requires password change on first login)
     async createUserByAdmin(createDto: any): Promise<UserDocument> {
-        const { email, password, name, role } = createDto;
+        const { email, password, name, role, phone, instapayNumber } = createDto;
 
         // Only allow Admin or Organizer roles
         if (role !== UserRole.ADMIN && role !== UserRole.ORGANIZER) {
@@ -92,14 +92,18 @@ export class UsersService {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        const newUser = new this.userModel({
+        const newUserPayload: any = {
             name,
             email,
             password: hashedPassword,
             role: role,
             isVerified: false, // Requires OTP verification
             requiresPasswordChange: true, // Must set own password on first login
-        });
+        };
+        if (phone) newUserPayload.phone = phone;
+        if (instapayNumber) newUserPayload.instapayNumber = instapayNumber;
+
+        const newUser = new this.userModel(newUserPayload);
 
         return newUser.save();
     }

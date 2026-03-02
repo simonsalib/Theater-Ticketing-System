@@ -59,6 +59,21 @@ export class BookingsController {
         return { success: true, data };
     }
 
+    // User: upload receipt for a pending booking
+    @Post(':id/receipt')
+    @UseGuards(JwtAuthGuard)
+    async uploadReceipt(
+        @Param('id') id: string,
+        @Body('receiptBase64') receiptBase64: string,
+        @Req() req: any
+    ) {
+        if (!receiptBase64) {
+            return { success: false, message: 'Receipt image is required' };
+        }
+        const data = await this.bookingsService.uploadReceipt(id, req.user._id, receiptBase64);
+        return { success: true, data };
+    }
+
     // Organizer: get all bookings for their event
     @Get('event/:eventId/bookings')
     @UseGuards(JwtAuthGuard)

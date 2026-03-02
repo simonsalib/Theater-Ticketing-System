@@ -70,9 +70,42 @@ const UpdateProfilePageContent = () => {
         e.preventDefault();
         setError('');
 
+        let corePhone = formData.phone.trim();
+        if (corePhone.startsWith('+20')) {
+            corePhone = corePhone.substring(3);
+        } else if (corePhone.startsWith('20') && corePhone.length === 13) {
+            corePhone = corePhone.substring(2);
+        }
+
+        if (corePhone && !/^\d{11}$/.test(corePhone)) {
+            const msg = "Phone number must be exactly 11 digits";
+            setError(msg);
+            toast.error(msg);
+            return;
+        }
+
+        const submissionData = { ...formData };
+        if (corePhone) submissionData.phone = `+20${corePhone}`;
+
+        if (user?.role === 'Organizer' && formData.instapayNumber) {
+            let coreInsta = formData.instapayNumber.trim();
+            if (coreInsta.startsWith('+20')) {
+                coreInsta = coreInsta.substring(3);
+            } else if (coreInsta.startsWith('20') && coreInsta.length === 13) {
+                coreInsta = coreInsta.substring(2);
+            }
+            if (!/^\d{11}$/.test(coreInsta)) {
+                const msg = "InstaPay number must be exactly 11 digits";
+                setError(msg);
+                toast.error(msg);
+                return;
+            }
+            submissionData.instapayNumber = `+20${coreInsta}`;
+        }
+
         try {
             setIsLoading(true);
-            const response = await api.put('/user/profile', formData);
+            const response = await api.put('/user/profile', submissionData);
 
             const updatedData = response.data.success ? response.data.data : response.data;
 

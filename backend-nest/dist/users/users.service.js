@@ -114,7 +114,7 @@ let UsersService = class UsersService {
         return await user.save();
     }
     async createUserByAdmin(createDto) {
-        const { email, password, name, role } = createDto;
+        const { email, password, name, role, phone, instapayNumber } = createDto;
         if (role !== user_schema_1.UserRole.ADMIN && role !== user_schema_1.UserRole.ORGANIZER) {
             throw new common_1.BadRequestException('Admin can only create Admin or Organizer accounts');
         }
@@ -123,14 +123,19 @@ let UsersService = class UsersService {
             throw new common_1.ConflictException('User with this email already exists');
         }
         const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = new this.userModel({
+        const newUserPayload = {
             name,
             email,
             password: hashedPassword,
             role: role,
             isVerified: false,
             requiresPasswordChange: true,
-        });
+        };
+        if (phone)
+            newUserPayload.phone = phone;
+        if (instapayNumber)
+            newUserPayload.instapayNumber = instapayNumber;
+        const newUser = new this.userModel(newUserPayload);
         return newUser.save();
     }
 };

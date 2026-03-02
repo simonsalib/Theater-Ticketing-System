@@ -60,6 +60,12 @@ export class Booking {
 
     @Prop({ type: [SelectedSeat] })
     selectedSeats: SelectedSeat[];
+
+    @Prop()
+    instapayReceipt: string;
+
+    @Prop({ default: false })
+    isReceiptUploaded: boolean;
 }
 
 export const BookingSchema = SchemaFactory.createForClass(Booking);

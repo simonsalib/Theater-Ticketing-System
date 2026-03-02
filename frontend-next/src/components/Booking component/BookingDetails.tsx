@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import api from '@/services/api';
 import ConfirmationDialog from '@/components/AdminComponent/ConfirmationDialog';
+import { FiCheckCircle, FiUploadCloud } from 'react-icons/fi';
 import './BookingDetails.css';
 
 interface Seat {
@@ -24,6 +25,8 @@ interface Booking {
     createdAt?: string;
     hasTheaterSeating?: boolean;
     selectedSeats?: Seat[];
+    isReceiptUploaded?: boolean;
+    instapayReceipt?: string;
 }
 
 interface Event {
@@ -58,14 +61,23 @@ const BookingDetails = ({ id }: BookingDetailsProps) => {
             const response = await api.get(`/booking/${id}`);
 
             if (response.data) {
-                setBooking(response.data);
+                const bData = response.data.success !== undefined ? response.data.data : response.data;
+                setBooking(bData);
 
-                if (response.data.eventId) {
+                let eventIdStr = null;
+                if (bData.eventId && typeof bData.eventId === 'object') {
+                    eventIdStr = bData.eventId._id || bData.eventId.id;
+                    setEvent(bData.eventId);
+                } else if (bData.eventId) {
+                    eventIdStr = bData.eventId;
+                }
+
+                if (eventIdStr && !bData.eventId?._id) {
                     try {
-                        const eventResponse = await api.get(`/event/${response.data.eventId}`);
-
-                        if (eventResponse.data.success && eventResponse.data.data) {
-                            setEvent(eventResponse.data.data);
+                        const eventResponse = await api.get(`/event/${eventIdStr}`);
+                        const eData = eventResponse.data.success ? eventResponse.data.data : eventResponse.data;
+                        if (eData) {
+                            setEvent(eData);
                         }
                     } catch (eventErr) {
                         console.error("Error fetching event details:", eventErr);
@@ -130,9 +142,25 @@ const BookingDetails = ({ id }: BookingDetailsProps) => {
             <div className="booking-details-card">
                 <div className="booking-header">
                     <h2>Event & Booking Details</h2>
-                    <span className={`booking-status ${booking.status?.toLowerCase() || 'confirmed'}`}>
-                        {booking.status || 'Confirmed'}
-                    </span>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        {booking.status === 'pending' && booking.isReceiptUploaded && (
+                            <span style={{
+                                color: '#10b981',
+                                background: 'rgba(16, 185, 129, 0.1)',
+                                padding: '4px 10px',
+                                borderRadius: '12px',
+                                fontSize: '0.85rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                            }}>
+                                <FiCheckCircle size={14} /> Pending Organizer Approval
+                            </span>
+                        )}
+                        <span className={`booking-status ${booking.status?.toLowerCase() || 'confirmed'}`}>
+                            {booking.status || 'Confirmed'}
+                        </span>
+                    </div>
                 </div>
 
                 <div className="event-details-content">
@@ -181,6 +209,10 @@ const BookingDetails = ({ id }: BookingDetailsProps) => {
                             <span className="info-value">{bookingDate}</span>
                         </div>
                         <div className="info-item">
+                            <span className="info-label">Status:</span>
+                            <span className="info-value" style={{ textTransform: 'capitalize' }}>{booking.status}</span>
+                        </div>
+                        <div className="info-item">
                             <span className="info-label">Number of Tickets:</span>
                             <span className="info-value">{booking.numberOfTickets || booking.quantity}</span>
                         </div>
@@ -216,44 +248,55 @@ const BookingDetails = ({ id }: BookingDetailsProps) => {
                                 flexWrap: 'wrap',
                                 gap: '8px'
                             }}>
-                                {booking.selectedSeats.map((seat, index) => (
-                                    <div
-                                        key={index}
-                                        style={{
-                                            padding: '8px 14px',
-                                            background: seat.seatType === 'vip'
-                                                ? 'rgba(245, 158, 11, 0.2)'
-                                                : seat.seatType === 'premium'
-                                                    ? 'rgba(139, 92, 246, 0.2)'
-                                                    : 'rgba(107, 114, 128, 0.2)',
-                                            border: `1px solid ${seat.seatType === 'vip'
-                                                ? 'rgba(245, 158, 11, 0.4)'
-                                                : seat.seatType === 'premium'
-                                                    ? 'rgba(139, 92, 246, 0.4)'
-                                                    : 'rgba(107, 114, 128, 0.4)'
-                                                }`,
-                                            borderRadius: '8px',
-                                            color: '#f8fafc'
-                                        }}
-                                    >
-                                        <strong>{seat.row}{seat.seatNumber}</strong>
-                                        <span style={{
-                                            marginLeft: '8px',
-                                            fontSize: '0.8rem',
-                                            opacity: 0.8,
-                                            textTransform: 'capitalize'
-                                        }}>
-                                            {seat.seatType}
-                                        </span>
-                                        <span style={{
-                                            marginLeft: '8px',
-                                            color: '#22d3ee',
-                                            fontWeight: 600
-                                        }}>
-                                            ${seat.price?.toFixed(2)}
-                                        </span>
-                                    </div>
-                                ))}
+                                {booking.selectedSeats.map((seat, index) => {
+                                    const isPendingBooking = booking.status === 'pending';
+                                    const chipBg = isPendingBooking
+                                        ? 'rgba(251, 191, 36, 0.2)'
+                                        : seat.seatType === 'vip'
+                                            ? 'rgba(249, 115, 22, 0.2)'
+                                            : seat.seatType === 'premium'
+                                                ? 'rgba(139, 92, 246, 0.2)'
+                                                : 'rgba(107, 114, 128, 0.2)';
+                                    const chipBorder = isPendingBooking
+                                        ? 'rgba(251, 191, 36, 0.5)'
+                                        : seat.seatType === 'vip'
+                                            ? 'rgba(249, 115, 22, 0.5)'
+                                            : seat.seatType === 'premium'
+                                                ? 'rgba(139, 92, 246, 0.4)'
+                                                : 'rgba(107, 114, 128, 0.4)';
+                                    const chipTextColor = isPendingBooking
+                                        ? '#fbbf24'
+                                        : '#f8fafc';
+                                    return (
+                                        <div
+                                            key={index}
+                                            style={{
+                                                padding: '8px 14px',
+                                                background: chipBg,
+                                                border: `1px solid ${chipBorder}`,
+                                                borderRadius: '8px',
+                                                color: chipTextColor
+                                            }}
+                                        >
+                                            <strong>{seat.row}{seat.seatNumber}</strong>
+                                            <span style={{
+                                                marginLeft: '8px',
+                                                fontSize: '0.8rem',
+                                                opacity: 0.8,
+                                                textTransform: 'capitalize'
+                                            }}>
+                                                {seat.seatType}
+                                            </span>
+                                            <span style={{
+                                                marginLeft: '8px',
+                                                color: '#22d3ee',
+                                                fontWeight: 600
+                                            }}>
+                                                ${seat.price?.toFixed(2)}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
@@ -271,6 +314,21 @@ const BookingDetails = ({ id }: BookingDetailsProps) => {
                         >
                             Cancel Booking
                         </button>
+                    )}
+                    {booking.status === 'pending' && !booking.isReceiptUploaded && (
+                        <Link
+                            href={`/bookings/${booking._id}/upload-receipt`}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: '6px',
+                                padding: '0.75rem 1.5rem', borderRadius: '8px',
+                                background: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa',
+                                border: '1px solid rgba(139, 92, 246, 0.4)', cursor: 'pointer',
+                                fontSize: '0.9rem', fontWeight: 500, transition: 'all 0.2s', width: 'fit-content',
+                                textDecoration: 'none'
+                            }}
+                        >
+                            <FiUploadCloud /> Upload Receipt
+                        </Link>
                     )}
                 </div>
             </div>

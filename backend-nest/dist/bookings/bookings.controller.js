@@ -45,6 +45,13 @@ let BookingsController = class BookingsController {
         const data = await this.bookingsService.getAvailableSeats(eventId);
         return { success: true, data };
     }
+    async uploadReceipt(id, receiptBase64, req) {
+        if (!receiptBase64) {
+            return { success: false, message: 'Receipt image is required' };
+        }
+        const data = await this.bookingsService.uploadReceipt(id, req.user._id, receiptBase64);
+        return { success: true, data };
+    }
     async getEventBookings(eventId) {
         const data = await this.bookingsService.findAllForEvent(eventId);
         return { success: true, count: data.length, data };
@@ -102,6 +109,16 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], BookingsController.prototype, "getEventSeats", null);
+__decorate([
+    (0, common_1.Post)(':id/receipt'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)('receiptBase64')),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, Object]),
+    __metadata("design:returntype", Promise)
+], BookingsController.prototype, "uploadReceipt", null);
 __decorate([
     (0, common_1.Get)('event/:eventId/bookings'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),

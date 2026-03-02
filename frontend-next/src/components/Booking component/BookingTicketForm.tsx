@@ -152,8 +152,16 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
                     setError(`Please enter name for seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber}`);
                     return;
                 }
-                if (!attendeeInfo[i].attendeePhone.trim()) {
-                    setError(`Please enter phone for seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber}`);
+
+                let corePhone = attendeeInfo[i].attendeePhone.trim();
+                if (corePhone.startsWith('+20')) {
+                    corePhone = corePhone.substring(3);
+                } else if (corePhone.startsWith('20') && corePhone.length === 13) {
+                    corePhone = corePhone.substring(2);
+                }
+
+                if (!/^\d{11}$/.test(corePhone)) {
+                    setError(`Phone number for seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber} must be exactly 11 digits`);
                     return;
                 }
             }
@@ -169,13 +177,19 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
             };
 
             if (selectedEvent.hasTheaterSeating) {
-                payload.selectedSeats = selectedSeats.map((seat, index) => ({
-                    row: seat.row,
-                    seatNumber: seat.seatNumber,
-                    section: seat.section,
-                    attendeeName: attendeeInfo[index]?.attendeeName || '',
-                    attendeePhone: attendeeInfo[index]?.attendeePhone || '',
-                }));
+                payload.selectedSeats = selectedSeats.map((seat, index) => {
+                    let corePhone = attendeeInfo[index]?.attendeePhone.trim() || '';
+                    if (corePhone.startsWith('+20')) corePhone = corePhone.substring(3);
+                    else if (corePhone.startsWith('20') && corePhone.length === 13) corePhone = corePhone.substring(2);
+
+                    return {
+                        row: seat.row,
+                        seatNumber: seat.seatNumber,
+                        section: seat.section,
+                        attendeeName: attendeeInfo[index]?.attendeeName || '',
+                        attendeePhone: `+20${corePhone}`,
+                    };
+                });
             } else {
                 payload.numberOfTickets = numberOfTickets;
             }

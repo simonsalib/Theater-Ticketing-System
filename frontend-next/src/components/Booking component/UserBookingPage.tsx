@@ -15,6 +15,7 @@ interface Booking {
     totalPrice?: number;
     status?: string;
     createdAt?: string;
+    pendingExpiresAt?: string;
 }
 
 interface EventDetails {
@@ -34,9 +35,40 @@ const UserBookingsPage = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
     const [cancellationLoading, setCancellationLoading] = useState<boolean>(false);
 
+    const [timers, setTimers] = useState<Record<string, string>>({});
+
     useEffect(() => {
         fetchBookings();
     }, []);
+
+    useEffect(() => {
+        const updateTimers = () => {
+            const newTimers: Record<string, string> = {};
+            const now = new Date().getTime();
+
+            bookings.forEach(booking => {
+                if (booking.status === 'pending' && booking.pendingExpiresAt) {
+                    const expires = new Date(booking.pendingExpiresAt).getTime();
+                    const distance = expires - now;
+
+                    if (distance > 0) {
+                        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+                        newTimers[booking._id] = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                    } else {
+                        newTimers[booking._id] = 'Expired';
+                        // Optionally update status locally to cancelled
+                        booking.status = 'cancelled';
+                    }
+                }
+            });
+            setTimers(newTimers);
+        };
+
+        updateTimers();
+        const interval = setInterval(updateTimers, 1000);
+        return () => clearInterval(interval);
+    }, [bookings]);
 
     const fetchBookings = async () => {
         try {
@@ -44,7 +76,9 @@ const UserBookingsPage = () => {
             const response = await api.get('/user/bookings');
 
             let bookingsData: Booking[] = [];
-            if (response.data && Array.isArray(response.data)) {
+            if (response.data && response.data.success !== undefined) {
+                bookingsData = response.data.data;
+            } else if (response.data && Array.isArray(response.data)) {
                 bookingsData = response.data;
             } else if (response.data && response.data.userId && Array.isArray(response.data.userId)) {
                 bookingsData = response.data.userId;
@@ -137,8 +171,13 @@ const UserBookingsPage = () => {
                                     <div className="booking-details">
                                         <p>Tickets: <strong>{booking.quantity || booking.numberOfTickets}</strong></p>
                                         <p>Total: <strong>${booking.totalPrice?.toFixed(2) || ((booking.quantity || 0) * (event?.ticketPrice || 0)).toFixed(2) || 'N/A'}</strong></p>
-                                        <p>Status: <span className={`status ${(booking.status || 'confirmed').toLowerCase()}`}>
+                                        <p>Status: <span className={`status ${(booking.status || 'confirmed').toLowerCase()}`} style={{ textTransform: 'capitalize' }}>
                                             {booking.status || 'Confirmed'}
+                                            {(booking.status === 'pending' || booking.status === 'Pending') && timers[booking._id] && timers[booking._id] !== 'Expired' && (
+                                                <span className="booking-timer" style={{ display: 'inline-block', marginLeft: '8px', fontSize: '0.9em', color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>
+                                                    ⏱️ {timers[booking._id]}
+                                                </span>
+                                            )}
                                         </span></p>
                                     </div>
 

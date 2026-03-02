@@ -27,6 +27,15 @@ export declare class BookingsController {
         success: boolean;
         data: any;
     }>;
+    uploadReceipt(id: string, receiptBase64: string, req: any): Promise<{
+        success: boolean;
+        message: string;
+        data?: undefined;
+    } | {
+        success: boolean;
+        data: import("./schemas/booking.schema").BookingDocument;
+        message?: undefined;
+    }>;
     getEventBookings(eventId: string): Promise<{
         success: boolean;
         count: number;

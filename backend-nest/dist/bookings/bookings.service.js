@@ -39,6 +39,7 @@ let BookingsService = BookingsService_1 = class BookingsService {
             const expiredBookings = await this.bookingModel.find({
                 status: 'pending',
                 pendingExpiresAt: { $lte: new Date() },
+                isReceiptUploaded: { $ne: true },
             }).exec();
             for (const booking of expiredBookings) {
                 if (booking.hasTheaterSeating && booking.selectedSeats?.length > 0) {
@@ -161,7 +162,13 @@ let BookingsService = BookingsService_1 = class BookingsService {
     async findOne(id) {
         const booking = await this.bookingModel
             .findById(id)
-            .populate('eventId')
+            .populate({
+            path: 'eventId',
+            populate: {
+                path: 'organizerId',
+                select: 'name instapayNumber'
+            }
+        })
             .exec();
         if (!booking) {
             throw new common_1.NotFoundException('Booking not found');
@@ -222,6 +229,22 @@ let BookingsService = BookingsService_1 = class BookingsService {
             booking.pendingExpiresAt = null;
         }
         booking.status = status;
+        return booking.save();
+    }
+    async uploadReceipt(bookingId, userId, receiptBase64) {
+        const booking = await this.bookingModel.findById(bookingId).exec();
+        if (!booking) {
+            throw new common_1.NotFoundException('Booking not found');
+        }
+        if (booking.StandardId.toString() !== userId.toString()) {
+            throw new common_1.BadRequestException('You do not have permission to modify this booking');
+        }
+        if (booking.status !== 'pending') {
+            throw new common_1.BadRequestException('Receipts can only be uploaded for pending bookings');
+        }
+        booking.instapayReceipt = receiptBase64;
+        booking.isReceiptUploaded = true;
+        booking.pendingExpiresAt = null;
         return booking.save();
     }
     async getAvailableSeats(eventId) {

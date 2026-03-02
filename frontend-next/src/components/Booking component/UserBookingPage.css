@@ -192,6 +192,23 @@
     color: #ef4444;
 }
 
+.booking-card.pending .booking-status-badge {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+}
+
+.booking-timer {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.8rem;
+    color: #f59e0b;
+    margin-left: 8px;
+    background: rgba(245, 158, 11, 0.1);
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+
 .booking-card-header {
     padding: 2rem 1.5rem 1rem;
 }
