@@ -23,13 +23,19 @@ export declare class Booking {
     instapayReceipt: string;
     isReceiptUploaded: boolean;
 }
-export declare const BookingSchema: MongooseSchema<Booking, import("mongoose").Model<Booking, any, any, any, Document<unknown, any, Booking, any, import("mongoose").DefaultSchemaOptions> & Booking & {
+export declare const BookingSchema: MongooseSchema<Booking, import("mongoose").Model<Booking, any, any, any, (Document<unknown, any, Booking, any, import("mongoose").DefaultSchemaOptions> & Booking & {
     _id: import("mongoose").Types.ObjectId;
 } & {
     __v: number;
-}, any, Booking>, {}, {}, {}, {}, import("mongoose").DefaultSchemaOptions, Booking, Document<unknown, {}, Booking, {
+} & {
     id: string;
-}, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Booking & {
+}) | (Document<unknown, any, Booking, any, import("mongoose").DefaultSchemaOptions> & Booking & {
+    _id: import("mongoose").Types.ObjectId;
+} & {
+    __v: number;
+}), any, Booking>, {}, {}, {}, {}, import("mongoose").DefaultSchemaOptions, Booking, Document<unknown, {}, Booking, {
+    id: string;
+}, import("mongoose").DefaultSchemaOptions> & Omit<Booking & {
     _id: import("mongoose").Types.ObjectId;
 } & {
     __v: number;
@@ -38,7 +44,7 @@ export declare const BookingSchema: MongooseSchema<Booking, import("mongoose").M
 }, {
     StandardId?: import("mongoose").SchemaDefinitionProperty<User | MongooseSchema.Types.ObjectId, Booking, Document<unknown, {}, Booking, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Booking & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Booking & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -47,7 +53,7 @@ export declare const BookingSchema: MongooseSchema<Booking, import("mongoose").M
     }> | undefined;
     eventId?: import("mongoose").SchemaDefinitionProperty<MongooseSchema.Types.ObjectId | Event, Booking, Document<unknown, {}, Booking, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Booking & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Booking & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -56,7 +62,7 @@ export declare const BookingSchema: MongooseSchema<Booking, import("mongoose").M
     }> | undefined;
     numberOfTickets?: import("mongoose").SchemaDefinitionProperty<number, Booking, Document<unknown, {}, Booking, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Booking & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Booking & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -65,7 +71,7 @@ export declare const BookingSchema: MongooseSchema<Booking, import("mongoose").M
     }> | undefined;
     totalPrice?: import("mongoose").SchemaDefinitionProperty<number, Booking, Document<unknown, {}, Booking, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Booking & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Booking & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -74,7 +80,7 @@ export declare const BookingSchema: MongooseSchema<Booking, import("mongoose").M
     }> | undefined;
     status?: import("mongoose").SchemaDefinitionProperty<string, Booking, Document<unknown, {}, Booking, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Booking & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Booking & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -83,7 +89,7 @@ export declare const BookingSchema: MongooseSchema<Booking, import("mongoose").M
     }> | undefined;
     hasTheaterSeating?: import("mongoose").SchemaDefinitionProperty<boolean, Booking, Document<unknown, {}, Booking, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Booking & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Booking & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -92,7 +98,7 @@ export declare const BookingSchema: MongooseSchema<Booking, import("mongoose").M
     }> | undefined;
     pendingExpiresAt?: import("mongoose").SchemaDefinitionProperty<Date, Booking, Document<unknown, {}, Booking, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Booking & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Booking & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -101,7 +107,7 @@ export declare const BookingSchema: MongooseSchema<Booking, import("mongoose").M
     }> | undefined;
     selectedSeats?: import("mongoose").SchemaDefinitionProperty<SelectedSeat[], Booking, Document<unknown, {}, Booking, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Booking & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Booking & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -110,7 +116,7 @@ export declare const BookingSchema: MongooseSchema<Booking, import("mongoose").M
     }> | undefined;
     instapayReceipt?: import("mongoose").SchemaDefinitionProperty<string, Booking, Document<unknown, {}, Booking, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Booking & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Booking & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -119,7 +125,7 @@ export declare const BookingSchema: MongooseSchema<Booking, import("mongoose").M
     }> | undefined;
     isReceiptUploaded?: import("mongoose").SchemaDefinitionProperty<boolean, Booking, Document<unknown, {}, Booking, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Booking & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Booking & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;

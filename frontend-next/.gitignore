@@ -32,7 +32,7 @@ yarn-error.log*
 
 # env files (now tracked)
 # .env*
-
+.env
 # vercel
 .vercel
 
