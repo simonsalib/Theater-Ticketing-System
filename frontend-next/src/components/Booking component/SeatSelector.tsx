@@ -400,7 +400,7 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                         <div key={type} className="legend-item">
                             <div className="legend-color" style={{ background: colors.bg }} />
                             <span>{colors.label}</span>
-                            {pricing && <span className="legend-price">${pricing.price}</span>}
+                            {pricing && <span className="legend-price">{pricing.price} EGP</span>}
                         </div>
                     );
                 })}
@@ -496,7 +496,7 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                     <motion.div className="seat-tooltip" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                         <strong>{hoveredSeat.row}{hoveredSeat.seatNumber}</strong>
                         <span className="tooltip-type">{SEAT_TYPE_COLORS[hoveredSeat.seatType]?.label}</span>
-                        <span className="tooltip-price">${hoveredSeat.price}</span>
+                        <span className="tooltip-price">{hoveredSeat.price} EGP</span>
                     </motion.div>
                 )}
             </AnimatePresence>

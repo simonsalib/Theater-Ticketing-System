@@ -6,7 +6,7 @@ import api from '@/services/api';
 import { ProtectedRoute } from '@/auth/ProtectedRoute';
 import { toast } from 'react-toastify';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiUser, FiMail, FiCamera, FiCheck, FiX, FiArrowLeft, FiDollarSign, FiPhone } from 'react-icons/fi';
+import { FiUser, FiMail, FiCamera, FiCheck, FiX, FiArrowLeft, FiDollarSign, FiPhone, FiImage } from 'react-icons/fi';
 import '@/components/UserComponent/UpdateProfilePage.css';
 
 const UpdateProfilePageContent = () => {
@@ -18,29 +18,59 @@ const UpdateProfilePageContent = () => {
         email: '',
         phone: '',
         profilePicture: '',
-        instapayNumber: ''
+        instapayNumber: '',
+        instapayQR: ''
     });
 
     const [profileImage, setProfileImage] = useState<string | null>(null);
+    const [instapayQRImage, setInstapayQRImage] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
+    const [profilePictureChanged, setProfilePictureChanged] = useState(false);
+    const [instapayQRChanged, setInstapayQRChanged] = useState(false);
 
-    // Initialize form with current user data
+    // Fetch fresh user data from API to ensure instapayQR and all fields are loaded
     useEffect(() => {
-        if (user) {
-            setFormData({
-                name: user.name || '',
-                email: user.email || '',
-                phone: (user as any).phone || '',
-                profilePicture: user.profilePicture || '',
-                instapayNumber: (user as any).instapayNumber || ''
-            });
-
-            if (user.profilePicture) {
-                setProfileImage(user.profilePicture);
+        const fetchFreshProfile = async () => {
+            try {
+                const res = await api.get('/user/profile');
+                const freshUser = res.data.success ? res.data.data : res.data;
+                setFormData({
+                    name: freshUser.name || '',
+                    email: freshUser.email || '',
+                    phone: freshUser.phone || '',
+                    profilePicture: freshUser.profilePicture || '',
+                    instapayNumber: freshUser.instapayNumber || '',
+                    instapayQR: freshUser.instapayQR || ''
+                });
+                if (freshUser.profilePicture) {
+                    setProfileImage(freshUser.profilePicture);
+                }
+                if (freshUser.instapayQR) {
+                    setInstapayQRImage(freshUser.instapayQR);
+                }
+            } catch {
+                // Fallback to auth context user if API fails
+                if (user) {
+                    setFormData({
+                        name: user.name || '',
+                        email: user.email || '',
+                        phone: user.phone || '',
+                        profilePicture: user.profilePicture || '',
+                        instapayNumber: user.instapayNumber || '',
+                        instapayQR: user.instapayQR || ''
+                    });
+                    if (user.profilePicture) {
+                        setProfileImage(user.profilePicture);
+                    }
+                    if (user.instapayQR) {
+                        setInstapayQRImage(user.instapayQR);
+                    }
+                }
             }
-        }
-    }, [user]);
+        };
+        fetchFreshProfile();
+    }, []);
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -49,9 +79,31 @@ const UpdateProfilePageContent = () => {
             reader.onloadend = () => {
                 const result = reader.result as string;
                 setProfileImage(result);
+                setProfilePictureChanged(true);
                 setFormData(prev => ({
                     ...prev,
                     profilePicture: result
+                }));
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleInstapayQRUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (file.size > 5 * 1024 * 1024) {
+                toast.error('QR image must be under 5MB');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const result = reader.result as string;
+                setInstapayQRImage(result);
+                setInstapayQRChanged(true);
+                setFormData(prev => ({
+                    ...prev,
+                    instapayQR: result
                 }));
             };
             reader.readAsDataURL(file);
@@ -70,37 +122,36 @@ const UpdateProfilePageContent = () => {
         e.preventDefault();
         setError('');
 
-        let corePhone = formData.phone.trim();
-        if (corePhone.startsWith('+20')) {
-            corePhone = corePhone.substring(3);
-        } else if (corePhone.startsWith('20') && corePhone.length === 13) {
-            corePhone = corePhone.substring(2);
-        }
-
-        if (corePhone && !/^\d{11}$/.test(corePhone)) {
+        const phone = formData.phone.trim();
+        if (phone && !/^\d{11}$/.test(phone)) {
             const msg = "Phone number must be exactly 11 digits";
             setError(msg);
             toast.error(msg);
             return;
         }
 
-        const submissionData = { ...formData };
-        if (corePhone) submissionData.phone = `+20${corePhone}`;
+        // Only include text fields + changed images to avoid sending huge base64 on every save
+        const submissionData: any = {
+            name: formData.name,
+            email: formData.email,
+            phone: phone,
+        };
+        if (profilePictureChanged) {
+            submissionData.profilePicture = formData.profilePicture;
+        }
+        if (instapayQRChanged) {
+            submissionData.instapayQR = formData.instapayQR;
+        }
 
         if (user?.role === 'Organizer' && formData.instapayNumber) {
-            let coreInsta = formData.instapayNumber.trim();
-            if (coreInsta.startsWith('+20')) {
-                coreInsta = coreInsta.substring(3);
-            } else if (coreInsta.startsWith('20') && coreInsta.length === 13) {
-                coreInsta = coreInsta.substring(2);
-            }
-            if (!/^\d{11}$/.test(coreInsta)) {
+            const instapay = formData.instapayNumber.trim();
+            if (!/^\d{11}$/.test(instapay)) {
                 const msg = "InstaPay number must be exactly 11 digits";
                 setError(msg);
                 toast.error(msg);
                 return;
             }
-            submissionData.instapayNumber = `+20${coreInsta}`;
+            submissionData.instapayNumber = instapay;
         }
 
         try {
@@ -280,6 +331,7 @@ const UpdateProfilePageContent = () => {
                         </motion.div>
 
                         {user?.role === 'Organizer' && (
+                            <>
                             <motion.div
                                 className="form-group"
                                 initial={{ opacity: 0, x: -10 }}
@@ -303,6 +355,51 @@ const UpdateProfilePageContent = () => {
                                     <div className="focus-border"></div>
                                 </div>
                             </motion.div>
+
+                            <motion.div
+                                className="form-group"
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: 0.45 }}
+                            >
+                                <label>
+                                    <FiImage className="label-icon" />
+                                    InstaPay QR Code
+                                </label>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    {instapayQRImage && (
+                                        <div style={{ position: 'relative', width: 'fit-content' }}>
+                                            <img
+                                                src={instapayQRImage}
+                                                alt="InstaPay QR"
+                                                style={{ width: '160px', height: '160px', objectFit: 'contain', borderRadius: '10px', border: '2px solid var(--border-color, rgba(255,255,255,0.1))', background: '#fff' }}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => { setInstapayQRImage(null); setInstapayQRChanged(true); setFormData(prev => ({ ...prev, instapayQR: '' })); }}
+                                                style={{ position: 'absolute', top: '-8px', right: '-8px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}
+                                            >
+                                                <FiX size={14} />
+                                            </button>
+                                        </div>
+                                    )}
+                                    <label
+                                        htmlFor="instapay-qr-upload"
+                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 18px', background: 'rgba(139, 92, 246, 0.15)', color: '#a78bfa', border: '1px dashed rgba(139,92,246,0.4)', borderRadius: '10px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 500, width: 'fit-content', transition: 'all 0.2s' }}
+                                    >
+                                        <FiImage size={18} />
+                                        {instapayQRImage ? 'Change QR Image' : 'Upload QR Image'}
+                                    </label>
+                                    <input
+                                        id="instapay-qr-upload"
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleInstapayQRUpload}
+                                        style={{ display: 'none' }}
+                                    />
+                                </div>
+                            </motion.div>
+                            </>
                         )}
                     </div>
 

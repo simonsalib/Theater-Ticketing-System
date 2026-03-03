@@ -153,14 +153,8 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
                     return;
                 }
 
-                let corePhone = attendeeInfo[i].attendeePhone.trim();
-                if (corePhone.startsWith('+20')) {
-                    corePhone = corePhone.substring(3);
-                } else if (corePhone.startsWith('20') && corePhone.length === 13) {
-                    corePhone = corePhone.substring(2);
-                }
-
-                if (!/^\d{11}$/.test(corePhone)) {
+                const phone = attendeeInfo[i].attendeePhone.trim();
+                if (!/^\d{11}$/.test(phone)) {
                     setError(`Phone number for seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber} must be exactly 11 digits`);
                     return;
                 }
@@ -177,19 +171,13 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
             };
 
             if (selectedEvent.hasTheaterSeating) {
-                payload.selectedSeats = selectedSeats.map((seat, index) => {
-                    let corePhone = attendeeInfo[index]?.attendeePhone.trim() || '';
-                    if (corePhone.startsWith('+20')) corePhone = corePhone.substring(3);
-                    else if (corePhone.startsWith('20') && corePhone.length === 13) corePhone = corePhone.substring(2);
-
-                    return {
-                        row: seat.row,
-                        seatNumber: seat.seatNumber,
-                        section: seat.section,
-                        attendeeName: attendeeInfo[index]?.attendeeName || '',
-                        attendeePhone: `+20${corePhone}`,
-                    };
-                });
+                payload.selectedSeats = selectedSeats.map((seat, index) => ({
+                    row: seat.row,
+                    seatNumber: seat.seatNumber,
+                    section: seat.section,
+                    attendeeName: attendeeInfo[index]?.attendeeName || '',
+                    attendeePhone: attendeeInfo[index]?.attendeePhone.trim() || '',
+                }));
             } else {
                 payload.numberOfTickets = numberOfTickets;
             }
@@ -300,7 +288,7 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
                         </div>
                     )}
                     <div className="success-details">
-                        <span>Total Paid: ${totalPrice.toFixed(2)}</span>
+                        <span>Total Paid: {totalPrice.toFixed(2)} EGP</span>
                     </div>
                     <p className="redirect-text">Redirecting to your bookings...</p>
                 </motion.div>
@@ -350,12 +338,12 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
                                         {selectedSeats.map(seat => (
                                             <span key={`${seat.section}-${seat.row}-${seat.seatNumber}`} className="header-seat-chip">
                                                 {seat.row}{seat.seatNumber}
-                                                <span className="header-chip-price">${seat.price}</span>
+                                                <span className="header-chip-price">{seat.price} EGP</span>
                                             </span>
                                         ))}
                                     </div>
                                     <span className="seats-count">{selectedSeats.length} seat{selectedSeats.length !== 1 ? 's' : ''}</span>
-                                    <span className="total-amount">${seatTotalPrice.toFixed(2)}</span>
+                                    <span className="total-amount">{seatTotalPrice.toFixed(2)} EGP</span>
                                 </>
                             )}
                         </div>
@@ -406,7 +394,7 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
                                                     <span className="attendee-seat-badge">
                                                         Seat {seat.row}{seat.seatNumber}
                                                     </span>
-                                                    <span className="attendee-seat-price">${seat.price}</span>
+                                                    <span className="attendee-seat-price">{seat.price} EGP</span>
                                                 </div>
                                                 <div className="attendee-fields">
                                                     <div className="attendee-field">
@@ -462,7 +450,7 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
                             >
                                 <FiArrowRight />
                                 {selectedSeats.length > 0
-                                    ? `Continue — ${selectedSeats.length} Seat${selectedSeats.length !== 1 ? 's' : ''} — $${seatTotalPrice.toFixed(2)}`
+                                    ? `Continue — ${selectedSeats.length} Seat${selectedSeats.length !== 1 ? 's' : ''} — ${seatTotalPrice.toFixed(2)} EGP`
                                     : 'Select Seats to Continue'
                                 }
                             </motion.button>
@@ -483,7 +471,7 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
                                 ) : (
                                     <>
                                         <FiCreditCard />
-                                        Confirm Booking — ${seatTotalPrice.toFixed(2)}
+                                        Confirm Booking — {seatTotalPrice.toFixed(2)} EGP
                                     </>
                                 )}
                             </motion.button>
@@ -587,7 +575,7 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
                             >
                                 <div className="price-row">
                                     <span>Price per ticket</span>
-                                    <span>${ticketPrice.toFixed(2)}</span>
+                                    <span>{ticketPrice.toFixed(2)} EGP</span>
                                 </div>
                                 <div className="price-row">
                                     <span>Quantity</span>
@@ -601,7 +589,7 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
                                     animate={{ scale: 1 }}
                                 >
                                     <span>Total</span>
-                                    <span className="total-price">${totalPrice.toFixed(2)}</span>
+                                    <span className="total-price">{totalPrice.toFixed(2)} EGP</span>
                                 </motion.div>
                             </motion.div>
 

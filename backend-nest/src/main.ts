@@ -9,9 +9,9 @@ import { json, urlencoded } from 'express';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // ✅ Increase body size limit for base64 receipt uploads
-  app.use(json({ limit: '10mb' }));
-  app.use(urlencoded({ extended: true, limit: '10mb' }));
+  // ✅ Increase body size limit for base64 image uploads (profile pictures, QR codes, receipts)
+  app.use(json({ limit: '50mb' }));
+  app.use(urlencoded({ extended: true, limit: '50mb' }));
 
   // ✅ Enable CORS for frontend (adjust origin later)
   app.enableCors({

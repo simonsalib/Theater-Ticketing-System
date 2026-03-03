@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import api from '@/services/api';
 import ConfirmationDialog from '../AdminComponent/ConfirmationDialog';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiCalendar, FiMapPin, FiClock, FiTrash2, FiEye, FiAlertCircle, FiCheckCircle, FiUploadCloud, FiGrid } from 'react-icons/fi';
+import { FiCalendar, FiMapPin, FiClock, FiTrash2, FiEye, FiAlertCircle, FiCheckCircle, FiUploadCloud, FiGrid, FiCopy } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import './UserBookingPage.css';
 
@@ -31,6 +31,12 @@ interface EventData {
     location: string;
     image: string;
     ticketPrice: number;
+    organizerId?: {
+        _id: string;
+        name: string;
+        instapayNumber?: string;
+        instapayQR?: string;
+    };
 }
 
 const UserBookingsPage = () => {
@@ -42,6 +48,7 @@ const UserBookingsPage = () => {
     const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [cancellationLoading, setCancellationLoading] = useState(false);
+    const [copiedNumber, setCopiedNumber] = useState<string | null>(null);
 
     const [timers, setTimers] = useState<Record<string, string>>({});
 
@@ -207,6 +214,153 @@ const UserBookingsPage = () => {
                 </div>
             </div>
 
+            {/* Pending bookings banner at top */}
+            {(() => {
+                const pendingBookings = bookings.filter(b => b.status === 'pending' && !b.isReceiptUploaded);
+                if (pendingBookings.length === 0) return null;
+                return (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        style={{
+                            margin: '0 0 28px', padding: '24px', borderRadius: '20px',
+                            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.14), rgba(239, 68, 68, 0.10))',
+                            border: '1px solid rgba(245, 158, 11, 0.4)',
+                            backdropFilter: 'blur(10px)'
+                        }}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px', color: '#fbbf24', fontWeight: 700, fontSize: '1.3rem' }}>
+                            <FiAlertCircle size={26} />
+                            Action Required — {pendingBookings.length} Pending Booking{pendingBookings.length > 1 ? 's' : ''}
+                        </div>
+
+                        {pendingBookings.map(booking => {
+                            const event = eventDetails[booking.eventId];
+                            const timeLeft = timers[booking._id];
+                            const instapayQR = event?.organizerId?.instapayQR;
+                            const rawInstapay = event?.organizerId?.instapayNumber ?? '';
+                            const instapayNumber = rawInstapay.startsWith('+20')
+                                ? rawInstapay.substring(3)
+                                : rawInstapay.startsWith('20') && rawInstapay.length >= 12
+                                    ? rawInstapay.substring(2)
+                                    : rawInstapay;
+
+                            return (
+                                <div key={booking._id} style={{
+                                    padding: '20px', borderRadius: '16px', marginBottom: '14px',
+                                    background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.08)'
+                                }}>
+                                    {/* Event info + timer */}
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                                        <div>
+                                            <strong style={{ fontSize: '1.2rem', display: 'block', marginBottom: '4px' }}>{event?.title || 'Event'}</strong>
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '1rem', color: '#d1d5db', flexWrap: 'wrap' }}>
+                                                <span style={{ fontWeight: 700, color: '#fbbf24', fontSize: '1.1rem' }}>{booking.totalPrice.toFixed(2)} EGP</span>
+                                                <span>{booking.numberOfTickets} ticket{booking.numberOfTickets > 1 ? 's' : ''}</span>
+                                                {booking.selectedSeats && booking.selectedSeats.length > 0 && (
+                                                    <span style={{ color: '#a78bfa' }}>
+                                                        Seats: {booking.selectedSeats.map(s => `${s.row}${s.seatNumber}`).join(', ')}
+                                                    </span>
+                                                )}
+                                            </span>
+                                        </div>
+                                        {timeLeft && timeLeft !== 'Expired' && (
+                                            <span style={{
+                                                display: 'flex', alignItems: 'center', gap: '6px',
+                                                padding: '6px 16px', borderRadius: '24px',
+                                                background: 'rgba(245, 158, 11, 0.25)', color: '#f59e0b',
+                                                fontSize: '1.1rem', fontWeight: 700
+                                            }}>
+                                                <FiClock size={18} /> {timeLeft}
+                                            </span>
+                                        )}
+                                        {timeLeft === 'Expired' && (
+                                            <span style={{ padding: '6px 16px', borderRadius: '24px', background: 'rgba(239, 68, 68, 0.25)', color: '#ef4444', fontSize: '1rem', fontWeight: 700 }}>Expired</span>
+                                        )}
+                                    </div>
+
+                                    {/* Payment info text */}
+                                    <p style={{ fontSize: '0.95rem', color: '#e5e7eb', margin: '0 0 16px', lineHeight: 1.5 }}>
+                                        Pay <strong style={{ color: '#fbbf24' }}>{booking.totalPrice.toFixed(2)} EGP</strong> via InstaPay and upload your receipt before time runs out.
+                                    </p>
+
+                                    {/* InstaPay QR image + number */}
+                                    {(instapayQR || instapayNumber) && (
+                                        <div style={{
+                                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
+                                            margin: '12px 0 16px', padding: '16px',
+                                            background: 'rgba(255,255,255,0.03)', borderRadius: '12px',
+                                            border: '1px solid rgba(139, 92, 246, 0.2)'
+                                        }}>
+                                            {instapayQR && (
+                                                <img
+                                                    src={instapayQR}
+                                                    alt="InstaPay QR"
+                                                    style={{
+                                                        width: '220px', height: '220px', objectFit: 'contain',
+                                                        borderRadius: '10px', border: '2px solid rgba(139, 92, 246, 0.4)'
+                                                    }}
+                                                />
+                                            )}
+                                            <div style={{ width: '100%' }}>
+                                                {instapayNumber && (
+                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                        <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>InstaPay Number:</span>
+                                                        <span style={{ fontWeight: 700, fontSize: '0.95rem', letterSpacing: '0.4px' }}>{instapayNumber}</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(instapayNumber).catch(() => {
+                                                                    const ta = document.createElement('textarea'); ta.value = instapayNumber; ta.style.position = 'fixed'; ta.style.left = '-9999px'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+                                                                });
+                                                                setCopiedNumber(booking._id);
+                                                                toast.success('InstaPay number copied!');
+                                                                setTimeout(() => setCopiedNumber(null), 2000);
+                                                            }}
+                                                            style={{
+                                                                background: copiedNumber === booking._id ? 'rgba(16, 185, 129, 0.2)' : 'rgba(139, 92, 246, 0.15)',
+                                                                border: '1px solid ' + (copiedNumber === booking._id ? 'rgba(16, 185, 129, 0.4)' : 'rgba(139, 92, 246, 0.3)'),
+                                                                color: copiedNumber === booking._id ? '#10b981' : '#a78bfa',
+                                                                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
+                                                                fontSize: '0.8rem', fontWeight: 600, padding: '4px 10px', borderRadius: '8px',
+                                                                transition: 'all 0.2s'
+                                                            }}
+                                                        >
+                                                            <FiCopy size={13} /> {copiedNumber === booking._id ? 'Copied!' : 'Copy'}
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                {instapayQR && (
+                                                    <p style={{ fontSize: '0.78rem', color: '#9ca3af', margin: '6px 0 0', textAlign: 'center' }}>
+                                                        Scan QR → Send {booking.totalPrice.toFixed(2)} EGP
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <motion.button
+                                        onClick={() => handleUploadClick(booking._id)}
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', width: '100%',
+                                            padding: '14px', borderRadius: '12px',
+                                            background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: 'white',
+                                            border: 'none', cursor: 'pointer', fontSize: '1rem', fontWeight: 700,
+                                            boxShadow: '0 6px 20px rgba(139, 92, 246, 0.35)',
+                                            letterSpacing: '0.3px'
+                                        }}
+                                    >
+                                        <FiUploadCloud size={20} /> Upload Receipt Now
+                                    </motion.button>
+                                </div>
+                            );
+                        })}
+                    </motion.div>
+                );
+            })()}
+
             {bookings.length === 0 ? (
                 <div className="empty-bookings">
                     <div className="empty-icon"><FiCalendar size={60} /></div>
@@ -264,6 +418,16 @@ const UserBookingsPage = () => {
                                             <span>Booked on {formatDate(booking.createdAt)}</span>
                                         </div>
 
+                                        {isPending && booking.isReceiptUploaded && (
+                                            <div style={{
+                                                margin: '12px 0', padding: '10px 14px', borderRadius: '10px',
+                                                background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)',
+                                                display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', fontSize: '0.85rem', fontWeight: 600
+                                            }}>
+                                                <FiCheckCircle size={16} /> Receipt uploaded — awaiting verification
+                                            </div>
+                                        )}
+
                                         <div className="booking-summary">
                                             <div className="summary-row">
                                                 <span>Tickets</span>
@@ -279,7 +443,7 @@ const UserBookingsPage = () => {
                                             )}
                                             <div className="summary-row total">
                                                 <span>Total Price</span>
-                                                <strong>${booking.totalPrice.toFixed(2)}</strong>
+                                                <strong>{booking.totalPrice.toFixed(2)} EGP</strong>
                                             </div>
                                         </div>
                                     </div>

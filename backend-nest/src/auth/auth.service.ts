@@ -166,7 +166,10 @@ export class AuthService {
                 name: user.name,
                 email: user.email,
                 role: user.role,
+                phone: (user as any).phone,
                 profilePicture: user.profilePicture,
+                instapayNumber: (user as any).instapayNumber,
+                instapayQR: (user as any).instapayQR,
             },
         };
     }
@@ -285,7 +288,10 @@ export class AuthService {
                 name: user.name,
                 email: user.email,
                 role: user.role,
+                phone: (user as any).phone,
                 profilePicture: user.profilePicture,
+                instapayNumber: (user as any).instapayNumber,
+                instapayQR: (user as any).instapayQR,
             },
         };
     }

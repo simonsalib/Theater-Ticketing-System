@@ -221,7 +221,7 @@ const EventBookingsPage = () => {
                                             </div>
                                             <div className="eb-card-right">
                                                 {getStatusBadge(booking.status)}
-                                                <span className="eb-price">${booking.totalPrice?.toFixed(2)}</span>
+                                                <span className="eb-price">{booking.totalPrice?.toFixed(2)} EGP</span>
                                             </div>
                                         </div>
 
@@ -234,7 +234,7 @@ const EventBookingsPage = () => {
                                                         <div key={sIdx} className="eb-seat-item">
                                                             <span className="eb-seat-label">{seat.row}{seat.seatNumber}</span>
                                                             <span className="eb-seat-type">{seat.seatType}</span>
-                                                            <span className="eb-seat-price">${seat.price}</span>
+                                                            <span className="eb-seat-price">{seat.price} EGP</span>
                                                             {seat.attendeeName && (
                                                                 <div className="eb-seat-attendee">
                                                                     <FiUser size={12} /> {seat.attendeeName}

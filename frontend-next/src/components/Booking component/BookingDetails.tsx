@@ -218,11 +218,11 @@ const BookingDetails = ({ id }: BookingDetailsProps) => {
                         </div>
                         <div className="info-item">
                             <span className="info-label">Price per Ticket:</span>
-                            <span className="info-value">${eventData.ticketPrice?.toFixed(2) || 'N/A'}</span>
+                            <span className="info-value">{eventData.ticketPrice?.toFixed(2) || 'N/A'} EGP</span>
                         </div>
                         <div className="info-item">
                             <span className="info-label">Total Price:</span>
-                            <span className="info-value">${booking.totalPrice?.toFixed(2) || 'N/A'}</span>
+                            <span className="info-value">{booking.totalPrice?.toFixed(2) || 'N/A'} EGP</span>
                         </div>
                     </div>
 
@@ -292,7 +292,7 @@ const BookingDetails = ({ id }: BookingDetailsProps) => {
                                                 color: '#22d3ee',
                                                 fontWeight: 600
                                             }}>
-                                                ${seat.price?.toFixed(2)}
+                                                ${seat.price?.toFixed(2)} EGP
                                             </span>
                                         </div>
                                     );

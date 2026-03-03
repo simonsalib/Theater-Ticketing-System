@@ -1,11 +1,11 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
     FiArrowLeft, FiUserPlus, FiMail, FiLock, FiUser,
-    FiShield, FiStar, FiCheck, FiAlertCircle
+    FiShield, FiStar, FiCheck, FiAlertCircle, FiUpload, FiX
 } from 'react-icons/fi';
 import api from '@/services/api';
 import { toast } from 'react-toastify';
@@ -25,18 +25,55 @@ const CreateUserPage = () => {
         confirmPassword: '',
         role: 'Organizer',
         phone: '',
-        instapayNumber: ''
+        instapayNumber: '',
+        instapayQR: ''
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [qrPreview, setQrPreview] = useState<string | null>(null);
+    const qrInputRef = useRef<HTMLInputElement>(null);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
         setError(null);
     };
 
     const handleRoleSelect = (role: string) => {
-        setFormData({ ...formData, role });
+        // Only reset organizer-specific fields when actually switching away from Organizer
+        setFormData(prev => ({
+            ...prev,
+            role,
+            instapayNumber: prev.role !== role ? '' : prev.instapayNumber,
+            instapayQR: prev.role !== role ? '' : prev.instapayQR,
+        }));
+        if (formData.role !== role) setQrPreview(null);
+    };
+
+    const handleQRUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            setError('Please upload a valid image file');
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            setError('Image must be smaller than 5MB');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const base64 = reader.result as string;
+            setQrPreview(base64);
+            setFormData(prev => ({ ...prev, instapayQR: base64 }));
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleRemoveQR = () => {
+        setQrPreview(null);
+        setFormData(prev => ({ ...prev, instapayQR: '' }));
+        if (qrInputRef.current) qrInputRef.current.value = '';
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -70,42 +107,24 @@ const CreateUserPage = () => {
             setError('Phone is required');
             return;
         }
-        let corePhone = formData.phone.trim();
-        if (corePhone.startsWith('+20')) corePhone = corePhone.substring(3);
-        else if (corePhone.startsWith('20') && (corePhone.length === 12 || corePhone.length === 13)) corePhone = corePhone.substring(2);
-
-        // If user wrote the number without the leading zero (e.g., 10xxxx), add it back.
-        if (corePhone.length === 10 && !corePhone.startsWith('0')) {
-            corePhone = '0' + corePhone;
-        }
-
-        if (!/^\d{11}$/.test(corePhone)) {
-            setError('Phone number must be exactly 11 digits (e.g., 01xxxxxxxxx)');
+        const phone = formData.phone.trim();
+        if (!/^\d{11}$/.test(phone)) {
+            setError('Phone number must be exactly 11 digits');
             return;
         }
-        const formattedPhone = `+20${corePhone}`;
 
         // Validate InstaPay
-        let formattedInstapay = '';
+        let instapayNumber = '';
         if (formData.role === 'Organizer') {
             if (!formData.instapayNumber.trim()) {
                 setError('InstaPay number is required for organizers');
                 return;
             }
-            let coreInsta = formData.instapayNumber.trim();
-            if (coreInsta.startsWith('+20')) coreInsta = coreInsta.substring(3);
-            else if (coreInsta.startsWith('20') && (coreInsta.length === 12 || coreInsta.length === 13)) coreInsta = coreInsta.substring(2);
-
-            // If user wrote the number without the leading zero (e.g., 10xxxx), add it back.
-            if (coreInsta.length === 10 && !coreInsta.startsWith('0')) {
-                coreInsta = '0' + coreInsta;
-            }
-
-            if (!/^\d{11}$/.test(coreInsta)) {
-                setError('InstaPay number must be exactly 11 digits (e.g., 01xxxxxxxxx)');
+            instapayNumber = formData.instapayNumber.trim();
+            if (!/^\d{11}$/.test(instapayNumber)) {
+                setError('InstaPay number must be exactly 11 digits');
                 return;
             }
-            formattedInstapay = `+20${coreInsta}`;
         }
 
         try {
@@ -115,10 +134,11 @@ const CreateUserPage = () => {
                 email: formData.email.trim(),
                 password: formData.password,
                 role: formData.role,
-                phone: formattedPhone
+                phone: phone
             };
             if (formData.role === 'Organizer') {
-                payload.instapayNumber = formattedInstapay;
+                payload.instapayNumber = instapayNumber;
+                if (formData.instapayQR) payload.instapayQR = formData.instapayQR;
             }
 
             const response = await api.post('/user/create', payload);
@@ -184,6 +204,47 @@ const CreateUserPage = () => {
                 )}
 
                 <form onSubmit={handleSubmit}>
+                    {/* Role Selection — First, so role-specific fields show correctly */}
+                    <div style={{ marginBottom: '2rem' }}>
+                        <label style={{ display: 'block', marginBottom: '0.75rem', color: 'var(--text-secondary)' }}>
+                            Select Role *
+                        </label>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                            {ROLES.map(role => {
+                                const RoleIcon = role.icon;
+                                const isSelected = formData.role === role.value;
+                                return (
+                                    <motion.button
+                                        key={role.value}
+                                        type="button"
+                                        onClick={() => handleRoleSelect(role.value)}
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        style={{
+                                            padding: '1rem',
+                                            borderRadius: '12px',
+                                            border: isSelected ? `2px solid ${role.color}` : '2px solid rgba(255, 255, 255, 0.1)',
+                                            background: isSelected ? `${role.color}20` : 'rgba(255, 255, 255, 0.03)',
+                                            color: isSelected ? role.color : 'var(--text-secondary)',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            gap: '0.5rem',
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                    >
+                                        <RoleIcon size={24} />
+                                        <span style={{ fontSize: '0.85rem', fontWeight: isSelected ? 600 : 400 }}>
+                                            {role.label}
+                                        </span>
+                                        {isSelected && <FiCheck size={16} />}
+                                    </motion.button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
                     {/* Name Field */}
                     <div style={{ marginBottom: '1.5rem' }}>
                         <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
@@ -256,30 +317,104 @@ const CreateUserPage = () => {
                         />
                     </div>
 
-                    {/* InstaPay Field (Organizer Only) */}
+                    {/* InstaPay Fields (Organizer Only) */}
                     {formData.role === 'Organizer' && (
-                        <div style={{ marginBottom: '1.5rem' }}>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
-                                <span style={{ marginRight: '0.5rem' }}>💳</span>
-                                InstaPay Number *
-                            </label>
-                            <input
-                                type="text"
-                                name="instapayNumber"
-                                value={formData.instapayNumber}
-                                onChange={handleChange}
-                                placeholder="Enter 11-digit InstaPay number"
-                                style={{
-                                    width: '100%',
-                                    padding: '0.75rem 1rem',
-                                    borderRadius: '8px',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                                    background: 'rgba(255, 255, 255, 0.05)',
-                                    color: 'white',
-                                    fontSize: '1rem'
-                                }}
-                            />
-                        </div>
+                        <>
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
+                                    <span style={{ marginRight: '0.5rem' }}>💳</span>
+                                    InstaPay Number *
+                                </label>
+                                <input
+                                    type="text"
+                                    name="instapayNumber"
+                                    value={formData.instapayNumber}
+                                    onChange={handleChange}
+                                    placeholder="Enter 11-digit InstaPay number"
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem 1rem',
+                                        borderRadius: '8px',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                        background: 'rgba(255, 255, 255, 0.05)',
+                                        color: 'white',
+                                        fontSize: '1rem'
+                                    }}
+                                />
+                            </div>
+
+                            {/* InstaPay QR Image Upload */}
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
+                                    <FiUpload style={{ marginRight: '0.5rem' }} />
+                                    InstaPay QR Code Image
+                                </label>
+                                {qrPreview ? (
+                                    <div style={{ position: 'relative', display: 'inline-block' }}>
+                                        <img
+                                            src={qrPreview}
+                                            alt="InstaPay QR Preview"
+                                            style={{
+                                                width: '160px',
+                                                height: '160px',
+                                                objectFit: 'contain',
+                                                borderRadius: '8px',
+                                                border: '1px solid rgba(255,255,255,0.15)',
+                                                background: 'rgba(255,255,255,0.05)',
+                                                display: 'block'
+                                            }}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleRemoveQR}
+                                            style={{
+                                                position: 'absolute',
+                                                top: '-8px',
+                                                right: '-8px',
+                                                background: '#ef4444',
+                                                border: 'none',
+                                                borderRadius: '50%',
+                                                width: '24px',
+                                                height: '24px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                cursor: 'pointer',
+                                                color: 'white',
+                                                padding: 0
+                                            }}
+                                        >
+                                            <FiX size={14} />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <motion.div
+                                        whileHover={{ scale: 1.01 }}
+                                        onClick={() => qrInputRef.current?.click()}
+                                        style={{
+                                            padding: '1.5rem',
+                                            borderRadius: '8px',
+                                            border: '2px dashed rgba(255,255,255,0.15)',
+                                            background: 'rgba(255,255,255,0.03)',
+                                            cursor: 'pointer',
+                                            textAlign: 'center',
+                                            color: 'var(--text-secondary)'
+                                        }}
+                                    >
+                                        <FiUpload size={28} style={{ marginBottom: '0.5rem', opacity: 0.6 }} />
+                                        <p style={{ margin: 0, fontSize: '0.9rem' }}>Click to upload QR image</p>
+                                        <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', opacity: 0.6 }}>PNG, JPG up to 5MB</p>
+                                    </motion.div>
+                                )}
+                                <input
+                                    ref={qrInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleQRUpload}
+                                    style={{ display: 'none' }}
+                                />
+                            </div>
+                        </>
                     )}
 
                     {/* Password Field */}
@@ -330,46 +465,7 @@ const CreateUserPage = () => {
                         />
                     </div>
 
-                    {/* Role Selection */}
-                    <div style={{ marginBottom: '2rem' }}>
-                        <label style={{ display: 'block', marginBottom: '0.75rem', color: 'var(--text-secondary)' }}>
-                            Select Role *
-                        </label>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
-                            {ROLES.map(role => {
-                                const RoleIcon = role.icon;
-                                const isSelected = formData.role === role.value;
-                                return (
-                                    <motion.button
-                                        key={role.value}
-                                        type="button"
-                                        onClick={() => handleRoleSelect(role.value)}
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
-                                        style={{
-                                            padding: '1rem',
-                                            borderRadius: '12px',
-                                            border: isSelected ? `2px solid ${role.color}` : '2px solid rgba(255, 255, 255, 0.1)',
-                                            background: isSelected ? `${role.color}20` : 'rgba(255, 255, 255, 0.03)',
-                                            color: isSelected ? role.color : 'var(--text-secondary)',
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            alignItems: 'center',
-                                            gap: '0.5rem',
-                                            transition: 'all 0.2s ease'
-                                        }}
-                                    >
-                                        <RoleIcon size={24} />
-                                        <span style={{ fontSize: '0.85rem', fontWeight: isSelected ? 600 : 400 }}>
-                                            {role.label}
-                                        </span>
-                                        {isSelected && <FiCheck size={16} />}
-                                    </motion.button>
-                                );
-                            })}
-                        </div>
-                    </div>
+                    {/* Role Selection moved to top */}
 
                     {/* Info Box */}
                     <div style={{

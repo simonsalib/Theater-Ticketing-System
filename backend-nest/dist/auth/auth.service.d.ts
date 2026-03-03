@@ -23,7 +23,10 @@ export declare class AuthService {
             name: string;
             email: string;
             role: string;
+            phone: any;
             profilePicture: string | undefined;
+            instapayNumber: any;
+            instapayQR: any;
         };
     }>;
     forgetPassword(email: string): Promise<{
@@ -44,7 +47,10 @@ export declare class AuthService {
             name: string;
             email: string;
             role: string;
+            phone: any;
             profilePicture: string | undefined;
+            instapayNumber: any;
+            instapayQR: any;
         };
     }>;
 }

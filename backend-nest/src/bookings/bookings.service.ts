@@ -202,7 +202,7 @@ export class BookingsService implements OnModuleInit {
                 path: 'eventId',
                 populate: {
                     path: 'organizerId',
-                    select: 'name instapayNumber'
+                    select: 'name instapayNumber instapayQR'
                 }
             })
             .exec();
@@ -215,7 +215,13 @@ export class BookingsService implements OnModuleInit {
     async findAllForUser(userId: string): Promise<BookingDocument[]> {
         return this.bookingModel
             .find({ StandardId: userId } as any)
-            .populate('eventId')
+            .populate({
+                path: 'eventId',
+                populate: {
+                    path: 'organizerId',
+                    select: 'name instapayNumber instapayQR'
+                }
+            })
             .sort({ createdAt: -1 })
             .exec();
     }

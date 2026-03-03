@@ -21,7 +21,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                 <p className="tooltip-label">{label}</p>
                 {payload.map((entry: any, index: number) => (
                     <p key={index} className="tooltip-item" style={{ color: entry.color }}>
-                        {entry.name}: {entry.name === 'Revenue' ? `$${entry.value.toFixed(2)}` : entry.value}
+                        {entry.name}: {entry.name === 'Revenue' ? `${entry.value.toFixed(2)} EGP` : entry.value}
                     </p>
                 ))}
             </div>
@@ -126,7 +126,7 @@ const EventAnalytics = () => {
                         />
                         <StatCard
                             title="Total Revenue"
-                            value={`$${analytics?.totalRevenue?.toLocaleString() || '0'}`}
+                            value={`${analytics?.totalRevenue?.toLocaleString() || '0'} EGP`}
                             icon={<FiDollarSign />}
                             color="#10b981"
                             delay={0.2}

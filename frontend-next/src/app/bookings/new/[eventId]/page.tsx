@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     FiCalendar, FiMapPin, FiTag, FiMinus, FiPlus,
     FiShoppingCart, FiArrowLeft, FiCheckCircle, FiAlertCircle,
-    FiCreditCard, FiUsers, FiGrid, FiUser, FiPhone, FiArrowRight, FiClock
+    FiCreditCard, FiUsers, FiGrid, FiUser, FiPhone, FiArrowRight, FiClock, FiCopy
 } from 'react-icons/fi';
 import { getImageUrl } from '@/utils/imageHelper';
 import SeatSelector from '@/components/Booking component/SeatSelector';
@@ -42,7 +42,16 @@ const BookTicketPage = () => {
 
     // Organizer InstaPay
     const [organizerInstapay, setOrganizerInstapay] = useState<string>('');
+    const [organizerInstapayQR, setOrganizerInstapayQR] = useState<string>('');
     const [hasCopied, setHasCopied] = useState(false);
+    const [bookingId, setBookingId] = useState<string>('');
+
+    // Receipt upload state
+    const [receiptFile, setReceiptFile] = useState<File | null>(null);
+    const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+    const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
+    const [receiptUploaded, setReceiptUploaded] = useState(false);
+    const receiptInputRef = React.useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (!eventId) return;
@@ -55,6 +64,7 @@ const BookTicketPage = () => {
                 // Read organizer InstaPay number from populated event data
                 if (data.organizerId && typeof data.organizerId === 'object') {
                     setOrganizerInstapay(data.organizerId.instapayNumber || '');
+                    setOrganizerInstapayQR(data.organizerId.instapayQR || '');
                 }
             } catch (err: any) {
                 console.error("Error fetching event details:", err);
@@ -132,27 +142,17 @@ const BookTicketPage = () => {
                 }
 
                 const phoneField = attendeeInfo[i]?.attendeePhone?.trim() || '';
-                if (!phoneField || phoneField === '+20') {
+                if (!phoneField) {
                     toast.error(`Please enter phone for seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber}`);
                     return;
                 }
 
-                let corePhone = phoneField;
-                if (corePhone.startsWith('+20')) corePhone = corePhone.substring(3);
-                else if (corePhone.startsWith('20') && (corePhone.length === 12 || corePhone.length === 13)) corePhone = corePhone.substring(2);
-
-                // If user wrote the number without the leading zero (e.g., 10xxxx), add it back.
-                if (corePhone.length === 10 && !corePhone.startsWith('0')) {
-                    corePhone = '0' + corePhone;
-                }
-
-                if (!/^\d{11}$/.test(corePhone)) {
-                    toast.error(`Phone number for seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber} must be exactly 11 digits (e.g., 01xxxxxxxxx)`);
+                if (!/^\d{11}$/.test(phoneField)) {
+                    toast.error(`Phone number for seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber} must be exactly 11 digits`);
                     return;
                 }
 
-                // Format directly for the payload
-                attendeeInfo[i].attendeePhone = `+20${corePhone}`;
+                attendeeInfo[i].attendeePhone = phoneField;
             }
         }
 
@@ -181,6 +181,7 @@ const BookTicketPage = () => {
 
 
             if (response.data.success) {
+                setBookingId(response.data.data?._id || '');
                 setSuccess(true);
             }
         } catch (err: any) {
@@ -256,52 +257,156 @@ const BookTicketPage = () => {
 
                     <div className="instapay-section">
                         <h3>Pay via InstaPay</h3>
-                        <p className="instapay-instruction">Send <strong>${totalToPay.toFixed(2)}</strong> to the organizer&apos;s InstaPay number below:</p>
+                        <p className="instapay-instruction">Send <strong>{totalToPay.toFixed(2)} EGP</strong> to the organizer&apos;s InstaPay below:</p>
+
+                        {organizerInstapayQR && (
+                            <div style={{
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
+                                margin: '16px 0', padding: '20px',
+                                background: 'rgba(139, 92, 246, 0.06)', borderRadius: '16px',
+                                border: '1px solid rgba(139, 92, 246, 0.2)'
+                            }}>
+                                <p style={{ fontSize: '1rem', color: '#a78bfa', margin: 0, fontWeight: 600 }}>
+                                    Scan QR Code to pay via InstaPay
+                                </p>
+                                <img
+                                    src={organizerInstapayQR}
+                                    alt="InstaPay QR"
+                                    style={{
+                                        maxWidth: '300px', width: '100%', borderRadius: '14px',
+                                        border: '3px solid rgba(139, 92, 246, 0.4)',
+                                        boxShadow: '0 8px 30px rgba(139, 92, 246, 0.2)'
+                                    }}
+                                />
+                                <p style={{ fontSize: '0.9rem', color: '#9ca3af', margin: 0 }}>
+                                    Open InstaPay app → Scan QR → Send {totalToPay.toFixed(2)} EGP
+                                </p>
+                            </div>
+                        )}
                         {organizerInstapay ? (
-                            <div className="instapay-number-box">
-                                <span className="instapay-number">{organizerInstapay}</span>
+                            <div className="instapay-number-box" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span className="instapay-number" style={{ flex: 1 }}>{organizerInstapay}</span>
                                 <button
                                     type="button"
                                     className="copy-btn"
                                     onClick={() => {
-                                        if (navigator.clipboard && window.isSecureContext) {
-                                            navigator.clipboard.writeText(organizerInstapay);
-                                        } else {
-                                            const textArea = document.createElement("textarea");
-                                            textArea.value = organizerInstapay;
-                                            textArea.style.position = "absolute";
-                                            textArea.style.left = "-999999px";
-                                            document.body.prepend(textArea);
-                                            textArea.select();
-                                            try {
-                                                document.execCommand('copy');
-                                            } catch (error) {
-                                                console.error(error);
-                                            } finally {
-                                                textArea.remove();
-                                            }
-                                        }
+                                        navigator.clipboard.writeText(organizerInstapay).catch(() => {
+                                            const ta = document.createElement('textarea'); ta.value = organizerInstapay; ta.style.position = 'fixed'; ta.style.left = '-9999px'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+                                        });
                                         setHasCopied(true);
                                         toast.success('InstaPay number copied!');
+                                        setTimeout(() => setHasCopied(false), 2000);
                                     }}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
                                 >
-                                    {hasCopied ? '✓ Copied' : 'Copy'}
+                                    <FiCopy size={14} /> {hasCopied ? 'Copied!' : 'Copy'}
                                 </button>
                             </div>
-                        ) : (
+                        ) : !organizerInstapayQR ? (
                             <p className="instapay-fallback">Contact the event organizer for payment details.</p>
-                        )}
+                        ) : null}
+
                         <p className="instapay-note">The organizer will confirm your booking once payment is verified.</p>
+
+                        {/* Receipt Upload Section */}
+                        <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(139, 92, 246, 0.08)', borderRadius: '12px', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+                            <h4 style={{ margin: '0 0 8px', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <FiCreditCard /> Upload Payment Receipt
+                            </h4>
+                            <p style={{ fontSize: '0.85rem', color: '#9ca3af', margin: '0 0 12px' }}>Upload a screenshot of your InstaPay transfer to speed up verification.</p>
+
+                            <input
+                                type="file"
+                                accept="image/*"
+                                ref={receiptInputRef}
+                                style={{ display: 'none' }}
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    if (!file.type.startsWith('image/')) { toast.error('Please select an image file'); return; }
+                                    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be less than 5MB'); return; }
+                                    setReceiptFile(file);
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => setReceiptPreview(reader.result as string);
+                                    reader.readAsDataURL(file);
+                                }}
+                            />
+
+                            {receiptUploaded ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', fontWeight: 600 }}>
+                                    <FiCheckCircle size={20} /> Receipt uploaded successfully!
+                                </div>
+                            ) : !receiptPreview ? (
+                                <motion.button
+                                    type="button"
+                                    onClick={() => receiptInputRef.current?.click()}
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '8px',
+                                        padding: '10px 20px', borderRadius: '10px',
+                                        background: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa',
+                                        border: '1px dashed rgba(139, 92, 246, 0.5)', cursor: 'pointer',
+                                        fontSize: '0.9rem', fontWeight: 500, width: '100%', justifyContent: 'center'
+                                    }}
+                                >
+                                    <FiCreditCard /> Choose Receipt Image
+                                </motion.button>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    <div style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', maxHeight: '200px' }}>
+                                        <img src={receiptPreview} alt="Receipt" style={{ width: '100%', maxHeight: '200px', objectFit: 'contain', background: '#000', borderRadius: '10px' }} />
+                                        <button
+                                            type="button"
+                                            onClick={() => { setReceiptFile(null); setReceiptPreview(null); if (receiptInputRef.current) receiptInputRef.current.value = ''; }}
+                                            style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(239, 68, 68, 0.9)', color: 'white', border: 'none', width: '28px', height: '28px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                    <motion.button
+                                        type="button"
+                                        onClick={async () => {
+                                            if (!receiptPreview || !bookingId) return;
+                                            try {
+                                                setIsUploadingReceipt(true);
+                                                const response = await api.post(`/booking/${bookingId}/receipt`, { receiptBase64: receiptPreview });
+                                                if (response.data?.success) {
+                                                    toast.success('Receipt uploaded! Awaiting organizer verification.');
+                                                    setReceiptUploaded(true);
+                                                } else {
+                                                    toast.error(response.data?.message || 'Upload failed');
+                                                }
+                                            } catch (err: any) {
+                                                toast.error(err.response?.data?.message || 'Failed to upload receipt');
+                                            } finally {
+                                                setIsUploadingReceipt(false);
+                                            }
+                                        }}
+                                        disabled={isUploadingReceipt}
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        style={{
+                                            padding: '10px 20px', borderRadius: '10px',
+                                            background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: 'white',
+                                            border: 'none', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600,
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                                        }}
+                                    >
+                                        {isUploadingReceipt ? 'Uploading...' : 'Submit Receipt'}
+                                    </motion.button>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     <motion.button
-                        className={`view-bookings-btn ${!hasCopied ? 'btn-disabled' : ''}`}
-                        onClick={() => hasCopied && router.push('/bookings')}
-                        disabled={!hasCopied}
-                        whileHover={hasCopied ? { scale: 1.02 } : {}}
-                        whileTap={hasCopied ? { scale: 0.98 } : {}}
+                        className="view-bookings-btn"
+                        onClick={() => router.push('/bookings')}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                     >
-                        Done
+                        Done — View My Bookings
                     </motion.button>
                 </motion.div>
             </motion.div>
@@ -348,12 +453,12 @@ const BookTicketPage = () => {
                                             {selectedSeats.map(seat => (
                                                 <span key={`${seat.section}-${seat.row}-${seat.seatNumber}`} className="header-seat-chip">
                                                     {seat.row}{seat.seatNumber}
-                                                    <span className="header-chip-price">${seat.price}</span>
+                                                    <span className="header-chip-price">{seat.price} EGP</span>
                                                 </span>
                                             ))}
                                         </div>
                                         <span className="seats-count">{selectedSeats.length} seat{selectedSeats.length !== 1 ? 's' : ''}</span>
-                                        <span className="total-amount">${seatTotalPrice.toFixed(2)}</span>
+                                        <span className="total-amount">{seatTotalPrice.toFixed(2)} EGP</span>
                                     </>
                                 )}
                             </div>
@@ -401,7 +506,7 @@ const BookTicketPage = () => {
                                                         <span className="attendee-seat-badge">
                                                             Seat {seat.row}{seat.seatNumber}
                                                         </span>
-                                                        <span className="attendee-seat-price">${seat.price}</span>
+                                                        <span className="attendee-seat-price">{seat.price} EGP</span>
                                                     </div>
                                                     <div className="attendee-fields">
                                                         <div className="attendee-field">
@@ -428,6 +533,20 @@ const BookTicketPage = () => {
                                                 </motion.div>
                                             ))}
                                         </div>
+
+                                        {/* InstaPay payment info - shown in attendee form */}
+                                        <div style={{
+                                            marginTop: '24px', padding: '20px', borderRadius: '16px',
+                                            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(109, 40, 217, 0.08))',
+                                            border: '1px solid rgba(139, 92, 246, 0.25)'
+                                        }}>
+                                            <h4 style={{ margin: '0 0 10px', fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '10px', color: '#a78bfa' }}>
+                                                <FiCreditCard size={22} /> Payment via InstaPay
+                                            </h4>
+                                            <p style={{ fontSize: '0.95rem', color: '#d1d5db', margin: 0, lineHeight: 1.5 }}>
+                                                After confirming, pay <strong style={{ color: '#fbbf24' }}>{seatTotalPrice.toFixed(2)} EGP</strong> via InstaPay — payment details will be shown after booking.
+                                            </p>
+                                        </div>
                                     </div>
                                 </motion.div>
                             )}
@@ -448,7 +567,7 @@ const BookTicketPage = () => {
                                 >
                                     <FiArrowRight />
                                     {selectedSeats.length > 0
-                                        ? `Next — ${selectedSeats.length} Seat${selectedSeats.length !== 1 ? 's' : ''} — $${seatTotalPrice.toFixed(2)}`
+                                        ? `Next — ${selectedSeats.length} Seat${selectedSeats.length !== 1 ? 's' : ''} — ${seatTotalPrice.toFixed(2)} EGP`
                                         : 'Select Seats to Continue'
                                     }
                                 </motion.button>
@@ -464,7 +583,7 @@ const BookTicketPage = () => {
                                     {isLoading ? (
                                         <><span className="btn-spinner"></span>Processing...</>
                                     ) : (
-                                        <><FiCreditCard /> Confirm Booking — ${seatTotalPrice.toFixed(2)}</>
+                                        <><FiCreditCard /> Confirm Booking — {seatTotalPrice.toFixed(2)} EGP</>
                                     )}
                                 </motion.button>
                             )}
@@ -498,10 +617,10 @@ const BookTicketPage = () => {
                                     </div>
                                 </div>
                                 <div className="price-summary-section">
-                                    <div className="price-row"><span>Price per ticket</span><span>${ticketPrice.toFixed(2)}</span></div>
+                                    <div className="price-row"><span>Price per ticket</span><span>{ticketPrice.toFixed(2)} EGP</span></div>
                                     <div className="price-row"><span>Quantity</span><span>× {numberOfTickets}</span></div>
                                     <div className="price-divider"></div>
-                                    <div className="price-row total"><span>Total</span><span className="total-price">${totalDisplayPrice.toFixed(2)}</span></div>
+                                    <div className="price-row total"><span>Total</span><span className="total-price">{totalDisplayPrice.toFixed(2)} EGP</span></div>
                                 </div>
                                 <div className="booking-actions">
                                     <button type="button" className="cancel-btn" onClick={() => router.push('/events')}>Cancel</button>

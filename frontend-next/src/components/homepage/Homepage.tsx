@@ -216,7 +216,7 @@ const Homepage = () => {
                                             </p>
                                         </div>
                                         <div className="event-price-tag">
-                                            <span>{event.ticketPrice > 0 ? `$${event.ticketPrice}` : 'Free'}</span>
+                                            <span>{event.ticketPrice > 0 ? `${event.ticketPrice} EGP` : 'Free'}</span>
                                         </div>
                                         <button
                                             className="view-detail-btn"

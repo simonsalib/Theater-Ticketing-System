@@ -20,6 +20,7 @@ interface UserData {
     email?: string;
     phone?: string;
     instapayNumber?: string;
+    instapayQR?: string;
     role?: string;
     createdAt?: string;
     profilePicture?: string;
@@ -92,7 +93,7 @@ const ProfilePage = () => {
             return [
                 { label: "My Events", value: "8", icon: FiCalendar, color: "#8B5CF6" },
                 { label: "Tickets Sold", value: "342", icon: FiUsers, color: "#22D3EE" },
-                { label: "Revenue", value: "$4.2K", icon: FiDollarSign, color: "#10B981" },
+                { label: "Revenue", value: "4.2K EGP", icon: FiDollarSign, color: "#10B981" },
                 { label: "Pending", value: "2", icon: FiClock, color: "#F59E0B" }
             ];
         } else if (role === "System Admin") {
@@ -100,7 +101,7 @@ const ProfilePage = () => {
                 { label: "Total Users", value: "156", icon: FiUsers, color: "#8B5CF6" },
                 { label: "Pending Approvals", value: "5", icon: FiClock, color: "#F59E0B" },
                 { label: "Active Events", value: "24", icon: FiCalendar, color: "#22D3EE" },
-                { label: "Total Revenue", value: "$12.8K", icon: FiDollarSign, color: "#10B981" }
+                { label: "Total Revenue", value: "12.8K EGP", icon: FiDollarSign, color: "#10B981" }
             ];
         }
         return [];
@@ -241,6 +242,34 @@ const ProfilePage = () => {
                             <span>Joined {displayUser?.createdAt ? new Date(displayUser.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : "Unknown"}</span>
                         </div>
                     </div>
+
+                    {/* InstaPay QR Code for Organizers */}
+                    {displayUser?.role === 'Organizer' && (displayUser as any)?.instapayQR && (
+                        <div style={{
+                            marginTop: '1.5rem',
+                            padding: '1.2rem',
+                            background: 'rgba(139, 92, 246, 0.08)',
+                            borderRadius: '16px',
+                            border: '1px solid rgba(139, 92, 246, 0.2)',
+                            textAlign: 'center'
+                        }}>
+                            <p style={{ color: '#a78bfa', fontWeight: 600, marginBottom: '0.8rem', fontSize: '1.05rem' }}>
+                                <FiDollarSign style={{ marginRight: 6, verticalAlign: 'middle' }} />
+                                InstaPay QR Code
+                            </p>
+                            <img
+                                src={(displayUser as any).instapayQR}
+                                alt="InstaPay QR"
+                                style={{
+                                    maxWidth: '240px',
+                                    width: '100%',
+                                    borderRadius: '12px',
+                                    border: '2px solid rgba(139, 92, 246, 0.3)',
+                                    boxShadow: '0 4px 20px rgba(139, 92, 246, 0.15)'
+                                }}
+                            />
+                        </div>
+                    )}
                 </motion.div>
 
                 {/* Quick Actions Section */}

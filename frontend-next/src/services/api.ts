@@ -4,7 +4,7 @@ import { API_BASE_URL } from "../config";
 const api = axios.create({
     baseURL: API_BASE_URL,
     withCredentials: true,
-    timeout: 15000, // 15 seconds timeout
+    timeout: 30000, // 30 seconds timeout (allows large base64 image uploads)
 });
 
 // Add interceptor to send token from localStorage (fallback for when cookies are blocked)

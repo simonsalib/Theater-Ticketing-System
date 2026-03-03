@@ -169,7 +169,7 @@ let BookingsService = BookingsService_1 = class BookingsService {
             path: 'eventId',
             populate: {
                 path: 'organizerId',
-                select: 'name instapayNumber'
+                select: 'name instapayNumber instapayQR'
             }
         })
             .exec();
@@ -181,7 +181,13 @@ let BookingsService = BookingsService_1 = class BookingsService {
     async findAllForUser(userId) {
         return this.bookingModel
             .find({ StandardId: userId })
-            .populate('eventId')
+            .populate({
+            path: 'eventId',
+            populate: {
+                path: 'organizerId',
+                select: 'name instapayNumber instapayQR'
+            }
+        })
             .sort({ createdAt: -1 })
             .exec();
     }

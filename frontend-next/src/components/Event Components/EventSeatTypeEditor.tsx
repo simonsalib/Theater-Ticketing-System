@@ -268,7 +268,7 @@ const EventSeatTypeEditor = ({
                 onClick={(e) => handleSeatClick(row, seatNum, section, e)}
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
-                title={`${row}${seatNum} - ${typeInfo.label} ($${price})`}
+                title={`${row}${seatNum} - ${typeInfo.label} (${price} EGP)`}
             >
                 <span className="seat-number">{seatNum}</span>
             </motion.div>
@@ -465,7 +465,7 @@ const EventSeatTypeEditor = ({
                             <div className="legend-color" style={{ background: info.color }} />
                             <span>{info.label}</span>
                             <span className="legend-count">({summary.counts[type] || 0})</span>
-                            <span className="legend-price">${typePricing[type as keyof TypePricing]}</span>
+                            <span className="legend-price">{typePricing[type as keyof TypePricing]} EGP</span>
                         </div>
                     ))}
                 </div>
@@ -475,7 +475,7 @@ const EventSeatTypeEditor = ({
                         Total: {Object.values(summary.counts).reduce((a, b) => a + b, 0)} seats
                     </span>
                     <span className="total-revenue">
-                        Max Revenue: ${Object.values(summary.totalRevenue).reduce((a, b) => a + b, 0).toFixed(2)}
+                        Max Revenue: {Object.values(summary.totalRevenue).reduce((a, b) => a + b, 0).toFixed(2)} EGP
                     </span>
                 </div>
             </div>

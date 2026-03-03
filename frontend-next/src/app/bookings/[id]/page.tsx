@@ -173,7 +173,7 @@ const BookingDetailsPage = () => {
                                         <span className="seats-count">+{(booking.selectedSeats?.length || 0) - 5} more</span>
                                     )}
                                 </div>
-                                <span className="total-amount">${booking.totalPrice?.toFixed(2)}</span>
+                                <span className="total-amount">{booking.totalPrice?.toFixed(2)} EGP</span>
                                 {organizerInstapay && (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--card-bg, rgba(255,255,255,0.05))', padding: '6px 12px', borderRadius: '8px' }}>
                                         <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary, #9ca3af)' }}>InstaPay:</span>
@@ -312,7 +312,7 @@ const BookingDetailsPage = () => {
                             </div>
                             <div className="financial-row">
                                 <span>Total Paid</span>
-                                <strong className="price-text">${booking.totalPrice?.toFixed(2)}</strong>
+                                <strong className="price-text">{booking.totalPrice?.toFixed(2)} EGP</strong>
                             </div>
                             {organizerInstapay && (
                                 <div className="financial-row" style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border-color, rgba(255,255,255,0.1))' }}>

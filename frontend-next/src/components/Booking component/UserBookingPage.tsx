@@ -170,7 +170,7 @@ const UserBookingsPage = () => {
 
                                     <div className="booking-details">
                                         <p>Tickets: <strong>{booking.quantity || booking.numberOfTickets}</strong></p>
-                                        <p>Total: <strong>${booking.totalPrice?.toFixed(2) || ((booking.quantity || 0) * (event?.ticketPrice || 0)).toFixed(2) || 'N/A'}</strong></p>
+                                        <p>Total: <strong>{booking.totalPrice?.toFixed(2) || ((booking.quantity || 0) * (event?.ticketPrice || 0)).toFixed(2) || 'N/A'} EGP</strong></p>
                                         <p>Status: <span className={`status ${(booking.status || 'confirmed').toLowerCase()}`} style={{ textTransform: 'capitalize' }}>
                                             {booking.status || 'Confirmed'}
                                             {(booking.status === 'pending' || booking.status === 'Pending') && timers[booking._id] && timers[booking._id] !== 'Expired' && (

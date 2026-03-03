@@ -10,6 +10,7 @@ export declare class User {
     email: string;
     phone: string;
     instapayNumber: string;
+    instapayQR: string;
     profilePicture?: string;
     password: string;
     role: string;
@@ -65,6 +66,15 @@ export declare const UserSchema: import("mongoose").Schema<User, import("mongoos
         id: string;
     }> | undefined;
     instapayNumber?: import("mongoose").SchemaDefinitionProperty<string, User, Document<unknown, {}, User, {
+        id: string;
+    }, import("mongoose").DefaultSchemaOptions> & Omit<User & {
+        _id: import("mongoose").Types.ObjectId;
+    } & {
+        __v: number;
+    }, "id"> & {
+        id: string;
+    }> | undefined;
+    instapayQR?: import("mongoose").SchemaDefinitionProperty<string, User, Document<unknown, {}, User, {
         id: string;
     }, import("mongoose").DefaultSchemaOptions> & Omit<User & {
         _id: import("mongoose").Types.ObjectId;

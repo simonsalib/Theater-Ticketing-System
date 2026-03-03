@@ -164,7 +164,10 @@ let AuthService = class AuthService {
                 name: user.name,
                 email: user.email,
                 role: user.role,
+                phone: user.phone,
                 profilePicture: user.profilePicture,
+                instapayNumber: user.instapayNumber,
+                instapayQR: user.instapayQR,
             },
         };
     }
@@ -250,7 +253,10 @@ let AuthService = class AuthService {
                 name: user.name,
                 email: user.email,
                 role: user.role,
+                phone: user.phone,
                 profilePicture: user.profilePicture,
+                instapayNumber: user.instapayNumber,
+                instapayQR: user.instapayQR,
             },
         };
     }
