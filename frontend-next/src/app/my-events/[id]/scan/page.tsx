@@ -146,7 +146,7 @@ const QRScannerPage = () => {
 
     const handleScan = async (qrData: string) => {
         try {
-            const res = await api.post('/tickets/scan', { qrData });
+            const res = await api.post('/tickets/scan', { qrData, eventId });
             const result: ScanResult = res.data;
             setScanResult(result);
             setScanHistory(prev => [result, ...prev.slice(0, 19)]); // Keep last 20

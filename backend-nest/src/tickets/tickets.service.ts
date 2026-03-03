@@ -161,6 +161,7 @@ export class TicketsService {
   async scanTicket(
     qrData: string,
     scannedByUserId: string,
+    expectedEventId?: string,
   ): Promise<{
     ticket: TicketDocument;
     userEmail: string;
@@ -184,6 +185,17 @@ export class TicketsService {
 
     if (!ticket) {
       throw new NotFoundException('Invalid QR code - no ticket found');
+    }
+
+    // Check that the ticket belongs to the expected event
+    if (expectedEventId) {
+      const ticketEventId = (ticket.eventId as any)?._id?.toString() || ticket.eventId?.toString();
+      if (ticketEventId !== expectedEventId) {
+        const eventTitle = (ticket.eventId as any)?.title || 'another event';
+        throw new BadRequestException(
+          `This ticket belongs to "${eventTitle}", not this event.`,
+        );
+      }
     }
 
     // Check if booking is confirmed
