@@ -243,6 +243,15 @@ const BookingTicketsPage = () => {
 
     const viewTicket = async (ticket: Ticket) => {
         try {
+            // Open the window BEFORE any async/await to preserve the user-gesture
+            // chain. Mobile browsers (iOS Safari in particular) block window.open()
+            // if it is called after an await, even if it originated from a tap.
+            const win = window.open('', '_blank');
+            if (!win) {
+                toast.error('Popup was blocked. Please allow popups for this site and try again.');
+                return;
+            }
+
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d')!;
             const width = 600;
@@ -351,9 +360,12 @@ const BookingTicketsPage = () => {
   <img src="${dataUrl}" alt="Ticket ${ticket.seatRow}${ticket.seatNumber}" />
 </body>
 </html>`;
-            const blob = new Blob([html], { type: 'text/html' });
-            const url = URL.createObjectURL(blob);
-            window.open(url, '_blank');
+            // Write the generated HTML into the window we already opened above.
+            // This avoids creating a blob URL and keeps everything in the same
+            // trusted browsing context so mobile browsers don't block it.
+            win.document.open();
+            win.document.write(html);
+            win.document.close();
         } catch (err) {
             console.error('Error generating ticket view:', err);
             toast.error('Failed to open ticket view');
