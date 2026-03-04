@@ -22,6 +22,7 @@ let User = class User {
     email;
     phone;
     instapayNumber;
+    instapayQR;
     profilePicture;
     password;
     role;
@@ -47,6 +48,10 @@ __decorate([
     (0, mongoose_1.Prop)(),
     __metadata("design:type", String)
 ], User.prototype, "instapayNumber", void 0);
+__decorate([
+    (0, mongoose_1.Prop)(),
+    __metadata("design:type", String)
+], User.prototype, "instapayQR", void 0);
 __decorate([
     (0, mongoose_1.Prop)({ required: false }),
     __metadata("design:type", String)

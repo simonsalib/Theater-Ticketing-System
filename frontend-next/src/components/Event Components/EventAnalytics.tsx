@@ -113,7 +113,7 @@ const EventAnalytics = () => {
                 </div>
                 <div className="stat-card">
                     <h3>Total Revenue</h3>
-                    <p>${analytics?.totalRevenue?.toFixed(2) || '0.00'}</p>
+                    <p>{analytics?.totalRevenue?.toFixed(2) || '0.00'} EGP</p>
                 </div>
                 <div className="stat-card">
                     <h3>Average Sales Rate</h3>
@@ -208,7 +208,7 @@ const EventAnalytics = () => {
                                                 </div>
                                             </td>
                                             <td className={getRevenueClass(event.revenue)}>
-                                                ${event.revenue?.toFixed(2)}
+                                                ${event.revenue?.toFixed(2)} EGP
                                             </td>
                                         </tr>
                                     ))}

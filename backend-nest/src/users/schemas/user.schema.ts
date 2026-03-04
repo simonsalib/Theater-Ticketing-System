@@ -23,6 +23,9 @@ export class User {
     @Prop()
     instapayNumber: string;
 
+    @Prop()
+    instapayQR: string;
+
     @Prop({ required: false })
     profilePicture?: string;
 

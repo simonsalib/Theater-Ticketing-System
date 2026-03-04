@@ -46,6 +46,7 @@ const QRScannerPage = () => {
     const [scanHistory, setScanHistory] = useState<ScanResult[]>([]);
     const scannerRef = useRef<any>(null);
     const scannerContainerRef = useRef<HTMLDivElement>(null);
+    const isProcessingRef = useRef(false);
 
     useEffect(() => {
         fetchStats();
@@ -106,9 +107,14 @@ const QRScannerPage = () => {
                     qrbox: { width: 250, height: 250 },
                 },
                 async (decodedText) => {
+                    // Prevent multiple scans - only process the first one
+                    if (isProcessingRef.current) return;
+                    isProcessingRef.current = true;
+
+                    // Stop camera immediately to prevent further reads
+                    stopScanner();
                     // QR code successfully decoded
                     await handleScan(decodedText);
-                    stopScanner();
                 },
                 (errorMessage) => {
                     // Scan error (ignore - continuous scanning)
@@ -140,7 +146,7 @@ const QRScannerPage = () => {
 
     const handleScan = async (qrData: string) => {
         try {
-            const res = await api.post('/tickets/scan', { qrData });
+            const res = await api.post('/tickets/scan', { qrData, eventId });
             const result: ScanResult = res.data;
             setScanResult(result);
             setScanHistory(prev => [result, ...prev.slice(0, 19)]); // Keep last 20
@@ -161,6 +167,7 @@ const QRScannerPage = () => {
     const resetScan = () => {
         setScanResult(null);
         setScanError(null);
+        isProcessingRef.current = false;
     };
 
     return (

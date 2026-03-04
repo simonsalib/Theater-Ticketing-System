@@ -102,7 +102,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, index = 0 }) => {
                         <h3 className="card-title">{event.title}</h3>
                         {standardPrice !== undefined && (
                             <div className="price-tag">
-                                <span className="price-amount">${standardPrice.toFixed(2)}</span>
+                                <span className="price-amount">{standardPrice.toFixed(2)} EGP</span>
                             </div>
                         )}
                     </div>

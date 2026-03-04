@@ -222,7 +222,7 @@ const EventDetailsPage = () => {
                         <div className="action-section">
                             <div className="price-display">
                                 <span className="price-label">Price per ticket</span>
-                                <span className="price-amount">${event.ticketPrice?.toFixed(2) || '0.00'}</span>
+                                <span className="price-amount">{event.ticketPrice?.toFixed(2) || '0.00'} EGP</span>
                             </div>
                             {user?.role === "Standard User" && (
                                 <motion.button className={`book-now-btn-detail ${ticketInfo.status === 'sold-out' ? 'disabled' : ''}`} onClick={() => router.push(`/bookings/new/${event._id}`)} disabled={ticketInfo.status === 'sold-out'} whileHover={ticketInfo.status !== 'sold-out' ? { scale: 1.03 } : {}} whileTap={ticketInfo.status !== 'sold-out' ? { scale: 0.98 } : {}}>

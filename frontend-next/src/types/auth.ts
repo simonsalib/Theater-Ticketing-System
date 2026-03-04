@@ -7,7 +7,10 @@ export interface User {
     name: string;
     email: string;
     role: UserRole;
+    phone?: string;
     profilePicture?: string;
+    instapayNumber?: string;
+    instapayQR?: string;
     isVerified?: boolean;
     createdAt?: string;
 }

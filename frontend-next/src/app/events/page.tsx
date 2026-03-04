@@ -1,10 +1,10 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from "@/services/api";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiSearch, FiCalendar, FiUser, FiArrowRight } from 'react-icons/fi';
+import { FiSearch, FiCalendar, FiUser, FiArrowRight, FiCamera } from 'react-icons/fi';
 import { useAuth } from '@/auth/AuthContext';
 import EventCard from '@/components/Event Components/EventCard';
 import { Event } from '@/types/event';
@@ -15,6 +15,10 @@ const EventListPage = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [myEvents, setMyEvents] = useState<Event[]>([]);
+    const [scanDropdownOpen, setScanDropdownOpen] = useState(false);
+    const [scanEventsLoading, setScanEventsLoading] = useState(false);
+    const scanDropdownRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
     const { user, loading: authLoading } = useAuth();
 
@@ -29,6 +33,32 @@ const EventListPage = () => {
             router.push('/admin/events');
         }
     }, [user, authLoading, router]);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (scanDropdownRef.current && !scanDropdownRef.current.contains(e.target as Node)) {
+                setScanDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const handleScanQRClick = async () => {
+        if (scanDropdownOpen) { setScanDropdownOpen(false); return; }
+        setScanEventsLoading(true);
+        setScanDropdownOpen(true);
+        try {
+            const response = await api.get<any>('/user/events');
+            const data = response.data.success ? response.data.data : response.data;
+            setMyEvents(Array.isArray(data) ? data : []);
+        } catch {
+            setMyEvents([]);
+        } finally {
+            setScanEventsLoading(false);
+        }
+    };
 
     const fetchEvents = async () => {
         try {
@@ -104,6 +134,66 @@ const EventListPage = () => {
 
                         <div className="action-buttons">
                             {user?.role === "Organizer" && <Link href="/my-events" className="action-btn primary"><FiCalendar /> <span>My Events</span></Link>}
+                            {user?.role === "Organizer" && (
+                                <div className="scan-qr-wrapper" ref={scanDropdownRef} style={{ position: 'relative' }}>
+                                    <button className="action-btn secondary" onClick={handleScanQRClick}>
+                                        <FiCamera /> <span>Scan QR</span>
+                                    </button>
+                                    <AnimatePresence>
+                                        {scanDropdownOpen && (
+                                            <motion.div
+                                                className="scan-event-dropdown"
+                                                initial={{ opacity: 0, y: -8 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: -8 }}
+                                                transition={{ duration: 0.18 }}
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: 'calc(100% + 8px)',
+                                                    right: 0,
+                                                    background: 'var(--card-bg, #1e1e2e)',
+                                                    border: '1px solid var(--border-color, #333)',
+                                                    borderRadius: '10px',
+                                                    minWidth: '220px',
+                                                    boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
+                                                    zIndex: 100,
+                                                    overflow: 'hidden',
+                                                }}
+                                            >
+                                                <div style={{ padding: '10px 14px 6px', fontSize: '0.75rem', color: 'var(--text-muted, #888)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Select event to scan</div>
+                                                {scanEventsLoading ? (
+                                                    <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted, #888)', fontSize: '0.9rem' }}>Loading...</div>
+                                                ) : myEvents.length === 0 ? (
+                                                    <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted, #888)', fontSize: '0.9rem' }}>No events found</div>
+                                                ) : (
+                                                    myEvents.map(event => (
+                                                        <button
+                                                            key={event._id}
+                                                            onClick={() => { setScanDropdownOpen(false); router.push(`/my-events/${event._id}/scan`); }}
+                                                            style={{
+                                                                display: 'block',
+                                                                width: '100%',
+                                                                textAlign: 'left',
+                                                                padding: '10px 14px',
+                                                                background: 'none',
+                                                                border: 'none',
+                                                                color: 'var(--text-primary, #fff)',
+                                                                cursor: 'pointer',
+                                                                fontSize: '0.9rem',
+                                                                transition: 'background 0.15s',
+                                                            }}
+                                                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--hover-bg, rgba(255,255,255,0.07))')}
+                                                            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                                                        >
+                                                            {event.title}
+                                                        </button>
+                                                    ))
+                                                )}
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            )}
                             {user?.role === "Standard User" && <Link href="/bookings" className="action-btn secondary"><FiUser /> <span>My Bookings</span></Link>}
                         </div>
                     </div>

@@ -53,7 +53,7 @@ export class UsersService {
     }
 
     async updateProfile(id: string, updateDto: any): Promise<UserDocument> {
-        const { name, email, phone, profilePicture, instapayNumber } = updateDto;
+        const { name, email, phone, profilePicture, instapayNumber, instapayQR } = updateDto;
 
         const user = await this.userModel.findById(id).exec();
         if (!user) {
@@ -69,16 +69,20 @@ export class UsersService {
 
         if (name) user.name = name;
         if (email) user.email = email;
-        if (phone !== undefined) (user as any).phone = phone;
-        if (profilePicture !== undefined) user.profilePicture = profilePicture;
-        if (instapayNumber !== undefined) (user as any).instapayNumber = instapayNumber;
+        if (phone !== undefined) user.set('phone', phone);
+        if (profilePicture !== undefined) user.set('profilePicture', profilePicture);
+        if (instapayNumber !== undefined) user.set('instapayNumber', instapayNumber);
+        if (instapayQR !== undefined) {
+            user.set('instapayQR', instapayQR);
+            user.markModified('instapayQR');
+        }
 
         return await user.save();
     }
 
     // Admin-only: Create user with Admin or Organizer role (requires password change on first login)
     async createUserByAdmin(createDto: any): Promise<UserDocument> {
-        const { email, password, name, role, phone, instapayNumber } = createDto;
+        const { email, password, name, role, phone, instapayNumber, instapayQR } = createDto;
 
         // Only allow Admin or Organizer roles
         if (role !== UserRole.ADMIN && role !== UserRole.ORGANIZER) {
@@ -102,6 +106,7 @@ export class UsersService {
         };
         if (phone) newUserPayload.phone = phone;
         if (instapayNumber) newUserPayload.instapayNumber = instapayNumber;
+        if (instapayQR) newUserPayload.instapayQR = instapayQR;
 
         const newUser = new this.userModel(newUserPayload);
 

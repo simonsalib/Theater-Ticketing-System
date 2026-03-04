@@ -38,13 +38,19 @@ export declare class Event {
     otp: string;
     otpExpires: Date;
 }
-export declare const EventSchema: MongooseSchema<Event, import("mongoose").Model<Event, any, any, any, Document<unknown, any, Event, any, import("mongoose").DefaultSchemaOptions> & Event & {
+export declare const EventSchema: MongooseSchema<Event, import("mongoose").Model<Event, any, any, any, (Document<unknown, any, Event, any, import("mongoose").DefaultSchemaOptions> & Event & {
     _id: import("mongoose").Types.ObjectId;
 } & {
     __v: number;
-}, any, Event>, {}, {}, {}, {}, import("mongoose").DefaultSchemaOptions, Event, Document<unknown, {}, Event, {
+} & {
     id: string;
-}, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Event & {
+}) | (Document<unknown, any, Event, any, import("mongoose").DefaultSchemaOptions> & Event & {
+    _id: import("mongoose").Types.ObjectId;
+} & {
+    __v: number;
+}), any, Event>, {}, {}, {}, {}, import("mongoose").DefaultSchemaOptions, Event, Document<unknown, {}, Event, {
+    id: string;
+}, import("mongoose").DefaultSchemaOptions> & Omit<Event & {
     _id: import("mongoose").Types.ObjectId;
 } & {
     __v: number;
@@ -53,7 +59,7 @@ export declare const EventSchema: MongooseSchema<Event, import("mongoose").Model
 }, {
     organizerId?: import("mongoose").SchemaDefinitionProperty<User | MongooseSchema.Types.ObjectId, Event, Document<unknown, {}, Event, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Event & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Event & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -62,7 +68,7 @@ export declare const EventSchema: MongooseSchema<Event, import("mongoose").Model
     }> | undefined;
     title?: import("mongoose").SchemaDefinitionProperty<string, Event, Document<unknown, {}, Event, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Event & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Event & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -71,7 +77,7 @@ export declare const EventSchema: MongooseSchema<Event, import("mongoose").Model
     }> | undefined;
     description?: import("mongoose").SchemaDefinitionProperty<string, Event, Document<unknown, {}, Event, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Event & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Event & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -80,7 +86,7 @@ export declare const EventSchema: MongooseSchema<Event, import("mongoose").Model
     }> | undefined;
     date?: import("mongoose").SchemaDefinitionProperty<Date, Event, Document<unknown, {}, Event, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Event & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Event & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -89,7 +95,7 @@ export declare const EventSchema: MongooseSchema<Event, import("mongoose").Model
     }> | undefined;
     location?: import("mongoose").SchemaDefinitionProperty<string, Event, Document<unknown, {}, Event, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Event & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Event & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -98,7 +104,7 @@ export declare const EventSchema: MongooseSchema<Event, import("mongoose").Model
     }> | undefined;
     category?: import("mongoose").SchemaDefinitionProperty<string, Event, Document<unknown, {}, Event, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Event & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Event & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -107,7 +113,7 @@ export declare const EventSchema: MongooseSchema<Event, import("mongoose").Model
     }> | undefined;
     image?: import("mongoose").SchemaDefinitionProperty<string, Event, Document<unknown, {}, Event, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Event & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Event & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -116,7 +122,7 @@ export declare const EventSchema: MongooseSchema<Event, import("mongoose").Model
     }> | undefined;
     ticketPrice?: import("mongoose").SchemaDefinitionProperty<number, Event, Document<unknown, {}, Event, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Event & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Event & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -125,7 +131,7 @@ export declare const EventSchema: MongooseSchema<Event, import("mongoose").Model
     }> | undefined;
     totalTickets?: import("mongoose").SchemaDefinitionProperty<number, Event, Document<unknown, {}, Event, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Event & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Event & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -134,7 +140,7 @@ export declare const EventSchema: MongooseSchema<Event, import("mongoose").Model
     }> | undefined;
     remainingTickets?: import("mongoose").SchemaDefinitionProperty<number, Event, Document<unknown, {}, Event, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Event & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Event & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -143,7 +149,7 @@ export declare const EventSchema: MongooseSchema<Event, import("mongoose").Model
     }> | undefined;
     status?: import("mongoose").SchemaDefinitionProperty<string, Event, Document<unknown, {}, Event, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Event & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Event & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -152,7 +158,7 @@ export declare const EventSchema: MongooseSchema<Event, import("mongoose").Model
     }> | undefined;
     theater?: import("mongoose").SchemaDefinitionProperty<MongooseSchema.Types.ObjectId | Theater, Event, Document<unknown, {}, Event, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Event & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Event & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -161,7 +167,7 @@ export declare const EventSchema: MongooseSchema<Event, import("mongoose").Model
     }> | undefined;
     hasTheaterSeating?: import("mongoose").SchemaDefinitionProperty<boolean, Event, Document<unknown, {}, Event, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Event & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Event & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -170,7 +176,7 @@ export declare const EventSchema: MongooseSchema<Event, import("mongoose").Model
     }> | undefined;
     seatPricing?: import("mongoose").SchemaDefinitionProperty<SeatPricing[], Event, Document<unknown, {}, Event, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Event & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Event & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -179,7 +185,7 @@ export declare const EventSchema: MongooseSchema<Event, import("mongoose").Model
     }> | undefined;
     bookedSeats?: import("mongoose").SchemaDefinitionProperty<BookedSeat[], Event, Document<unknown, {}, Event, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Event & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Event & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -188,7 +194,7 @@ export declare const EventSchema: MongooseSchema<Event, import("mongoose").Model
     }> | undefined;
     seatConfig?: import("mongoose").SchemaDefinitionProperty<EventSeatConfig[], Event, Document<unknown, {}, Event, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Event & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Event & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -197,7 +203,7 @@ export declare const EventSchema: MongooseSchema<Event, import("mongoose").Model
     }> | undefined;
     otp?: import("mongoose").SchemaDefinitionProperty<string, Event, Document<unknown, {}, Event, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Event & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Event & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -206,7 +212,7 @@ export declare const EventSchema: MongooseSchema<Event, import("mongoose").Model
     }> | undefined;
     otpExpires?: import("mongoose").SchemaDefinitionProperty<Date, Event, Document<unknown, {}, Event, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Event & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Event & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;

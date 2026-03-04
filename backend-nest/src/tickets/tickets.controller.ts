@@ -51,8 +51,8 @@ export class TicketsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ORGANIZER)
   @Post('scan')
-  async scanTicket(@Body('qrData') qrData: string, @Req() req: any) {
-    const result = await this.ticketsService.scanTicket(qrData, req.user.userId);
+  async scanTicket(@Body() body: { qrData: string; eventId?: string }, @Req() req: any) {
+    const result = await this.ticketsService.scanTicket(body.qrData, req.user.userId, body.eventId);
     return result;
   }
 

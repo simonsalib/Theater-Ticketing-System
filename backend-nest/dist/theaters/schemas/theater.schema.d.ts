@@ -43,13 +43,19 @@ export declare class Theater {
     isActive: boolean;
     image: string;
 }
-export declare const TheaterSchema: MongooseSchema<Theater, import("mongoose").Model<Theater, any, any, any, Document<unknown, any, Theater, any, import("mongoose").DefaultSchemaOptions> & Theater & {
+export declare const TheaterSchema: MongooseSchema<Theater, import("mongoose").Model<Theater, any, any, any, (Document<unknown, any, Theater, any, import("mongoose").DefaultSchemaOptions> & Theater & {
     _id: import("mongoose").Types.ObjectId;
 } & {
     __v: number;
-}, any, Theater>, {}, {}, {}, {}, import("mongoose").DefaultSchemaOptions, Theater, Document<unknown, {}, Theater, {
+} & {
     id: string;
-}, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Theater & {
+}) | (Document<unknown, any, Theater, any, import("mongoose").DefaultSchemaOptions> & Theater & {
+    _id: import("mongoose").Types.ObjectId;
+} & {
+    __v: number;
+}), any, Theater>, {}, {}, {}, {}, import("mongoose").DefaultSchemaOptions, Theater, Document<unknown, {}, Theater, {
+    id: string;
+}, import("mongoose").DefaultSchemaOptions> & Omit<Theater & {
     _id: import("mongoose").Types.ObjectId;
 } & {
     __v: number;
@@ -58,7 +64,7 @@ export declare const TheaterSchema: MongooseSchema<Theater, import("mongoose").M
 }, {
     name?: import("mongoose").SchemaDefinitionProperty<string, Theater, Document<unknown, {}, Theater, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Theater & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Theater & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -67,7 +73,7 @@ export declare const TheaterSchema: MongooseSchema<Theater, import("mongoose").M
     }> | undefined;
     description?: import("mongoose").SchemaDefinitionProperty<string, Theater, Document<unknown, {}, Theater, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Theater & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Theater & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -76,7 +82,7 @@ export declare const TheaterSchema: MongooseSchema<Theater, import("mongoose").M
     }> | undefined;
     createdBy?: import("mongoose").SchemaDefinitionProperty<User | MongooseSchema.Types.ObjectId, Theater, Document<unknown, {}, Theater, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Theater & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Theater & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -85,7 +91,7 @@ export declare const TheaterSchema: MongooseSchema<Theater, import("mongoose").M
     }> | undefined;
     layout?: import("mongoose").SchemaDefinitionProperty<TheaterLayout, Theater, Document<unknown, {}, Theater, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Theater & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Theater & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -94,7 +100,7 @@ export declare const TheaterSchema: MongooseSchema<Theater, import("mongoose").M
     }> | undefined;
     seatConfig?: import("mongoose").SchemaDefinitionProperty<SeatConfig[], Theater, Document<unknown, {}, Theater, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Theater & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Theater & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -103,7 +109,7 @@ export declare const TheaterSchema: MongooseSchema<Theater, import("mongoose").M
     }> | undefined;
     totalSeats?: import("mongoose").SchemaDefinitionProperty<number, Theater, Document<unknown, {}, Theater, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Theater & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Theater & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -112,7 +118,7 @@ export declare const TheaterSchema: MongooseSchema<Theater, import("mongoose").M
     }> | undefined;
     vipSeats?: import("mongoose").SchemaDefinitionProperty<number, Theater, Document<unknown, {}, Theater, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Theater & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Theater & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -121,7 +127,7 @@ export declare const TheaterSchema: MongooseSchema<Theater, import("mongoose").M
     }> | undefined;
     premiumSeats?: import("mongoose").SchemaDefinitionProperty<number, Theater, Document<unknown, {}, Theater, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Theater & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Theater & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -130,7 +136,7 @@ export declare const TheaterSchema: MongooseSchema<Theater, import("mongoose").M
     }> | undefined;
     isActive?: import("mongoose").SchemaDefinitionProperty<boolean, Theater, Document<unknown, {}, Theater, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Theater & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Theater & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
@@ -139,7 +145,7 @@ export declare const TheaterSchema: MongooseSchema<Theater, import("mongoose").M
     }> | undefined;
     image?: import("mongoose").SchemaDefinitionProperty<string, Theater, Document<unknown, {}, Theater, {
         id: string;
-    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<Theater & {
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Theater & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;

@@ -90,7 +90,7 @@ let UsersService = class UsersService {
         }
     }
     async updateProfile(id, updateDto) {
-        const { name, email, phone, profilePicture, instapayNumber } = updateDto;
+        const { name, email, phone, profilePicture, instapayNumber, instapayQR } = updateDto;
         const user = await this.userModel.findById(id).exec();
         if (!user) {
             throw new common_1.NotFoundException('User not found');
@@ -106,15 +106,19 @@ let UsersService = class UsersService {
         if (email)
             user.email = email;
         if (phone !== undefined)
-            user.phone = phone;
+            user.set('phone', phone);
         if (profilePicture !== undefined)
-            user.profilePicture = profilePicture;
+            user.set('profilePicture', profilePicture);
         if (instapayNumber !== undefined)
-            user.instapayNumber = instapayNumber;
+            user.set('instapayNumber', instapayNumber);
+        if (instapayQR !== undefined) {
+            user.set('instapayQR', instapayQR);
+            user.markModified('instapayQR');
+        }
         return await user.save();
     }
     async createUserByAdmin(createDto) {
-        const { email, password, name, role, phone, instapayNumber } = createDto;
+        const { email, password, name, role, phone, instapayNumber, instapayQR } = createDto;
         if (role !== user_schema_1.UserRole.ADMIN && role !== user_schema_1.UserRole.ORGANIZER) {
             throw new common_1.BadRequestException('Admin can only create Admin or Organizer accounts');
         }
@@ -135,6 +139,8 @@ let UsersService = class UsersService {
             newUserPayload.phone = phone;
         if (instapayNumber)
             newUserPayload.instapayNumber = instapayNumber;
+        if (instapayQR)
+            newUserPayload.instapayQR = instapayQR;
         const newUser = new this.userModel(newUserPayload);
         return newUser.save();
     }

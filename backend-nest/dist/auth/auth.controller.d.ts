@@ -25,7 +25,10 @@ export declare class AuthController {
                 name: string;
                 email: string;
                 role: string;
+                phone: any;
                 profilePicture: string | undefined;
+                instapayNumber: any;
+                instapayQR: any;
             };
         };
     }>;
@@ -68,7 +71,10 @@ export declare class AuthController {
                 name: string;
                 email: string;
                 role: string;
+                phone: any;
                 profilePicture: string | undefined;
+                instapayNumber: any;
+                instapayQR: any;
             };
         };
     }>;
