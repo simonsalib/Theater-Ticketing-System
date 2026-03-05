@@ -847,6 +847,12 @@
     box-shadow: 0 0 15px rgba(14, 165, 233, 0.4);
 }
 
+.seat.booked {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    border-color: #f87171;
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+}
+
 /* Category Tool Helpers */
 .tool-btn.type-vip.active {
     background: #f59e0b !important;

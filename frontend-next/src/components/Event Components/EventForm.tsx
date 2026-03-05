@@ -44,6 +44,16 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
     const [selectedTheaterLayout, setSelectedTheaterLayout] = useState<any>(null);
     const [showSeatConfigurator, setShowSeatConfigurator] = useState(false);
     const [eventSeatConfig, setEventSeatConfig] = useState<any[]>(initialData?.seatConfig || []);
+    const [preBookedSeats, setPreBookedSeats] = useState<any[]>(() => {
+        // Load organizer-reserved seats (those without a bookingId) from backend's bookedSeats
+        const booked = (initialData as any)?.bookedSeats;
+        if (Array.isArray(booked)) {
+            return booked
+                .filter((s: any) => !s.bookingId)
+                .map((s: any) => ({ section: s.section || 'main', row: s.row, seatNumber: s.seatNumber }));
+        }
+        return [];
+    });
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -128,8 +138,9 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
         });
     };
 
-    const handleSeatConfigSave = (newConfig: any[], newPricing: any[]) => {
+    const handleSeatConfigSave = (newConfig: any[], newPricing: any[], newPreBooked: any[] = []) => {
         setEventSeatConfig(newConfig);
+        setPreBookedSeats(newPreBooked);
         const pricingObj: Record<string, number> = {};
         newPricing.forEach(p => { pricingObj[p.seatType] = p.price; });
         setFormData(prev => ({ ...prev, seatPricing: pricingObj }));
@@ -212,6 +223,9 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
                 if (eventSeatConfig && eventSeatConfig.length > 0) {
                     requestData.seatConfig = eventSeatConfig;
                 }
+                if (preBookedSeats && preBookedSeats.length > 0) {
+                    requestData.preBookedSeats = preBookedSeats;
+                }
             }
 
             let response;
@@ -239,6 +253,7 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
                 theaterLayout={selectedTheaterLayout}
                 initialSeatConfig={eventSeatConfig}
                 initialPricing={formData.seatPricing}
+                initialPreBookedSeats={preBookedSeats}
                 onSave={handleSeatConfigSave}
                 onCancel={() => setShowSeatConfigurator(false)}
             />

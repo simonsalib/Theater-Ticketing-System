@@ -206,6 +206,10 @@
     background: linear-gradient(180deg, #38bdf8 0%, #0ea5e9 100%);
 }
 
+.category-select-btn.type-booked .cat-color {
+    background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+}
+
 .category-select-btn.type-vip.active {
     border-color: #fbbf24;
     color: #fbbf24;
@@ -224,6 +228,11 @@
 .category-select-btn.type-standard.active {
     border-color: #6b7280;
     color: #9ca3af;
+}
+
+.category-select-btn.type-booked.active {
+    border-color: #ef4444;
+    color: #ef4444;
 }
 
 /* Pricing Section */
@@ -344,6 +353,10 @@
 
 .legend-color.wheelchair {
     background: linear-gradient(180deg, #38bdf8 0%, #0ea5e9 100%);
+}
+
+.legend-color.booked {
+    background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
 }
 
 .legend-color.disabled {

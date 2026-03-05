@@ -37,7 +37,22 @@ export class EventsService {
             hasTheaterSeating,
             seatPricing,
             seatConfig,
+            preBookedSeats,
         } = createDto;
+
+        const isTheater = hasTheaterSeating === 'true' || hasTheaterSeating === true;
+
+        // Convert preBookedSeats to bookedSeats format (no bookingId = organizer-reserved)
+        const bookedSeats = [];
+        if (isTheater && preBookedSeats && Array.isArray(preBookedSeats)) {
+            for (const s of preBookedSeats) {
+                bookedSeats.push({
+                    row: s.row,
+                    seatNumber: s.seatNumber,
+                    section: s.section || 'main',
+                });
+            }
+        }
 
         const event = new this.eventModel({
             organizerId: userId,
@@ -50,10 +65,11 @@ export class EventsService {
             totalTickets,
             remainingTickets: totalTickets,
             image: image || 'default-image.jpg',
-            theater: hasTheaterSeating === 'true' || hasTheaterSeating === true ? theater : null,
-            hasTheaterSeating: hasTheaterSeating === 'true' || hasTheaterSeating === true,
+            theater: isTheater ? theater : null,
+            hasTheaterSeating: isTheater,
             seatPricing: typeof seatPricing === 'string' ? JSON.parse(seatPricing) : seatPricing || [],
             seatConfig: typeof seatConfig === 'string' ? JSON.parse(seatConfig) : seatConfig || [],
+            bookedSeats,
         });
 
         return event.save();
@@ -120,6 +136,22 @@ export class EventsService {
             try {
                 updateDto.seatConfig = JSON.parse(updateDto.seatConfig);
             } catch (e) { }
+        }
+
+        // Handle preBookedSeats: replace organizer-reserved seats (those without bookingId)
+        if (updateDto.preBookedSeats && Array.isArray(updateDto.preBookedSeats)) {
+            // Keep booking-linked seats, replace organizer-reserved ones
+            const bookingLinkedSeats = (event.bookedSeats || []).filter(
+                (s: any) => s.bookingId,
+            );
+            const newOrganizerSeats = updateDto.preBookedSeats.map((s: any) => ({
+                row: s.row,
+                seatNumber: s.seatNumber,
+                section: s.section || 'main',
+            }));
+            event.bookedSeats = [...bookingLinkedSeats, ...newOrganizerSeats];
+            event.markModified('bookedSeats');
+            delete updateDto.preBookedSeats;
         }
 
         Object.assign(event, updateDto);
