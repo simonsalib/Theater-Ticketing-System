@@ -108,8 +108,8 @@ const CreateUserPage = () => {
             return;
         }
         const phone = formData.phone.trim();
-        if (!/^\d{11}$/.test(phone)) {
-            setError('Phone number must be exactly 11 digits');
+        if (!/^01\d{9}$/.test(phone)) {
+            setError('Phone number must be 11 digits starting with 01');
             return;
         }
 
@@ -304,7 +304,7 @@ const CreateUserPage = () => {
                             name="phone"
                             value={formData.phone}
                             onChange={handleChange}
-                            placeholder="Enter 11-digit phone number"
+                            placeholder="01xxxxxxxxx"
                             style={{
                                 width: '100%',
                                 padding: '0.75rem 1rem',

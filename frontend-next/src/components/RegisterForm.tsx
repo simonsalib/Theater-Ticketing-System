@@ -53,9 +53,9 @@ export default function RegisterForm() {
         }
 
         const phone = form.phone.trim();
-        if (!/^\d{11}$/.test(phone)) {
-            setError("Phone number must be exactly 11 digits");
-            toast.error("Phone number must be exactly 11 digits");
+        if (!/^01\d{9}$/.test(phone)) {
+            setError("Phone number must be 11 digits starting with 01");
+            toast.error("Phone number must be 11 digits starting with 01");
             setLoading(false);
             return;
         }
@@ -179,7 +179,7 @@ export default function RegisterForm() {
                                 <input
                                     type="tel"
                                     name="phone"
-                                    placeholder="Enter your phone number"
+                                    placeholder="01xxxxxxxxx"
                                     className="form-input"
                                     value={form.phone}
                                     onChange={handleChange}

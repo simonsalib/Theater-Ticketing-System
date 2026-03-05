@@ -28,6 +28,11 @@ export class AuthService {
     async register(registerDto: any) {
         const { email, password, name, phone } = registerDto;
 
+        // Validate phone: must be 11 digits starting with 01
+        if (phone && !/^01\d{9}$/.test(phone)) {
+            throw new BadRequestException('Phone number must be 11 digits starting with 01');
+        }
+
         // Check if email already exists as a verified user
         const existingUser = await this.usersService.findOneByEmail(email);
         if (existingUser) {

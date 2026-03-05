@@ -69,7 +69,12 @@ export class UsersService {
 
         if (name) user.name = name;
         if (email) user.email = email;
-        if (phone !== undefined) user.set('phone', phone);
+        if (phone !== undefined) {
+            if (phone && !/^01\d{9}$/.test(phone)) {
+                throw new BadRequestException('Phone number must be 11 digits starting with 01');
+            }
+            user.set('phone', phone);
+        }
         if (profilePicture !== undefined) user.set('profilePicture', profilePicture);
         if (instapayNumber !== undefined) user.set('instapayNumber', instapayNumber);
         if (instapayQR !== undefined) {
@@ -104,7 +109,12 @@ export class UsersService {
             isVerified: false, // Requires OTP verification
             requiresPasswordChange: true, // Must set own password on first login
         };
-        if (phone) newUserPayload.phone = phone;
+        if (phone) {
+            if (!/^01\d{9}$/.test(phone)) {
+                throw new BadRequestException('Phone number must be 11 digits starting with 01');
+            }
+            newUserPayload.phone = phone;
+        }
         if (instapayNumber) newUserPayload.instapayNumber = instapayNumber;
         if (instapayQR) newUserPayload.instapayQR = instapayQR;
 

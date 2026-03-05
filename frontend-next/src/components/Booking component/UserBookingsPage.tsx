@@ -247,12 +247,7 @@ const UserBookingsPage = () => {
                             const event = eventDetails[booking.eventId];
                             const timeLeft = timers[booking._id];
                             const instapayQR = event?.organizerId?.instapayQR;
-                            const rawInstapay = event?.organizerId?.instapayNumber ?? '';
-                            const instapayNumber = rawInstapay.startsWith('+20')
-                                ? rawInstapay.substring(3)
-                                : rawInstapay.startsWith('20') && rawInstapay.length >= 12
-                                    ? rawInstapay.substring(2)
-                                    : rawInstapay;
+                            const instapayNumber = event?.organizerId?.instapayNumber ?? '';
 
                             return (
                                 <div key={booking._id} style={{

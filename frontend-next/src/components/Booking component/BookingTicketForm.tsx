@@ -154,8 +154,8 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
                 }
 
                 const phone = attendeeInfo[i].attendeePhone.trim();
-                if (!/^\d{11}$/.test(phone)) {
-                    setError(`Phone number for seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber} must be exactly 11 digits`);
+                if (!/^01\d{9}$/.test(phone)) {
+                    setError(`Phone for seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber} must be 11 digits starting with 01`);
                     return;
                 }
             }
@@ -410,7 +410,7 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
                                                         <FiPhone className="field-icon" />
                                                         <input
                                                             type="tel"
-                                                            placeholder="Phone Number"
+                                                            placeholder="01xxxxxxxxx"
                                                             value={attendeeInfo[index]?.attendeePhone || ''}
                                                             onChange={(e) => handleAttendeeChange(index, 'attendeePhone', e.target.value)}
                                                             className="attendee-input"

@@ -123,8 +123,8 @@ const UpdateProfilePageContent = () => {
         setError('');
 
         const phone = formData.phone.trim();
-        if (phone && !/^\d{11}$/.test(phone)) {
-            const msg = "Phone number must be exactly 11 digits";
+        if (phone && !/^01\d{9}$/.test(phone)) {
+            const msg = "Phone number must be 11 digits starting with 01";
             setError(msg);
             toast.error(msg);
             return;

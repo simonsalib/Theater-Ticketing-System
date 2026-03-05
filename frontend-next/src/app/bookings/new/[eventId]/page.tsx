@@ -101,7 +101,7 @@ const BookTicketPage = () => {
         // Initialize attendee info for each seat (preserve existing data)
         const newAttendeeInfo = selectedSeats.map((_seat, index) => {
             const existing = attendeeInfo[index];
-            return existing || { attendeeName: '', attendeePhone: '+20' };
+            return existing || { attendeeName: '', attendeePhone: '' };
         });
         setAttendeeInfo(newAttendeeInfo);
         setShowAttendeeForm(true);
@@ -147,8 +147,8 @@ const BookTicketPage = () => {
                     return;
                 }
 
-                if (!/^\d{11}$/.test(phoneField)) {
-                    toast.error(`Phone number for seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber} must be exactly 11 digits`);
+                if (!/^01\d{9}$/.test(phoneField)) {
+                    toast.error(`Phone for seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber} must be 11 digits starting with 01`);
                     return;
                 }
 
@@ -523,7 +523,7 @@ const BookTicketPage = () => {
                                                             <FiPhone className="field-icon" />
                                                             <input
                                                                 type="tel"
-                                                                placeholder="Phone Number"
+                                                                placeholder="01xxxxxxxxx"
                                                                 value={attendeeInfo[index]?.attendeePhone || ''}
                                                                 onChange={(e) => handleAttendeeChange(index, 'attendeePhone', e.target.value)}
                                                                 className="attendee-input"
