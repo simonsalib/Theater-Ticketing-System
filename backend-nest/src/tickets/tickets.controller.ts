@@ -52,7 +52,7 @@ export class TicketsController {
   @Roles(UserRole.ORGANIZER)
   @Post('scan')
   async scanTicket(@Body() body: { qrData: string; eventId?: string }, @Req() req: any) {
-    const result = await this.ticketsService.scanTicket(body.qrData, req.user.userId, body.eventId);
+    const result = await this.ticketsService.scanTicket(body.qrData, req.user._id, body.eventId);
     return result;
   }
 

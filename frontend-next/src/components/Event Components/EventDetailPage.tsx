@@ -385,12 +385,12 @@ const EventDetailsPage = ({ id }: EventDetailsPageProps) => {
                                     {event.hasTheaterSeating ? 'Starting from' : 'Price per ticket'}
                                 </span>
                                 <span className="price-amount">
-                                    ${event.hasTheaterSeating
+                                    {event.hasTheaterSeating
                                         ? (event.seatPricing?.find(p => p.seatType === 'standard')?.price?.toFixed(2) ||
                                             event.seatPricing?.[0]?.price?.toFixed(2) ||
                                             '0.00')
                                         : (event.ticketPrice?.toFixed(2) || '0.00')
-                                    }
+                                    } EGP
                                 </span>
                             </div>
 
@@ -409,6 +409,17 @@ const EventDetailsPage = ({ id }: EventDetailsPageProps) => {
                                             ? 'Select Seats'
                                             : 'Book Tickets'
                                     }
+                                </motion.button>
+                            )}
+                            {!user && ticketInfo.status !== 'sold-out' && (
+                                <motion.button
+                                    className="book-now-btn-detail"
+                                    onClick={() => router.push('/login')}
+                                    whileHover={{ scale: 1.03 }}
+                                    whileTap={{ scale: 0.98 }}
+                                >
+                                    <FiShoppingCart />
+                                    Login to Book
                                 </motion.button>
                             )}
                         </div>

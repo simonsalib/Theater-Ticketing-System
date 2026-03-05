@@ -75,10 +75,19 @@ export class EventsService {
         return event;
     }
 
-    async update(id: string, updateDto: any): Promise<EventDocument> {
+    async update(id: string, updateDto: any, user?: any): Promise<EventDocument> {
         const event = await this.eventModel.findById(id).exec();
         if (!event) {
             throw new NotFoundException('Event not found');
+        }
+
+        // Only the event organizer or an admin can update the event
+        if (user) {
+            const isAdmin = user.role === 'System Admin';
+            const isOwner = event.organizerId.toString() === user._id.toString();
+            if (!isAdmin && !isOwner) {
+                throw new ForbiddenException('You are not authorised to update this event');
+            }
         }
 
         // Prevent revoking an approved event if it has bookings
@@ -166,10 +175,19 @@ export class EventsService {
         await this.eventModel.deleteOne({ _id: event._id }).exec();
     }
 
-    async delete(id: string): Promise<void> {
+    async delete(id: string, user?: any): Promise<void> {
         const event = await this.eventModel.findById(id).exec();
         if (!event) {
             throw new NotFoundException('Event not found');
+        }
+
+        // Only the event organizer or an admin can delete the event
+        if (user) {
+            const isAdmin = user.role === 'System Admin';
+            const isOwner = event.organizerId.toString() === user._id.toString();
+            if (!isAdmin && !isOwner) {
+                throw new ForbiddenException('You are not authorised to delete this event');
+            }
         }
 
         if (event.status === 'approved') {
@@ -208,7 +226,24 @@ export class EventsService {
 
         const analytics = events.map((event) => {
             const ticketsSold = event.totalTickets - event.remainingTickets;
-            const percentageSold = (ticketsSold / event.totalTickets) * 100;
+            const percentageSold =
+                event.totalTickets > 0
+                    ? (ticketsSold / event.totalTickets) * 100
+                    : 0;
+
+            // For theater-seated events, revenue is the sum of prices from booked seats.
+            // For non-seated events, use ticketPrice * ticketsSold.
+            let revenue: number;
+            if (event.hasTheaterSeating && event.bookedSeats && event.seatPricing?.length > 0) {
+                // We can't access selectedSeats here easily, so approximate using
+                // the average seat price across all pricing tiers.
+                const avgPrice =
+                    event.seatPricing.reduce((s: number, p: any) => s + (p.price || 0), 0) /
+                    (event.seatPricing.length || 1);
+                revenue = ticketsSold * avgPrice;
+            } else {
+                revenue = ticketsSold * event.ticketPrice;
+            }
 
             return {
                 eventId: event._id,
@@ -217,7 +252,7 @@ export class EventsService {
                 ticketsSold: ticketsSold,
                 ticketsAvailable: event.remainingTickets,
                 percentageSold: percentageSold.toFixed(2),
-                revenue: ticketsSold * event.ticketPrice,
+                revenue,
             };
         });
 

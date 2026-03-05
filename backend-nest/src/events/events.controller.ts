@@ -10,10 +10,12 @@ import {
     Req,
     HttpCode,
     HttpStatus,
-    ForbiddenException,
 } from '@nestjs/common';
 import { EventsService } from './events.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { UserRole } from '../users/schemas/user.schema';
 
 @Controller('api/v1/event')
 export class EventsController {
@@ -37,11 +39,9 @@ export class EventsController {
     }
 
     @Get('all')
-    @UseGuards(JwtAuthGuard)
-    async findAll(@Req() req: any) {
-        if (req.user.role !== 'System Admin') {
-            throw new ForbiddenException('Only admins can view all events');
-        }
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN)
+    async findAll() {
         const data = await this.eventsService.findAll();
         return { success: true, data };
     }
@@ -71,9 +71,10 @@ export class EventsController {
     async update(
         @Param('id') id: string,
         @Body() updateDto: any,
+        @Req() req: any,
     ) {
         // Image is expected to be sent as base64 string in updateDto.image
-        const data = await this.eventsService.update(id, updateDto);
+        const data = await this.eventsService.update(id, updateDto, req.user);
         return { success: true, data };
     }
 
@@ -95,8 +96,8 @@ export class EventsController {
 
     @Delete(':id')
     @UseGuards(JwtAuthGuard)
-    async remove(@Param('id') id: string) {
-        await this.eventsService.delete(id);
+    async remove(@Param('id') id: string, @Req() req: any) {
+        await this.eventsService.delete(id, req.user);
         return { success: true, message: 'Event deleted successfully' };
     }
 }

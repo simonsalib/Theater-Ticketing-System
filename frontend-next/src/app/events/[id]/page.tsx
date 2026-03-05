@@ -156,6 +156,17 @@ const EventDetailsPage = () => {
                                     <FiGrid /> Select Seats
                                 </motion.button>
                             )}
+                            {!user && (
+                                <motion.button
+                                    className="confirm-booking-btn"
+                                    onClick={() => router.push('/login')}
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    style={{ padding: '10px 20px', minWidth: 'auto', fontSize: '0.9rem' }}
+                                >
+                                    <FiShoppingCart /> Login to Book
+                                </motion.button>
+                            )}
                         </div>
                     </motion.div>
 
@@ -228,6 +239,12 @@ const EventDetailsPage = () => {
                                 <motion.button className={`book-now-btn-detail ${ticketInfo.status === 'sold-out' ? 'disabled' : ''}`} onClick={() => router.push(`/bookings/new/${event._id}`)} disabled={ticketInfo.status === 'sold-out'} whileHover={ticketInfo.status !== 'sold-out' ? { scale: 1.03 } : {}} whileTap={ticketInfo.status !== 'sold-out' ? { scale: 0.98 } : {}}>
                                     <FiShoppingCart />
                                     {ticketInfo.status === 'sold-out' ? 'Sold Out' : 'Book Tickets'}
+                                </motion.button>
+                            )}
+                            {!user && ticketInfo.status !== 'sold-out' && (
+                                <motion.button className="book-now-btn-detail" onClick={() => router.push('/login')} whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
+                                    <FiShoppingCart />
+                                    Login to Book
                                 </motion.button>
                             )}
                         </div>

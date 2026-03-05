@@ -15,7 +15,7 @@ interface Booking {
     userId: string;
     numberOfTickets: number;
     totalPrice: number;
-    status: 'pending' | 'confirmed' | 'cancelled';
+    status: 'pending' | 'confirmed' | 'canceled' | 'rejected';
     selectedSeats?: { section: string; row: string; seatNumber: number }[];
     createdAt: string;
     pendingExpiresAt?: string;
@@ -60,6 +60,7 @@ const UserBookingsPage = () => {
         const updateTimers = () => {
             const newTimers: Record<string, string> = {};
             const now = new Date().getTime();
+            const expiredIds: string[] = [];
 
             bookings.forEach(booking => {
                 if (booking.status === 'pending' && booking.pendingExpiresAt) {
@@ -72,18 +73,26 @@ const UserBookingsPage = () => {
                         newTimers[booking._id] = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
                     } else {
                         newTimers[booking._id] = 'Expired';
-                        // Optionally update status locally to cancelled
-                        booking.status = 'cancelled';
+                        expiredIds.push(booking._id);
                     }
                 }
             });
             setTimers(newTimers);
+            // Update expired bookings via setState instead of direct mutation
+            if (expiredIds.length > 0) {
+                setBookings(prev =>
+                    prev.map(b =>
+                        expiredIds.includes(b._id) ? { ...b, status: 'canceled' } : b
+                    )
+                );
+            }
         };
 
         updateTimers();
         const interval = setInterval(updateTimers, 1000);
         return () => clearInterval(interval);
-    }, [bookings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [bookings.length]);
 
     const fetchBookings = async () => {
         try {
@@ -373,7 +382,7 @@ const UserBookingsPage = () => {
                     <AnimatePresence>
                         {bookings.map((booking, index) => {
                             const event = eventDetails[booking.eventId];
-                            const isCancelled = booking.status === 'cancelled' || (booking as any).status === 'Cancelled';
+                            const isCancelled = booking.status === 'canceled';
 
                             const isPending = booking.status === 'pending';
                             const timeLeft = timers[booking._id];

@@ -72,8 +72,9 @@ const Homepage = () => {
     useEffect(() => {
         api.get('/event/approved')
             .then(response => {
-                if (response.data && Array.isArray(response.data)) {
-                    const events: EventData[] = response.data.map((event: any) => ({
+                const eventsData = response.data?.data || response.data;
+                if (eventsData && Array.isArray(eventsData)) {
+                    const events: EventData[] = eventsData.map((event: any) => ({
                         id: event._id,
                         title: event.title,
                         date: new Date(event.date).toLocaleDateString(),

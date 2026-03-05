@@ -180,7 +180,7 @@ const EventSeatConfigurator: React.FC<EventSeatConfiguratorProps> = ({
                                     <span className="price-cat-color"></span>
                                     <label>{type.charAt(0).toUpperCase() + type.slice(1)}</label>
                                     <div className="price-input-wrapper">
-                                        <span className="currency">$</span>
+                                        <span className="currency">EGP</span>
                                         <input
                                             type="text"
                                             inputMode="decimal"

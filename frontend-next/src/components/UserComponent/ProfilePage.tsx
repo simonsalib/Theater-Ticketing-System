@@ -7,8 +7,8 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
     FiUser, FiMail, FiCalendar, FiEdit, FiArrowLeft,
-    FiActivity, FiAward, FiTrendingUp, FiDollarSign,
-    FiUsers, FiCheckCircle, FiClock, FiBarChart2,
+    FiActivity, FiDollarSign,
+    FiUsers, FiClock,
     FiGrid, FiPlus, FiPieChart, FiSettings, FiPhone
 } from 'react-icons/fi';
 import { IconType } from 'react-icons';
@@ -24,13 +24,6 @@ interface UserData {
     role?: string;
     createdAt?: string;
     profilePicture?: string;
-}
-
-interface StatItem {
-    label: string;
-    value: string;
-    icon: IconType;
-    color: string;
 }
 
 interface QuickAction {
@@ -78,34 +71,6 @@ const ProfilePage = () => {
     };
 
     const displayUser = userData || user;
-
-    // Role-specific stats data
-    const getStatsForRole = (): StatItem[] => {
-        const role = displayUser?.role;
-
-        if (role === "Standard User") {
-            return [
-                { label: "Events Attended", value: "12", icon: FiCalendar, color: "#8B5CF6" },
-                { label: "Upcoming", value: "3", icon: FiClock, color: "#22D3EE" },
-                { label: "Total Bookings", value: "15", icon: FiCheckCircle, color: "#10B981" }
-            ];
-        } else if (role === "Organizer") {
-            return [
-                { label: "My Events", value: "8", icon: FiCalendar, color: "#8B5CF6" },
-                { label: "Tickets Sold", value: "342", icon: FiUsers, color: "#22D3EE" },
-                { label: "Revenue", value: "4.2K EGP", icon: FiDollarSign, color: "#10B981" },
-                { label: "Pending", value: "2", icon: FiClock, color: "#F59E0B" }
-            ];
-        } else if (role === "System Admin") {
-            return [
-                { label: "Total Users", value: "156", icon: FiUsers, color: "#8B5CF6" },
-                { label: "Pending Approvals", value: "5", icon: FiClock, color: "#F59E0B" },
-                { label: "Active Events", value: "24", icon: FiCalendar, color: "#22D3EE" },
-                { label: "Total Revenue", value: "12.8K EGP", icon: FiDollarSign, color: "#10B981" }
-            ];
-        }
-        return [];
-    };
 
     // Role-specific quick actions
     const getQuickActions = (): QuickAction[] => {

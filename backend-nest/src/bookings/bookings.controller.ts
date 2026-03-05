@@ -41,8 +41,8 @@ export class BookingsController {
 
     @Delete(':id')
     @UseGuards(JwtAuthGuard)
-    async remove(@Param('id') id: string) {
-        await this.bookingsService.delete(id);
+    async remove(@Param('id') id: string, @Req() req: any) {
+        await this.bookingsService.delete(id, req.user._id);
         return { success: true, message: 'Booking deleted successfully' };
     }
 
@@ -88,8 +88,9 @@ export class BookingsController {
     async updateBookingStatus(
         @Param('id') id: string,
         @Body('status') status: string,
+        @Req() req: any,
     ) {
-        const data = await this.bookingsService.updateBookingStatus(id, status);
+        const data = await this.bookingsService.updateBookingStatus(id, status, req.user);
         return { success: true, data };
     }
 }

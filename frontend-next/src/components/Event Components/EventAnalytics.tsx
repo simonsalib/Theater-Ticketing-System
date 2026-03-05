@@ -208,7 +208,7 @@ const EventAnalytics = () => {
                                                 </div>
                                             </td>
                                             <td className={getRevenueClass(event.revenue)}>
-                                                ${event.revenue?.toFixed(2)} EGP
+                                                {event.revenue?.toFixed(2)} EGP
                                             </td>
                                         </tr>
                                     ))}

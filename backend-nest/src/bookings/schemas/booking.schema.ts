@@ -70,5 +70,9 @@ export class Booking {
 
 export const BookingSchema = SchemaFactory.createForClass(Booking);
 
-// TTL index: auto-delete pending bookings after pendingExpiresAt
-BookingSchema.index({ pendingExpiresAt: 1 }, { expireAfterSeconds: 0 });
+// NOTE: We intentionally do NOT use a MongoDB TTL index on pendingExpiresAt.
+// A TTL index would delete pending booking documents without releasing the
+// reserved seats back to the event's remainingTickets counter.  Seat release
+// is handled by the setInterval cleanup in BookingsService.onModuleInit().
+// If you previously had a TTL index in MongoDB, drop it manually:
+//   db.bookings.dropIndex("pendingExpiresAt_1")

@@ -167,7 +167,6 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
         try {
             const payload: any = {
                 eventId: selectedEvent._id,
-                status: 'confirmed'
             };
 
             if (selectedEvent.hasTheaterSeating) {

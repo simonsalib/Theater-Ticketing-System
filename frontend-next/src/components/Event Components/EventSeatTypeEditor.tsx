@@ -383,7 +383,7 @@ const EventSeatTypeEditor = ({
                             <div key={type} className="price-input-group">
                                 <label style={{ color: info.color }}>{info.label}</label>
                                 <div className="price-input">
-                                    <span>$</span>
+                                    <span>EGP</span>
                                     <input
                                         type="number"
                                         min="0"

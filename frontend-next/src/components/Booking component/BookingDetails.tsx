@@ -292,7 +292,7 @@ const BookingDetails = ({ id }: BookingDetailsProps) => {
                                                 color: '#22d3ee',
                                                 fontWeight: 600
                                             }}>
-                                                ${seat.price?.toFixed(2)} EGP
+                                                {seat.price?.toFixed(2)} EGP
                                             </span>
                                         </div>
                                     );
@@ -307,7 +307,7 @@ const BookingDetails = ({ id }: BookingDetailsProps) => {
                     {eventData._id && (
                         <Link href={`/events/${eventData._id}`} className="view-event-btn">View Event Page</Link>
                     )}
-                    {booking.status !== 'Cancelled' && (
+                    {booking.status !== 'rejected' && (
                         <button
                             onClick={() => setShowCancelConfirm(true)}
                             className="cancel-booking-btn"

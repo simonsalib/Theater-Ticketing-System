@@ -2,6 +2,7 @@ import {
     Injectable,
     NotFoundException,
     BadRequestException,
+    ForbiddenException,
     OnModuleInit,
     Logger,
 } from '@nestjs/common';
@@ -226,10 +227,15 @@ export class BookingsService implements OnModuleInit {
             .exec();
     }
 
-    async delete(id: string): Promise<void> {
+    async delete(id: string, userId: string): Promise<void> {
         const booking = await this.bookingModel.findById(id).exec();
         if (!booking) {
             throw new NotFoundException('Booking not found');
+        }
+
+        // Only the booking owner can cancel their own booking
+        if (booking.StandardId.toString() !== userId.toString()) {
+            throw new ForbiddenException('You are not authorised to cancel this booking');
         }
 
         const event = await this.eventModel.findById(booking.eventId).exec();
@@ -259,7 +265,7 @@ export class BookingsService implements OnModuleInit {
             .exec();
     }
 
-    async updateBookingStatus(bookingId: string, status: string): Promise<BookingDocument> {
+    async updateBookingStatus(bookingId: string, status: string, user: any): Promise<BookingDocument> {
         const booking = await this.bookingModel.findById(bookingId).exec();
         if (!booking) {
             throw new NotFoundException('Booking not found');
@@ -267,6 +273,17 @@ export class BookingsService implements OnModuleInit {
 
         if (!['confirmed', 'rejected'].includes(status)) {
             throw new BadRequestException('Status must be confirmed or rejected');
+        }
+
+        // Only the event organizer or an admin can update booking status
+        const event = await this.eventModel.findById(booking.eventId).exec();
+        if (!event) {
+            throw new NotFoundException('Event not found');
+        }
+        const isAdmin = user.role === 'System Admin';
+        const isOrganizer = event.organizerId.toString() === user._id.toString();
+        if (!isAdmin && !isOrganizer) {
+            throw new ForbiddenException('Only the event organizer or an admin can update booking status');
         }
 
         // If rejecting a previously pending booking that had seats, release the seats
