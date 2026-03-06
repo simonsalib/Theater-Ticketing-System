@@ -33,7 +33,18 @@ let EventsService = class EventsService {
         if (role !== user_schema_1.UserRole.ORGANIZER) {
             throw new common_1.ForbiddenException('Only organizers can create events');
         }
-        const { title, description, date, location, category, ticketPrice, totalTickets, image, theater, hasTheaterSeating, seatPricing, seatConfig, } = createDto;
+        const { title, description, date, location, category, ticketPrice, totalTickets, image, theater, hasTheaterSeating, seatPricing, seatConfig, preBookedSeats, } = createDto;
+        const isTheater = hasTheaterSeating === 'true' || hasTheaterSeating === true;
+        const bookedSeats = [];
+        if (isTheater && preBookedSeats && Array.isArray(preBookedSeats)) {
+            for (const s of preBookedSeats) {
+                bookedSeats.push({
+                    row: s.row,
+                    seatNumber: s.seatNumber,
+                    section: s.section || 'main',
+                });
+            }
+        }
         const event = new this.eventModel({
             organizerId: userId,
             title,
@@ -45,10 +56,11 @@ let EventsService = class EventsService {
             totalTickets,
             remainingTickets: totalTickets,
             image: image || 'default-image.jpg',
-            theater: hasTheaterSeating === 'true' || hasTheaterSeating === true ? theater : null,
-            hasTheaterSeating: hasTheaterSeating === 'true' || hasTheaterSeating === true,
+            theater: isTheater ? theater : null,
+            hasTheaterSeating: isTheater,
             seatPricing: typeof seatPricing === 'string' ? JSON.parse(seatPricing) : seatPricing || [],
             seatConfig: typeof seatConfig === 'string' ? JSON.parse(seatConfig) : seatConfig || [],
+            bookedSeats,
         });
         return event.save();
     }
@@ -65,10 +77,17 @@ let EventsService = class EventsService {
         }
         return event;
     }
-    async update(id, updateDto) {
+    async update(id, updateDto, user) {
         const event = await this.eventModel.findById(id).exec();
         if (!event) {
             throw new common_1.NotFoundException('Event not found');
+        }
+        if (user) {
+            const isAdmin = user.role === 'System Admin';
+            const isOwner = event.organizerId.toString() === user._id.toString();
+            if (!isAdmin && !isOwner) {
+                throw new common_1.ForbiddenException('You are not authorised to update this event');
+            }
         }
         if (event.status === 'approved' &&
             updateDto.status &&
@@ -95,6 +114,17 @@ let EventsService = class EventsService {
             }
             catch (e) { }
         }
+        if (updateDto.preBookedSeats && Array.isArray(updateDto.preBookedSeats)) {
+            const bookingLinkedSeats = (event.bookedSeats || []).filter((s) => s.bookingId);
+            const newOrganizerSeats = updateDto.preBookedSeats.map((s) => ({
+                row: s.row,
+                seatNumber: s.seatNumber,
+                section: s.section || 'main',
+            }));
+            event.bookedSeats = [...bookingLinkedSeats, ...newOrganizerSeats];
+            event.markModified('bookedSeats');
+            delete updateDto.preBookedSeats;
+        }
         Object.assign(event, updateDto);
         return event.save();
     }
@@ -102,6 +132,9 @@ let EventsService = class EventsService {
         const event = await this.eventModel.findById(id).exec();
         if (!event) {
             throw new common_1.NotFoundException('Event not found');
+        }
+        if (user.role !== 'System Admin') {
+            throw new common_1.ForbiddenException('Only admins can delete approved events');
         }
         if (event.status !== 'approved') {
             throw new common_1.BadRequestException('OTP verification is only required for approved events');
@@ -131,10 +164,17 @@ let EventsService = class EventsService {
         await this.bookingModel.deleteMany({ eventId: event._id }).exec();
         await this.eventModel.deleteOne({ _id: event._id }).exec();
     }
-    async delete(id) {
+    async delete(id, user) {
         const event = await this.eventModel.findById(id).exec();
         if (!event) {
             throw new common_1.NotFoundException('Event not found');
+        }
+        if (user) {
+            const isAdmin = user.role === 'System Admin';
+            const isOwner = event.organizerId.toString() === user._id.toString();
+            if (!isAdmin && !isOwner) {
+                throw new common_1.ForbiddenException('You are not authorised to delete this event');
+            }
         }
         if (event.status === 'approved') {
             throw new common_1.BadRequestException('Approved events require OTP verification. Please use the OTP verification endpoint.');
@@ -161,7 +201,18 @@ let EventsService = class EventsService {
         }
         const analytics = events.map((event) => {
             const ticketsSold = event.totalTickets - event.remainingTickets;
-            const percentageSold = (ticketsSold / event.totalTickets) * 100;
+            const percentageSold = event.totalTickets > 0
+                ? (ticketsSold / event.totalTickets) * 100
+                : 0;
+            let revenue;
+            if (event.hasTheaterSeating && event.bookedSeats && event.seatPricing?.length > 0) {
+                const avgPrice = event.seatPricing.reduce((s, p) => s + (p.price || 0), 0) /
+                    (event.seatPricing.length || 1);
+                revenue = ticketsSold * avgPrice;
+            }
+            else {
+                revenue = ticketsSold * event.ticketPrice;
+            }
             return {
                 eventId: event._id,
                 eventTitle: event.title,
@@ -169,7 +220,7 @@ let EventsService = class EventsService {
                 ticketsSold: ticketsSold,
                 ticketsAvailable: event.remainingTickets,
                 percentageSold: percentageSold.toFixed(2),
-                revenue: ticketsSold * event.ticketPrice,
+                revenue,
             };
         });
         const totalRevenue = analytics.reduce((sum, item) => sum + item.revenue, 0);

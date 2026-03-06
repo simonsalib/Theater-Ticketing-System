@@ -11,6 +11,18 @@ declare class SelectedSeat {
     attendeeName: string;
     attendeePhone: string;
 }
+declare class CancellationSeat {
+    row: string;
+    seatNumber: number;
+    section: string;
+}
+declare class CancellationRequest {
+    status: string;
+    requestedAt: Date;
+    reason: string;
+    seatsToCancel: CancellationSeat[];
+    cancelAll: boolean;
+}
 export declare class Booking {
     StandardId: User | MongooseSchema.Types.ObjectId;
     eventId: Event | MongooseSchema.Types.ObjectId;
@@ -22,6 +34,7 @@ export declare class Booking {
     selectedSeats: SelectedSeat[];
     instapayReceipt: string;
     isReceiptUploaded: boolean;
+    cancellationRequest: CancellationRequest;
 }
 export declare const BookingSchema: MongooseSchema<Booking, import("mongoose").Model<Booking, any, any, any, (Document<unknown, any, Booking, any, import("mongoose").DefaultSchemaOptions> & Booking & {
     _id: import("mongoose").Types.ObjectId;
@@ -124,6 +137,15 @@ export declare const BookingSchema: MongooseSchema<Booking, import("mongoose").M
         id: string;
     }> | undefined;
     isReceiptUploaded?: import("mongoose").SchemaDefinitionProperty<boolean, Booking, Document<unknown, {}, Booking, {
+        id: string;
+    }, import("mongoose").DefaultSchemaOptions> & Omit<Booking & {
+        _id: import("mongoose").Types.ObjectId;
+    } & {
+        __v: number;
+    }, "id"> & {
+        id: string;
+    }> | undefined;
+    cancellationRequest?: import("mongoose").SchemaDefinitionProperty<CancellationRequest, Booking, Document<unknown, {}, Booking, {
         id: string;
     }, import("mongoose").DefaultSchemaOptions> & Omit<Booking & {
         _id: import("mongoose").Types.ObjectId;

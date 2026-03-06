@@ -16,6 +16,9 @@ exports.EventsController = void 0;
 const common_1 = require("@nestjs/common");
 const events_service_1 = require("./events.service");
 const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
+const roles_guard_1 = require("../auth/roles.guard");
+const roles_decorator_1 = require("../auth/roles.decorator");
+const user_schema_1 = require("../users/schemas/user.schema");
 let EventsController = class EventsController {
     eventsService;
     constructor(eventsService) {
@@ -29,10 +32,7 @@ let EventsController = class EventsController {
         const data = await this.eventsService.findAllApproved();
         return { success: true, data };
     }
-    async findAll(req) {
-        if (req.user.role !== 'System Admin') {
-            throw new common_1.ForbiddenException('Only admins can view all events');
-        }
+    async findAll() {
         const data = await this.eventsService.findAll();
         return { success: true, data };
     }
@@ -48,8 +48,8 @@ let EventsController = class EventsController {
         const data = await this.eventsService.findOne(id);
         return { success: true, data };
     }
-    async update(id, updateDto) {
-        const data = await this.eventsService.update(id, updateDto);
+    async update(id, updateDto, req) {
+        const data = await this.eventsService.update(id, updateDto, req.user);
         return { success: true, data };
     }
     async requestDeletionOTP(id, req) {
@@ -60,8 +60,8 @@ let EventsController = class EventsController {
         await this.eventsService.verifyDeletionOTP(eventId, otp);
         return { success: true, message: 'Event deleted successfully' };
     }
-    async remove(id) {
-        await this.eventsService.delete(id);
+    async remove(id, req) {
+        await this.eventsService.delete(id, req.user);
         return { success: true, message: 'Event deleted successfully' };
     }
 };
@@ -83,10 +83,10 @@ __decorate([
 ], EventsController.prototype, "findAllApproved", null);
 __decorate([
     (0, common_1.Get)('all'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    __param(0, (0, common_1.Req)()),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(user_schema_1.UserRole.ADMIN),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], EventsController.prototype, "findAll", null);
 __decorate([
@@ -117,8 +117,9 @@ __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [String, Object, Object]),
     __metadata("design:returntype", Promise)
 ], EventsController.prototype, "update", null);
 __decorate([
@@ -145,8 +146,9 @@ __decorate([
     (0, common_1.Delete)(':id'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", Promise)
 ], EventsController.prototype, "remove", null);
 exports.EventsController = EventsController = __decorate([

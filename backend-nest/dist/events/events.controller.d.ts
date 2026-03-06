@@ -10,7 +10,7 @@ export declare class EventsController {
         success: boolean;
         data: import("./schemas/event.schema").EventDocument[];
     }>;
-    findAll(req: any): Promise<{
+    findAll(): Promise<{
         success: boolean;
         data: import("./schemas/event.schema").EventDocument[];
     }>;
@@ -26,7 +26,7 @@ export declare class EventsController {
         success: boolean;
         data: import("./schemas/event.schema").EventDocument;
     }>;
-    update(id: string, updateDto: any): Promise<{
+    update(id: string, updateDto: any, req: any): Promise<{
         success: boolean;
         data: import("./schemas/event.schema").EventDocument;
     }>;
@@ -38,7 +38,7 @@ export declare class EventsController {
         success: boolean;
         message: string;
     }>;
-    remove(id: string): Promise<{
+    remove(id: string, req: any): Promise<{
         success: boolean;
         message: string;
     }>;

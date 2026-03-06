@@ -49,20 +49,13 @@ let TheatersService = class TheatersService {
         };
     }
     async create(createTheaterDto, userId) {
-        console.log('--- THEATER CREATION START ---');
-        console.log('User ID:', userId);
-        console.log('Payload Name:', createTheaterDto.name);
         const { name, description, layout, seatConfig, image } = createTheaterDto;
         if (!name || !layout?.mainFloor?.rows || !layout?.mainFloor?.seatsPerRow) {
-            console.error('VALIDATION FAILED: Missing required top-level fields');
-            console.error('Payload Layout:', JSON.stringify(layout, null, 2));
             throw new common_1.BadRequestException('Name, rows, and seatsPerRow are required');
         }
         try {
-            console.log('Processing layout and defaults...');
             const mainFloor = layout.mainFloor || { rows: 0, seatsPerRow: 0, aislePositions: [], rowLabels: [] };
             const balcony = layout.balcony || { rows: 0, seatsPerRow: 0, aislePositions: [], rowLabels: [] };
-            console.log('Creating theater model instance...');
             const theater = new this.theaterModel({
                 name,
                 description,
@@ -96,17 +89,11 @@ let TheatersService = class TheatersService {
                 seatConfig: seatConfig || [],
                 image,
             });
-            console.log('Attempting to save theater to DB...');
-            const savedTheater = await theater.save();
-            console.log('SUCCESS: Theater saved with ID:', savedTheater._id);
-            console.log('--- THEATER CREATION END ---');
-            return savedTheater;
+            return await theater.save();
         }
         catch (error) {
-            console.error('--- THEATER CREATION CRASHED ---');
-            console.error('Error Object:', error);
             if (error.name === 'ValidationError') {
-                console.error('Mongoose Validation Errors:', error.errors);
+                throw new common_1.BadRequestException(Object.values(error.errors).map((e) => e.message).join('; '));
             }
             throw error;
         }
@@ -191,34 +178,25 @@ let TheatersService = class TheatersService {
         }
         try {
             const updatedTheater = await theater.save();
-            console.log('Theater updated successfully:', updatedTheater._id);
             return updatedTheater;
         }
         catch (error) {
-            console.error('Error updating theater:', error);
             if (error.name === 'ValidationError') {
-                console.error('Mongoose Validation Errors:', error.errors);
+                throw new common_1.BadRequestException(Object.values(error.errors).map((e) => e.message).join('; '));
             }
             throw error;
         }
     }
     async hardDelete(id) {
-        console.log('--- THEATER HARD DELETE START ---');
-        console.log('Theater ID to delete:', id);
         const theater = await this.theaterModel.findById(id).exec();
         if (!theater) {
-            console.log('Theater not found!');
             throw new common_1.NotFoundException('Theater not found');
         }
-        console.log('Found theater:', theater.name);
         const eventsUsingTheater = await this.eventModel.countDocuments({ theater: id }).exec();
-        console.log('Events using theater:', eventsUsingTheater);
         if (eventsUsingTheater > 0) {
             throw new common_1.BadRequestException(`Cannot delete theater. ${eventsUsingTheater} event(s) are using this theater. Please remove or reassign those events first.`);
         }
-        const result = await this.theaterModel.findByIdAndDelete(id).exec();
-        console.log('Delete result:', result ? 'SUCCESS' : 'FAILED');
-        console.log('--- THEATER HARD DELETE END ---');
+        await this.theaterModel.findByIdAndDelete(id).exec();
     }
     async updateSeatConfig(id, seatConfig) {
         const theater = await this.theaterModel.findById(id).exec();

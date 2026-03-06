@@ -93,4 +93,69 @@ export class BookingsController {
         const data = await this.bookingsService.updateBookingStatus(id, status, req.user);
         return { success: true, data };
     }
+
+    // User: cancel selected seats from a pending booking
+    @Post(':id/cancel-seats')
+    @UseGuards(JwtAuthGuard)
+    async cancelSelectedSeats(
+        @Param('id') id: string,
+        @Body() body: { seatKeys: string[]; cancelAll: boolean },
+        @Req() req: any,
+    ) {
+        const result = await this.bookingsService.cancelSelectedSeats(
+            id,
+            req.user._id,
+            body.seatKeys || [],
+            body.cancelAll || false,
+        );
+        return { success: true, ...result };
+    }
+
+    // User: request cancellation for a confirmed booking
+    @Post(':id/request-cancellation')
+    @UseGuards(JwtAuthGuard)
+    async requestCancellation(
+        @Param('id') id: string,
+        @Body() body: { seatKeys: string[]; cancelAll: boolean; reason: string },
+        @Req() req: any,
+    ) {
+        const data = await this.bookingsService.requestCancellation(
+            id,
+            req.user._id,
+            body.seatKeys || [],
+            body.cancelAll || false,
+            body.reason || '',
+        );
+        return { success: true, data };
+    }
+
+    // Organizer: get cancellation requests for their event
+    @Get('event/:eventId/cancellation-requests')
+    @UseGuards(JwtAuthGuard)
+    async getCancellationRequests(@Param('eventId') eventId: string) {
+        const data = await this.bookingsService.getCancellationRequests(eventId);
+        return { success: true, count: data.length, data };
+    }
+
+    // Organizer: approve a cancellation request
+    @Patch(':id/approve-cancellation')
+    @UseGuards(JwtAuthGuard)
+    async approveCancellation(
+        @Param('id') id: string,
+        @Req() req: any,
+    ) {
+        const data = await this.bookingsService.approveCancellation(id, req.user);
+        return { success: true, data };
+    }
+
+    // Organizer: reject a cancellation request
+    @Patch(':id/reject-cancellation')
+    @UseGuards(JwtAuthGuard)
+    async rejectCancellation(
+        @Param('id') id: string,
+        @Req() req: any,
+    ) {
+        const data = await this.bookingsService.rejectCancellation(id, req.user);
+        return { success: true, data };
+    }
 }

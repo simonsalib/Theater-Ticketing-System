@@ -232,6 +232,33 @@ export class TicketsService {
     ticket.scannedBy = new Types.ObjectId(scannedByUserId);
     await ticket.save();
 
+    // Remove this seat from any pending cancellation request on the booking
+    try {
+      const fullBooking = await this.bookingModel.findById(ticket.bookingId).exec();
+      if (fullBooking?.cancellationRequest?.status === 'pending') {
+        const seatKey = `${ticket.section}-${ticket.seatRow}-${ticket.seatNumber}`;
+        const remaining = (fullBooking.cancellationRequest.seatsToCancel || []).filter(
+          (s: any) => `${s.section}-${s.row}-${s.seatNumber}` !== seatKey,
+        );
+        if (remaining.length === 0) {
+          // No seats left in the request — reset it
+          fullBooking.cancellationRequest = {
+            status: 'none',
+            requestedAt: null,
+            reason: '',
+            seatsToCancel: [],
+            cancelAll: false,
+          } as any;
+        } else {
+          fullBooking.cancellationRequest.seatsToCancel = remaining as any;
+          fullBooking.cancellationRequest.cancelAll = false;
+        }
+        await fullBooking.save();
+      }
+    } catch (err) {
+      this.logger.error(`Error updating cancellation request after scan:`, err);
+    }
+
     return {
       ticket,
       userEmail: user?.email || '',
@@ -246,6 +273,52 @@ export class TicketsService {
       isFree: true,
       message: '✅ Valid ticket! This is the first scan. Seat is free to enter.',
     };
+  }
+
+  /**
+   * Get all scanned tickets for a booking (used to exclude from cancellation).
+   */
+  async getScannedSeatsForBooking(bookingId: string): Promise<TicketDocument[]> {
+    return this.ticketModel
+      .find({
+        bookingId: new Types.ObjectId(bookingId),
+        isScanned: true,
+      })
+      .exec();
+  }
+
+  /**
+   * Delete all tickets for a booking (used when cancellation is approved).
+   */
+  async deleteTicketsForBooking(bookingId: string): Promise<number> {
+    const result = await this.ticketModel
+      .deleteMany({ bookingId: new Types.ObjectId(bookingId) })
+      .exec();
+    this.logger.log(`Deleted ${result.deletedCount} tickets for booking ${bookingId}`);
+    return result.deletedCount;
+  }
+
+  /**
+   * Delete tickets for specific seats of a booking (partial cancellation).
+   */
+  async deleteTicketsForSeats(
+    bookingId: string,
+    seats: Array<{ row: string; seatNumber: number; section: string }>,
+  ): Promise<number> {
+    let deletedCount = 0;
+    for (const seat of seats) {
+      const result = await this.ticketModel
+        .deleteMany({
+          bookingId: new Types.ObjectId(bookingId),
+          seatRow: seat.row,
+          seatNumber: seat.seatNumber,
+          section: seat.section,
+        })
+        .exec();
+      deletedCount += result.deletedCount;
+    }
+    this.logger.log(`Deleted ${deletedCount} tickets for partial cancellation of booking ${bookingId}`);
+    return deletedCount;
   }
 
   /**

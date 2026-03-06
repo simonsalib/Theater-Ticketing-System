@@ -32,6 +32,39 @@ class SelectedSeat {
     attendeePhone: string;
 }
 
+@Schema()
+class CancellationSeat {
+    @Prop({ required: true })
+    row: string;
+
+    @Prop({ required: true })
+    seatNumber: number;
+
+    @Prop({ enum: ['main', 'balcony'], default: 'main' })
+    section: string;
+}
+
+@Schema()
+class CancellationRequest {
+    @Prop({
+        enum: ['none', 'pending', 'approved', 'rejected'],
+        default: 'none',
+    })
+    status: string;
+
+    @Prop({ type: Date, default: null })
+    requestedAt: Date;
+
+    @Prop({ default: '' })
+    reason: string;
+
+    @Prop({ type: [CancellationSeat], default: [] })
+    seatsToCancel: CancellationSeat[];
+
+    @Prop({ default: false })
+    cancelAll: boolean;
+}
+
 @Schema({ timestamps: true })
 export class Booking {
     @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
@@ -66,6 +99,9 @@ export class Booking {
 
     @Prop({ default: false })
     isReceiptUploaded: boolean;
+
+    @Prop({ type: CancellationRequest, default: () => ({ status: 'none' }) })
+    cancellationRequest: CancellationRequest;
 }
 
 export const BookingSchema = SchemaFactory.createForClass(Booking);

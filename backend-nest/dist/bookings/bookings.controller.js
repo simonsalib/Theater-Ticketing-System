@@ -33,8 +33,8 @@ let BookingsController = class BookingsController {
         const data = await this.bookingsService.findOne(id);
         return { success: true, data };
     }
-    async remove(id) {
-        await this.bookingsService.delete(id);
+    async remove(id, req) {
+        await this.bookingsService.delete(id, req.user._id);
         return { success: true, message: 'Booking deleted successfully' };
     }
     async getAvailableSeats(eventId) {
@@ -56,8 +56,28 @@ let BookingsController = class BookingsController {
         const data = await this.bookingsService.findAllForEvent(eventId);
         return { success: true, count: data.length, data };
     }
-    async updateBookingStatus(id, status) {
-        const data = await this.bookingsService.updateBookingStatus(id, status);
+    async updateBookingStatus(id, status, req) {
+        const data = await this.bookingsService.updateBookingStatus(id, status, req.user);
+        return { success: true, data };
+    }
+    async cancelSelectedSeats(id, body, req) {
+        const result = await this.bookingsService.cancelSelectedSeats(id, req.user._id, body.seatKeys || [], body.cancelAll || false);
+        return { success: true, ...result };
+    }
+    async requestCancellation(id, body, req) {
+        const data = await this.bookingsService.requestCancellation(id, req.user._id, body.seatKeys || [], body.cancelAll || false, body.reason || '');
+        return { success: true, data };
+    }
+    async getCancellationRequests(eventId) {
+        const data = await this.bookingsService.getCancellationRequests(eventId);
+        return { success: true, count: data.length, data };
+    }
+    async approveCancellation(id, req) {
+        const data = await this.bookingsService.approveCancellation(id, req.user);
+        return { success: true, data };
+    }
+    async rejectCancellation(id, req) {
+        const data = await this.bookingsService.rejectCancellation(id, req.user);
         return { success: true, data };
     }
 };
@@ -91,8 +111,9 @@ __decorate([
     (0, common_1.Delete)(':id'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", Promise)
 ], BookingsController.prototype, "remove", null);
 __decorate([
@@ -132,10 +153,57 @@ __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)('status')),
+    __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:paramtypes", [String, String, Object]),
     __metadata("design:returntype", Promise)
 ], BookingsController.prototype, "updateBookingStatus", null);
+__decorate([
+    (0, common_1.Post)(':id/cancel-seats'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, Object]),
+    __metadata("design:returntype", Promise)
+], BookingsController.prototype, "cancelSelectedSeats", null);
+__decorate([
+    (0, common_1.Post)(':id/request-cancellation'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, Object]),
+    __metadata("design:returntype", Promise)
+], BookingsController.prototype, "requestCancellation", null);
+__decorate([
+    (0, common_1.Get)('event/:eventId/cancellation-requests'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    __param(0, (0, common_1.Param)('eventId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], BookingsController.prototype, "getCancellationRequests", null);
+__decorate([
+    (0, common_1.Patch)(':id/approve-cancellation'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], BookingsController.prototype, "approveCancellation", null);
+__decorate([
+    (0, common_1.Patch)(':id/reject-cancellation'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], BookingsController.prototype, "rejectCancellation", null);
 exports.BookingsController = BookingsController = __decorate([
     (0, common_1.Controller)('api/v1/booking'),
     __metadata("design:paramtypes", [bookings_service_1.BookingsService])

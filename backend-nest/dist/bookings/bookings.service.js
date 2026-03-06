@@ -191,10 +191,16 @@ let BookingsService = BookingsService_1 = class BookingsService {
             .sort({ createdAt: -1 })
             .exec();
     }
-    async delete(id) {
+    async delete(id, userId) {
         const booking = await this.bookingModel.findById(id).exec();
         if (!booking) {
             throw new common_1.NotFoundException('Booking not found');
+        }
+        if (booking.StandardId.toString() !== userId.toString()) {
+            throw new common_1.ForbiddenException('You are not authorised to cancel this booking');
+        }
+        if (booking.status === 'confirmed') {
+            throw new common_1.BadRequestException('Cannot cancel a confirmed booking');
         }
         const event = await this.eventModel.findById(booking.eventId).exec();
         if (!event) {
@@ -220,13 +226,22 @@ let BookingsService = BookingsService_1 = class BookingsService {
             .sort({ createdAt: -1 })
             .exec();
     }
-    async updateBookingStatus(bookingId, status) {
+    async updateBookingStatus(bookingId, status, user) {
         const booking = await this.bookingModel.findById(bookingId).exec();
         if (!booking) {
             throw new common_1.NotFoundException('Booking not found');
         }
         if (!['confirmed', 'rejected'].includes(status)) {
             throw new common_1.BadRequestException('Status must be confirmed or rejected');
+        }
+        const event = await this.eventModel.findById(booking.eventId).exec();
+        if (!event) {
+            throw new common_1.NotFoundException('Event not found');
+        }
+        const isAdmin = user.role === 'System Admin';
+        const isOrganizer = event.organizerId.toString() === user._id.toString();
+        if (!isAdmin && !isOrganizer) {
+            throw new common_1.ForbiddenException('Only the event organizer or an admin can update booking status');
         }
         if (status === 'rejected' && booking.hasTheaterSeating && booking.selectedSeats?.length > 0) {
             await this.eventModel.findByIdAndUpdate(booking.eventId, {
@@ -385,6 +400,234 @@ let BookingsService = BookingsService_1 = class BookingsService {
             bookedCount: event.bookedSeats.length,
             availableCount: allSeats.filter((s) => !s.isBooked && s.isActive).length,
         };
+    }
+    async cancelSelectedSeats(bookingId, userId, seatKeys, cancelAll) {
+        const booking = await this.bookingModel.findById(bookingId).exec();
+        if (!booking) {
+            throw new common_1.NotFoundException('Booking not found');
+        }
+        if (booking.StandardId.toString() !== userId.toString()) {
+            throw new common_1.ForbiddenException('You are not authorised to modify this booking');
+        }
+        if (booking.status !== 'pending') {
+            throw new common_1.BadRequestException('Can only cancel seats from a pending booking');
+        }
+        if (!booking.hasTheaterSeating || !booking.selectedSeats?.length) {
+            await this.delete(bookingId, userId);
+            return { message: 'Booking cancelled successfully' };
+        }
+        if (cancelAll || seatKeys.length >= booking.selectedSeats.length) {
+            await this.delete(bookingId, userId);
+            return { message: 'All seats cancelled. Booking removed.' };
+        }
+        const seatsToRemove = booking.selectedSeats.filter((s) => seatKeys.includes(`${s.section}-${s.row}-${s.seatNumber}`));
+        if (seatsToRemove.length === 0) {
+            throw new common_1.BadRequestException('No matching seats found to cancel');
+        }
+        const seatKeysToRemove = new Set(seatsToRemove.map((s) => `${s.section}-${s.row}-${s.seatNumber}`));
+        const remainingSeats = booking.selectedSeats.filter((s) => !seatKeysToRemove.has(`${s.section}-${s.row}-${s.seatNumber}`));
+        const removedPrice = seatsToRemove.reduce((sum, s) => sum + (s.price || 0), 0);
+        for (const seat of seatsToRemove) {
+            await this.eventModel.findByIdAndUpdate(booking.eventId, {
+                $pull: {
+                    bookedSeats: {
+                        row: seat.row,
+                        seatNumber: seat.seatNumber,
+                        section: seat.section,
+                        bookingId: booking._id,
+                    },
+                },
+                $inc: { remainingTickets: 1 },
+            });
+        }
+        booking.selectedSeats = remainingSeats;
+        booking.numberOfTickets = remainingSeats.length;
+        booking.totalPrice = booking.totalPrice - removedPrice;
+        const savedBooking = await booking.save();
+        return {
+            message: `${seatsToRemove.length} seat(s) cancelled successfully`,
+            booking: savedBooking,
+        };
+    }
+    async requestCancellation(bookingId, userId, seatKeys, cancelAll, reason) {
+        const booking = await this.bookingModel.findById(bookingId).exec();
+        if (!booking) {
+            throw new common_1.NotFoundException('Booking not found');
+        }
+        if (booking.StandardId.toString() !== userId.toString()) {
+            throw new common_1.ForbiddenException('You are not authorised to modify this booking');
+        }
+        const isConfirmed = booking.status === 'confirmed';
+        const isPendingWithReceipt = booking.status === 'pending' && booking.isReceiptUploaded === true;
+        if (!isConfirmed && !isPendingWithReceipt) {
+            throw new common_1.BadRequestException('Can only request cancellation for confirmed bookings or pending bookings with receipt uploaded');
+        }
+        const scannedTickets = await this.ticketsService.getScannedSeatsForBooking(bookingId);
+        const scannedKeys = new Set(scannedTickets.map((t) => `${t.section}-${t.seatRow}-${t.seatNumber}`));
+        const newSeatsToCancel = (cancelAll
+            ? booking.selectedSeats.map((s) => ({
+                row: s.row,
+                seatNumber: s.seatNumber,
+                section: s.section || 'main',
+            }))
+            : seatKeys.map((key) => {
+                const [section, row, seatNum] = key.split('-');
+                return { section, row, seatNumber: parseInt(seatNum, 10) };
+            })).filter((s) => !scannedKeys.has(`${s.section}-${s.row}-${s.seatNumber}`));
+        if (newSeatsToCancel.length === 0) {
+            throw new common_1.BadRequestException('All selected seats have already been scanned and cannot be cancelled');
+        }
+        if (booking.cancellationRequest?.status === 'pending') {
+            const existingKeys = new Set((booking.cancellationRequest.seatsToCancel || []).map((s) => `${s.section}-${s.row}-${s.seatNumber}`));
+            const merged = [...(booking.cancellationRequest.seatsToCancel || [])];
+            for (const seat of newSeatsToCancel) {
+                const key = `${seat.section}-${seat.row}-${seat.seatNumber}`;
+                if (!existingKeys.has(key)) {
+                    merged.push(seat);
+                    existingKeys.add(key);
+                }
+            }
+            const isCancelAll = cancelAll || merged.length >= booking.selectedSeats.length;
+            booking.cancellationRequest = {
+                status: 'pending',
+                requestedAt: booking.cancellationRequest.requestedAt,
+                reason: reason || booking.cancellationRequest.reason || '',
+                seatsToCancel: merged,
+                cancelAll: isCancelAll,
+            };
+            return booking.save();
+        }
+        booking.cancellationRequest = {
+            status: 'pending',
+            requestedAt: new Date(),
+            reason: reason || '',
+            seatsToCancel: newSeatsToCancel,
+            cancelAll,
+        };
+        return booking.save();
+    }
+    async getCancellationRequests(eventId) {
+        return this.bookingModel
+            .find({
+            eventId,
+            'cancellationRequest.status': 'pending',
+        })
+            .populate('StandardId', 'name email phone')
+            .sort({ 'cancellationRequest.requestedAt': -1 })
+            .exec();
+    }
+    async approveCancellation(bookingId, user) {
+        const booking = await this.bookingModel.findById(bookingId).exec();
+        if (!booking) {
+            throw new common_1.NotFoundException('Booking not found');
+        }
+        const event = await this.eventModel.findById(booking.eventId).exec();
+        if (!event) {
+            throw new common_1.NotFoundException('Event not found');
+        }
+        const isAdmin = user.role === 'System Admin';
+        const isOrganizer = event.organizerId.toString() === user._id.toString();
+        if (!isAdmin && !isOrganizer) {
+            throw new common_1.ForbiddenException('Only the event organizer or an admin can approve cancellations');
+        }
+        if (booking.cancellationRequest?.status !== 'pending') {
+            throw new common_1.BadRequestException('No pending cancellation request found');
+        }
+        const cancelAll = booking.cancellationRequest.cancelAll;
+        const seatsToCancel = booking.cancellationRequest.seatsToCancel || [];
+        if (cancelAll || seatsToCancel.length >= booking.selectedSeats.length) {
+            if (booking.hasTheaterSeating && booking.selectedSeats?.length > 0) {
+                await this.eventModel.findByIdAndUpdate(booking.eventId, {
+                    $pull: { bookedSeats: { bookingId: booking._id } },
+                    $inc: { remainingTickets: booking.numberOfTickets },
+                });
+            }
+            else {
+                await this.eventModel.findByIdAndUpdate(booking.eventId, {
+                    $inc: { remainingTickets: booking.numberOfTickets },
+                });
+            }
+            try {
+                await this.ticketsService.deleteTicketsForBooking(bookingId);
+            }
+            catch (err) {
+                this.logger.error(`Error deleting tickets for booking ${bookingId}:`, err);
+            }
+            booking.status = 'canceled';
+            booking.cancellationRequest = {
+                status: 'approved',
+                requestedAt: booking.cancellationRequest.requestedAt,
+                reason: booking.cancellationRequest.reason,
+                seatsToCancel: seatsToCancel,
+                cancelAll: true,
+            };
+            return booking.save();
+        }
+        const seatKeysToCancel = new Set(seatsToCancel.map((s) => `${s.section}-${s.row}-${s.seatNumber}`));
+        for (const seat of seatsToCancel) {
+            await this.eventModel.findByIdAndUpdate(booking.eventId, {
+                $pull: {
+                    bookedSeats: {
+                        row: seat.row,
+                        seatNumber: seat.seatNumber,
+                        section: seat.section,
+                        bookingId: booking._id,
+                    },
+                },
+                $inc: { remainingTickets: 1 },
+            });
+        }
+        try {
+            await this.ticketsService.deleteTicketsForSeats(bookingId, seatsToCancel.map((s) => ({
+                row: s.row,
+                seatNumber: s.seatNumber,
+                section: s.section,
+            })));
+        }
+        catch (err) {
+            this.logger.error(`Error deleting tickets for partial cancellation of booking ${bookingId}:`, err);
+        }
+        const removedPrice = booking.selectedSeats
+            .filter((s) => seatKeysToCancel.has(`${s.section}-${s.row}-${s.seatNumber}`))
+            .reduce((sum, s) => sum + (s.price || 0), 0);
+        const remainingSeats = booking.selectedSeats.filter((s) => !seatKeysToCancel.has(`${s.section}-${s.row}-${s.seatNumber}`));
+        booking.selectedSeats = remainingSeats;
+        booking.numberOfTickets = remainingSeats.length;
+        booking.totalPrice = booking.totalPrice - removedPrice;
+        booking.cancellationRequest = {
+            status: 'none',
+            requestedAt: null,
+            reason: '',
+            seatsToCancel: [],
+            cancelAll: false,
+        };
+        return booking.save();
+    }
+    async rejectCancellation(bookingId, user) {
+        const booking = await this.bookingModel.findById(bookingId).exec();
+        if (!booking) {
+            throw new common_1.NotFoundException('Booking not found');
+        }
+        const event = await this.eventModel.findById(booking.eventId).exec();
+        if (!event) {
+            throw new common_1.NotFoundException('Event not found');
+        }
+        const isAdmin = user.role === 'System Admin';
+        const isOrganizer = event.organizerId.toString() === user._id.toString();
+        if (!isAdmin && !isOrganizer) {
+            throw new common_1.ForbiddenException('Only the event organizer or an admin can reject cancellations');
+        }
+        if (booking.cancellationRequest?.status !== 'pending') {
+            throw new common_1.BadRequestException('No pending cancellation request found');
+        }
+        booking.cancellationRequest = {
+            status: 'rejected',
+            requestedAt: booking.cancellationRequest.requestedAt,
+            reason: booking.cancellationRequest.reason,
+            seatsToCancel: booking.cancellationRequest.seatsToCancel,
+            cancelAll: booking.cancellationRequest.cancelAll,
+        };
+        return booking.save();
     }
 };
 exports.BookingsService = BookingsService;

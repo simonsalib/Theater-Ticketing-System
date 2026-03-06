@@ -406,21 +406,47 @@
    Responsive Adjustments
    ============================================ */
 @media (max-width: 900px) {
+    .configurator-header {
+        flex-direction: column;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        text-align: center;
+    }
+
+    .header-left p {
+        font-size: 0.7rem;
+    }
+
+    .header-actions {
+        width: 100%;
+        justify-content: center;
+    }
+
     .configurator-main {
         flex-direction: column;
+        overflow-y: auto;
+        overflow-x: hidden;
     }
 
     .configurator-sidebar {
         width: 100%;
         flex-direction: row;
         flex-wrap: wrap;
+        flex-shrink: 0;
         border-right: none;
         border-bottom: 1px solid rgba(139, 92, 246, 0.15);
+        max-height: 35vh;
+        overflow-y: auto;
     }
 
     .sidebar-section {
         flex: 1;
         min-width: 200px;
         border-bottom: none;
+    }
+
+    .configurator-canvas-area {
+        min-height: 60vh;
+        flex-shrink: 0;
     }
 }

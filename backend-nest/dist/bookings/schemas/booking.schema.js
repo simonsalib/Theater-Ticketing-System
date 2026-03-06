@@ -55,6 +55,59 @@ __decorate([
 SelectedSeat = __decorate([
     (0, mongoose_1.Schema)()
 ], SelectedSeat);
+let CancellationSeat = class CancellationSeat {
+    row;
+    seatNumber;
+    section;
+};
+__decorate([
+    (0, mongoose_1.Prop)({ required: true }),
+    __metadata("design:type", String)
+], CancellationSeat.prototype, "row", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ required: true }),
+    __metadata("design:type", Number)
+], CancellationSeat.prototype, "seatNumber", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ enum: ['main', 'balcony'], default: 'main' }),
+    __metadata("design:type", String)
+], CancellationSeat.prototype, "section", void 0);
+CancellationSeat = __decorate([
+    (0, mongoose_1.Schema)()
+], CancellationSeat);
+let CancellationRequest = class CancellationRequest {
+    status;
+    requestedAt;
+    reason;
+    seatsToCancel;
+    cancelAll;
+};
+__decorate([
+    (0, mongoose_1.Prop)({
+        enum: ['none', 'pending', 'approved', 'rejected'],
+        default: 'none',
+    }),
+    __metadata("design:type", String)
+], CancellationRequest.prototype, "status", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: Date, default: null }),
+    __metadata("design:type", Date)
+], CancellationRequest.prototype, "requestedAt", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: '' }),
+    __metadata("design:type", String)
+], CancellationRequest.prototype, "reason", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: [CancellationSeat], default: [] }),
+    __metadata("design:type", Array)
+], CancellationRequest.prototype, "seatsToCancel", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: false }),
+    __metadata("design:type", Boolean)
+], CancellationRequest.prototype, "cancelAll", void 0);
+CancellationRequest = __decorate([
+    (0, mongoose_1.Schema)()
+], CancellationRequest);
 let Booking = class Booking {
     StandardId;
     eventId;
@@ -66,6 +119,7 @@ let Booking = class Booking {
     selectedSeats;
     instapayReceipt;
     isReceiptUploaded;
+    cancellationRequest;
 };
 exports.Booking = Booking;
 __decorate([
@@ -111,9 +165,12 @@ __decorate([
     (0, mongoose_1.Prop)({ default: false }),
     __metadata("design:type", Boolean)
 ], Booking.prototype, "isReceiptUploaded", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: CancellationRequest, default: () => ({ status: 'none' }) }),
+    __metadata("design:type", CancellationRequest)
+], Booking.prototype, "cancellationRequest", void 0);
 exports.Booking = Booking = __decorate([
     (0, mongoose_1.Schema)({ timestamps: true })
 ], Booking);
 exports.BookingSchema = mongoose_1.SchemaFactory.createForClass(Booking);
-exports.BookingSchema.index({ pendingExpiresAt: 1 }, { expireAfterSeconds: 0 });
 //# sourceMappingURL=booking.schema.js.map

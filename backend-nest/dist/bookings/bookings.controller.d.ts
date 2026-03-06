@@ -15,7 +15,7 @@ export declare class BookingsController {
         success: boolean;
         data: import("./schemas/booking.schema").BookingDocument;
     }>;
-    remove(id: string): Promise<{
+    remove(id: string, req: any): Promise<{
         success: boolean;
         message: string;
     }>;
@@ -41,7 +41,36 @@ export declare class BookingsController {
         count: number;
         data: import("./schemas/booking.schema").BookingDocument[];
     }>;
-    updateBookingStatus(id: string, status: string): Promise<{
+    updateBookingStatus(id: string, status: string, req: any): Promise<{
+        success: boolean;
+        data: import("./schemas/booking.schema").BookingDocument;
+    }>;
+    cancelSelectedSeats(id: string, body: {
+        seatKeys: string[];
+        cancelAll: boolean;
+    }, req: any): Promise<{
+        message: string;
+        booking?: import("./schemas/booking.schema").BookingDocument;
+        success: boolean;
+    }>;
+    requestCancellation(id: string, body: {
+        seatKeys: string[];
+        cancelAll: boolean;
+        reason: string;
+    }, req: any): Promise<{
+        success: boolean;
+        data: import("./schemas/booking.schema").BookingDocument;
+    }>;
+    getCancellationRequests(eventId: string): Promise<{
+        success: boolean;
+        count: number;
+        data: import("./schemas/booking.schema").BookingDocument[];
+    }>;
+    approveCancellation(id: string, req: any): Promise<{
+        success: boolean;
+        data: import("./schemas/booking.schema").BookingDocument;
+    }>;
+    rejectCancellation(id: string, req: any): Promise<{
         success: boolean;
         data: import("./schemas/booking.schema").BookingDocument;
     }>;

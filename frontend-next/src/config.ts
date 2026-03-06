@@ -8,10 +8,10 @@ const getBaseUrl = () => {
 
     if (typeof window !== 'undefined') {
         // Client-side development: use the current hostname
-        return `http://${window.location.hostname}:3001`;
+        return `http://${window.location.hostname}:8000`;
     }
     // Server-side fallback
-    return "http://localhost:3001";
+    return "http://localhost:8000";
 };
 
 export const BASE_URL = getBaseUrl();

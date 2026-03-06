@@ -11,10 +11,10 @@ export declare class EventsService {
     findAllApproved(): Promise<EventDocument[]>;
     findAll(): Promise<EventDocument[]>;
     findOne(id: string): Promise<EventDocument>;
-    update(id: string, updateDto: any): Promise<EventDocument>;
+    update(id: string, updateDto: any, user?: any): Promise<EventDocument>;
     requestDeletionOTP(id: string, user: any): Promise<void>;
     verifyDeletionOTP(id: string, otp: string): Promise<void>;
-    delete(id: string): Promise<void>;
+    delete(id: string, user?: any): Promise<void>;
     findByOrganizer(organizerId: string): Promise<EventDocument[]>;
     getOrganizerAnalytics(organizerId: string): Promise<any>;
 }

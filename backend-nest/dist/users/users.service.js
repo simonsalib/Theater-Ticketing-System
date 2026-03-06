@@ -105,8 +105,12 @@ let UsersService = class UsersService {
             user.name = name;
         if (email)
             user.email = email;
-        if (phone !== undefined)
+        if (phone !== undefined) {
+            if (phone && !/^01\d{9}$/.test(phone)) {
+                throw new common_1.BadRequestException('Phone number must be 11 digits starting with 01');
+            }
             user.set('phone', phone);
+        }
         if (profilePicture !== undefined)
             user.set('profilePicture', profilePicture);
         if (instapayNumber !== undefined)
@@ -135,8 +139,12 @@ let UsersService = class UsersService {
             isVerified: false,
             requiresPasswordChange: true,
         };
-        if (phone)
+        if (phone) {
+            if (!/^01\d{9}$/.test(phone)) {
+                throw new common_1.BadRequestException('Phone number must be 11 digits starting with 01');
+            }
             newUserPayload.phone = phone;
+        }
         if (instapayNumber)
             newUserPayload.instapayNumber = instapayNumber;
         if (instapayQR)

@@ -68,6 +68,9 @@ let AuthService = class AuthService {
     }
     async register(registerDto) {
         const { email, password, name, phone } = registerDto;
+        if (phone && !/^01\d{9}$/.test(phone)) {
+            throw new common_1.BadRequestException('Phone number must be 11 digits starting with 01');
+        }
         const existingUser = await this.usersService.findOneByEmail(email);
         if (existingUser) {
             throw new common_1.ConflictException('User already exists');
