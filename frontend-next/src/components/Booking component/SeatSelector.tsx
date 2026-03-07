@@ -122,16 +122,9 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                     s.section === seat.section
             );
 
-            if (isSelected) {
-                return prev.filter(
-                    s => !(s.row === seat.row &&
-                        s.seatNumber === seat.seatNumber &&
-                        s.section === seat.section)
-                );
-            } else {
-                if (prev.length >= maxSeats) return prev;
-                return [...prev, seat];
-            }
+            if (isSelected) return prev;
+            if (prev.length >= maxSeats) return prev;
+            return [...prev, seat];
         });
     }, [maxSeats]);
 
@@ -460,15 +453,7 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                 </div>
             </div>
 
-            <AnimatePresence>
-                {hoveredSeat && !hoveredSeat.isBooked && hoveredSeat.isActive && (
-                    <motion.div className="seat-tooltip" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                        <strong>{hoveredSeat.row}{hoveredSeat.seatNumber}</strong>
-                        <span className="tooltip-type">{SEAT_TYPE_COLORS[hoveredSeat.seatType]?.label}</span>
-                        <span className="tooltip-price">{hoveredSeat.price} EGP</span>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+
 
         </div>
     );
