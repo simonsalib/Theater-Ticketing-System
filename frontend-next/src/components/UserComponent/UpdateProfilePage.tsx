@@ -4,7 +4,7 @@ import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/auth/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiUser, FiMail, FiCamera, FiCheck, FiX, FiArrowLeft, FiImage } from 'react-icons/fi';
+import { FiUser, FiMail, FiCamera, FiCheck, FiX, FiArrowLeft, FiImage, FiLink } from 'react-icons/fi';
 import api from '@/services/api';
 import './UpdateProfilePage.css';
 
@@ -12,6 +12,7 @@ interface FormData {
     name: string;
     email: string;
     profilePicture: string;
+    instapayLink?: string;
 }
 
 const UpdateProfilePage = () => {
@@ -21,7 +22,8 @@ const UpdateProfilePage = () => {
     const [formData, setFormData] = useState<FormData>({
         name: '',
         email: '',
-        profilePicture: ''
+        profilePicture: '',
+        instapayLink: ''
     });
 
     const [profileImage, setProfileImage] = useState<string | null>(null);
@@ -34,7 +36,8 @@ const UpdateProfilePage = () => {
             setFormData({
                 name: user.name || '',
                 email: user.email || '',
-                profilePicture: (user as any).profilePicture || ''
+                profilePicture: (user as any).profilePicture || '',
+                instapayLink: (user as any).instapayLink || ''
             });
 
             if ((user as any).profilePicture) {
@@ -221,6 +224,30 @@ const UpdateProfilePage = () => {
                                 <div className="focus-border"></div>
                             </div>
                         </motion.div>
+
+                        {user?.role === 'Organizer' && (
+                            <motion.div
+                                className="form-group"
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: 0.4 }}
+                            >
+                                <label>
+                                    <FiLink className="label-icon" />
+                                    InstaPay Link / Reference (Optional)
+                                </label>
+                                <div className="input-wrapper">
+                                    <input
+                                        type="url"
+                                        name="instapayLink"
+                                        value={formData.instapayLink || ''}
+                                        onChange={handleChange}
+                                        placeholder="https://instapay.to/..."
+                                    />
+                                    <div className="focus-border"></div>
+                                </div>
+                            </motion.div>
+                        )}
                     </div>
 
                     <motion.div

@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     FiCalendar, FiMapPin, FiTag, FiMinus, FiPlus,
     FiShoppingCart, FiArrowLeft, FiCheckCircle, FiAlertCircle,
-    FiCreditCard, FiUsers, FiGrid, FiUser, FiPhone, FiArrowRight, FiClock, FiCopy
+    FiCreditCard, FiUsers, FiGrid, FiUser, FiPhone, FiArrowRight, FiClock, FiCopy, FiExternalLink
 } from 'react-icons/fi';
 import { getImageUrl } from '@/utils/imageHelper';
 import SeatSelector from '@/components/Booking component/SeatSelector';
@@ -44,9 +44,9 @@ const BookTicketPage = () => {
     const [showAttendeeForm, setShowAttendeeForm] = useState(false);
     const [attendeeInfo, setAttendeeInfo] = useState<AttendeeInfo[]>([]);
 
-    // Organizer InstaPay
     const [organizerInstapay, setOrganizerInstapay] = useState<string>('');
     const [organizerInstapayQR, setOrganizerInstapayQR] = useState<string>('');
+    const [organizerInstapayLink, setOrganizerInstapayLink] = useState<string>('');
     const [hasCopied, setHasCopied] = useState(false);
     const [bookingId, setBookingId] = useState<string>('');
 
@@ -119,6 +119,7 @@ const BookTicketPage = () => {
                 if (eventData.organizerId && typeof eventData.organizerId === 'object') {
                     setOrganizerInstapay(eventData.organizerId.instapayNumber || '');
                     setOrganizerInstapayQR(eventData.organizerId.instapayQR || '');
+                    setOrganizerInstapayLink(eventData.organizerId.instapayLink || '');
                 }
 
                 // Process bookings (if logged in and successful)
@@ -476,9 +477,47 @@ const BookTicketPage = () => {
                                     <FiCopy size={14} /> {hasCopied ? 'Copied!' : 'Copy'}
                                 </button>
                             </div>
-                        ) : !organizerInstapayQR ? (
+                        ) : !organizerInstapayQR && !organizerInstapayLink ? (
                             <p className="instapay-fallback">Contact the event organizer for payment details.</p>
                         ) : null}
+
+                        {organizerInstapayLink && (
+                            <div style={{
+                                marginTop: '16px',
+                                display: 'flex',
+                                justifyContent: 'center'
+                            }}>
+                                <a
+                                    href={organizerInstapayLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        padding: '12px 24px',
+                                        background: 'rgba(16, 185, 129, 0.15)',
+                                        color: '#10b981',
+                                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                                        borderRadius: '12px',
+                                        textDecoration: 'none',
+                                        fontWeight: 600,
+                                        transition: 'all 0.2s',
+                                        boxShadow: '0 4px 15px rgba(16, 185, 129, 0.1)'
+                                    }}
+                                    onMouseOver={(e) => {
+                                        e.currentTarget.style.background = 'rgba(16, 185, 129, 0.25)';
+                                        e.currentTarget.style.transform = 'translateY(-2px)';
+                                    }}
+                                    onMouseOut={(e) => {
+                                        e.currentTarget.style.background = 'rgba(16, 185, 129, 0.15)';
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                    }}
+                                >
+                                    <FiExternalLink /> Pay directly via InstaPay Link
+                                </a>
+                            </div>
+                        )}
 
                         <p className="instapay-note">The organizer will confirm your booking once payment is verified.</p>
 

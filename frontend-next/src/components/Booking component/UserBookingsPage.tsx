@@ -7,7 +7,7 @@ import ConfirmationDialog from '../AdminComponent/ConfirmationDialog';
 import CancelSeatsModal from './CancelSeatsModal';
 import RequestCancellationModal from './RequestCancellationModal';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiCalendar, FiMapPin, FiClock, FiTrash2, FiEye, FiAlertCircle, FiCheckCircle, FiUploadCloud, FiGrid, FiCopy, FiRotateCcw } from 'react-icons/fi';
+import { FiCalendar, FiMapPin, FiClock, FiTrash2, FiEye, FiAlertCircle, FiCheckCircle, FiUploadCloud, FiGrid, FiCopy, FiRotateCcw, FiExternalLink } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import { useLanguage } from '@/contexts/LanguageContext';
 import './UserBookingPage.css';
@@ -46,6 +46,7 @@ interface EventData {
         name: string;
         instapayNumber?: string;
         instapayQR?: string;
+        instapayLink?: string;
     };
 }
 
@@ -113,7 +114,7 @@ const UserBookingsPage = () => {
         updateTimers();
         const interval = setInterval(updateTimers, 1000);
         return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [bookings.length]);
 
     const fetchBookings = async () => {
@@ -338,6 +339,7 @@ const UserBookingsPage = () => {
                             const timeLeft = timers[booking._id];
                             const instapayQR = event?.organizerId?.instapayQR;
                             const instapayNumber = event?.organizerId?.instapayNumber ?? '';
+                            const instapayLink = event?.organizerId?.instapayLink ?? '';
 
                             return (
                                 <div key={booking._id} style={{
@@ -433,6 +435,82 @@ const UserBookingsPage = () => {
                                         </div>
                                     )}
 
+                                    {instapayLink && (
+                                        <div style={{
+                                            marginBottom: '16px',
+                                            display: 'flex',
+                                            justifyContent: 'center'
+                                        }}>
+                                            <a
+                                                href={instapayLink}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px',
+                                                    padding: '12px 24px',
+                                                    background: 'rgba(16, 185, 129, 0.15)',
+                                                    color: '#10b981',
+                                                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                                                    borderRadius: '12px',
+                                                    textDecoration: 'none',
+                                                    fontWeight: 600,
+                                                    transition: 'all 0.2s',
+                                                    boxShadow: '0 4px 15px rgba(16, 185, 129, 0.1)'
+                                                }}
+                                                onMouseOver={(e) => {
+                                                    e.currentTarget.style.background = 'rgba(16, 185, 129, 0.25)';
+                                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                                }}
+                                                onMouseOut={(e) => {
+                                                    e.currentTarget.style.background = 'rgba(16, 185, 129, 0.15)';
+                                                    e.currentTarget.style.transform = 'translateY(0)';
+                                                }}
+                                            >
+                                                <FiExternalLink /> Pay directly via InstaPay Link
+                                            </a>
+                                        </div>
+                                    )}
+
+                                    {instapayLink && (
+                                        <div style={{
+                                            marginBottom: '16px',
+                                            display: 'flex',
+                                            justifyContent: 'center'
+                                        }}>
+                                            <a
+                                                href={instapayLink}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px',
+                                                    padding: '12px 24px',
+                                                    background: 'rgba(16, 185, 129, 0.15)',
+                                                    color: '#10b981',
+                                                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                                                    borderRadius: '12px',
+                                                    textDecoration: 'none',
+                                                    fontWeight: 600,
+                                                    transition: 'all 0.2s',
+                                                    boxShadow: '0 4px 15px rgba(16, 185, 129, 0.1)'
+                                                }}
+                                                onMouseOver={(e) => {
+                                                    e.currentTarget.style.background = 'rgba(16, 185, 129, 0.25)';
+                                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                                }}
+                                                onMouseOut={(e) => {
+                                                    e.currentTarget.style.background = 'rgba(16, 185, 129, 0.15)';
+                                                    e.currentTarget.style.transform = 'translateY(0)';
+                                                }}
+                                            >
+                                                <FiExternalLink /> Pay directly via InstaPay Link
+                                            </a>
+                                        </div>
+                                    )}
+
                                     <motion.button
                                         onClick={() => handleUploadClick(booking._id)}
                                         whileHover={{ scale: 1.02 }}
@@ -495,7 +573,6 @@ const UserBookingsPage = () => {
 
                                     <div className="booking-card-header">
                                         <h3>{event?.title || 'Loading Event...'}</h3>
-                                        <span className="booking-id">ID: {booking._id.substring(0, 8)}...</span>
                                     </div>
 
                                     <div className="booking-card-body">

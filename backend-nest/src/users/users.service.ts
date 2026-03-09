@@ -61,7 +61,7 @@ export class UsersService {
     }
 
     async updateProfile(id: string, updateDto: any): Promise<UserDocument> {
-        const { name, email, phone, profilePicture, instapayNumber, instapayQR } = updateDto;
+        const { name, email, phone, profilePicture, instapayNumber, instapayLink, instapayQR } = updateDto;
 
         const user = await this.userModel.findById(id).exec();
         if (!user) {
@@ -85,6 +85,7 @@ export class UsersService {
         }
         if (profilePicture !== undefined) user.set('profilePicture', profilePicture);
         if (instapayNumber !== undefined) user.set('instapayNumber', instapayNumber);
+        if (instapayLink !== undefined) user.set('instapayLink', instapayLink);
         if (instapayQR !== undefined) {
             user.set('instapayQR', instapayQR);
             user.markModified('instapayQR');
@@ -106,7 +107,7 @@ export class UsersService {
     }
 
     async createUserByAdmin(createDto: any): Promise<UserDocument> {
-        const { email, password, name, role, phone, instapayNumber, instapayQR, username } = createDto;
+        const { email, password, name, role, phone, instapayNumber, instapayLink, instapayQR, username } = createDto;
 
         // Allow Admin, Organizer, or Scanner roles
         if (role !== UserRole.ADMIN && role !== UserRole.ORGANIZER && role !== UserRole.SCANNER) {
@@ -164,6 +165,7 @@ export class UsersService {
             newUserPayload.phone = phone;
         }
         if (instapayNumber) newUserPayload.instapayNumber = instapayNumber;
+        if (instapayLink) newUserPayload.instapayLink = instapayLink;
         if (instapayQR) newUserPayload.instapayQR = instapayQR;
 
         const newUser = new this.userModel(newUserPayload);

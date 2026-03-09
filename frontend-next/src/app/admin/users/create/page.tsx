@@ -29,6 +29,7 @@ const CreateUserPage = () => {
         role: 'Organizer',
         phone: '',
         instapayNumber: '',
+        instapayLink: '',
         instapayQR: ''
     });
     const [loading, setLoading] = useState(false);
@@ -50,6 +51,7 @@ const CreateUserPage = () => {
             ...prev,
             role,
             instapayNumber: prev.role !== role ? '' : prev.instapayNumber,
+            instapayLink: prev.role !== role ? '' : prev.instapayLink,
             instapayQR: prev.role !== role ? '' : prev.instapayQR,
         }));
         if (formData.role !== role) setQrPreview(null);
@@ -156,6 +158,7 @@ const CreateUserPage = () => {
                 payload.phone = formData.phone.trim();
                 if (formData.role === 'Organizer') {
                     payload.instapayNumber = instapayNumber;
+                    if (formData.instapayLink.trim()) payload.instapayLink = formData.instapayLink.trim();
                     if (formData.instapayQR) payload.instapayQR = formData.instapayQR;
                 }
             }
@@ -380,6 +383,29 @@ const CreateUserPage = () => {
                                     value={formData.instapayNumber}
                                     onChange={handleChange}
                                     placeholder="Enter 11-digit InstaPay number"
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem 1rem',
+                                        borderRadius: '8px',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                        background: 'rgba(255, 255, 255, 0.05)',
+                                        color: 'white',
+                                        fontSize: '1rem'
+                                    }}
+                                />
+                            </div>
+
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
+                                    <span style={{ marginRight: '0.5rem' }}>🔗</span>
+                                    InstaPay Link / Reference (Optional)
+                                </label>
+                                <input
+                                    type="url"
+                                    name="instapayLink"
+                                    value={formData.instapayLink}
+                                    onChange={handleChange}
+                                    placeholder="Enter InstaPay payment link"
                                     style={{
                                         width: '100%',
                                         padding: '0.75rem 1rem',
