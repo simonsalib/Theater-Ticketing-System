@@ -61,6 +61,7 @@ export class UsersService {
     }
 
     async updateProfile(id: string, updateDto: any): Promise<UserDocument> {
+        console.log('Update Profile DTO received:', JSON.stringify(updateDto, null, 2));
         const { name, email, phone, profilePicture, instapayNumber, instapayLink, instapayQR } = updateDto;
 
         const user = await this.userModel.findById(id).exec();

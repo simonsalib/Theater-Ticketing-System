@@ -10,6 +10,7 @@ export interface User {
     phone?: string;
     profilePicture?: string;
     instapayNumber?: string;
+    instapayLink?: string;
     instapayQR?: string;
     isVerified?: boolean;
     isBlocked?: boolean;
