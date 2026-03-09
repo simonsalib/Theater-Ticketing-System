@@ -664,7 +664,7 @@
 
 /* Full Page Seat Area */
 .theater-seat-area {
-    padding: 10px;
+    padding: 0;
     display: flex;
     justify-content: center;
     align-items: flex-start;
@@ -675,7 +675,7 @@
     min-height: auto;
     max-width: 100%;
     width: 100%;
-    padding: 15px;
+    padding: 0;
 }
 
 /* Fixed Bottom Action Bar */

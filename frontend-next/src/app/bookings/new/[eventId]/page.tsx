@@ -37,6 +37,8 @@ const BookTicketPage = () => {
     // Seat selection state
     const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
     const [seatTotalPrice, setSeatTotalPrice] = useState(0);
+    const [existingSeats, setExistingSeats] = useState<{ row: string; seatNumber: number; section: string }[]>([]);
+    const [initialSeatsData, setInitialSeatsData] = useState<any>(null);
 
     // Attendee form state
     const [showAttendeeForm, setShowAttendeeForm] = useState(false);
@@ -95,25 +97,65 @@ const BookTicketPage = () => {
 
     useEffect(() => {
         if (!eventId) return;
-        const fetchEvent = async () => {
+        const fetchAllData = async () => {
+            setIsEventLoading(true);
             try {
-                setIsEventLoading(true);
-                const response = await api.get<any>(`/event/${eventId}`);
-                const data = response.data.success ? response.data.data : response.data;
-                setEvent(data);
-                // Read organizer InstaPay number from populated event data
-                if (data.organizerId && typeof data.organizerId === 'object') {
-                    setOrganizerInstapay(data.organizerId.instapayNumber || '');
-                    setOrganizerInstapayQR(data.organizerId.instapayQR || '');
+                // Fetch event details
+                const eventPromise = api.get<any>(`/event/${eventId}`);
+
+                // Fetch user bookings (optional)
+                const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+                const bookingsPromise = token ? api.get('/user/bookings').catch(e => null) : Promise.resolve(null);
+
+                // Fetch theater seats eagerly
+                const seatsPromise = api.get<any>(`/booking/event/${eventId}/seats`).catch(e => null);
+
+                // Wait for all three
+                const [eventResponse, bookingsResponse, seatsResponse] = await Promise.all([eventPromise, bookingsPromise, seatsPromise]);
+
+                // Process event
+                const eventData = eventResponse.data.success ? eventResponse.data.data : eventResponse.data;
+                setEvent(eventData);
+                if (eventData.organizerId && typeof eventData.organizerId === 'object') {
+                    setOrganizerInstapay(eventData.organizerId.instapayNumber || '');
+                    setOrganizerInstapayQR(eventData.organizerId.instapayQR || '');
                 }
+
+                // Process bookings (if logged in and successful)
+                if (bookingsResponse && bookingsResponse.data) {
+                    let bookingsData: any[] = [];
+                    if (bookingsResponse.data.success !== undefined) {
+                        bookingsData = bookingsResponse.data.data;
+                    } else if (Array.isArray(bookingsResponse.data)) {
+                        bookingsData = bookingsResponse.data;
+                    }
+
+                    const bookedSeats: { row: string; seatNumber: number; section: string }[] = [];
+                    bookingsData.forEach(booking => {
+                        const bEventId = typeof booking.eventId === 'object' ? booking.eventId._id : booking.eventId;
+                        if (bEventId === eventId && booking.status !== 'canceled' && booking.status !== 'rejected') {
+                            if (booking.selectedSeats && Array.isArray(booking.selectedSeats)) {
+                                bookedSeats.push(...booking.selectedSeats);
+                            }
+                        }
+                    });
+                    setExistingSeats(bookedSeats);
+                }
+
+                // Process eager seats data
+                if (seatsResponse?.data?.success) {
+                    setInitialSeatsData(seatsResponse.data.data);
+                }
+
             } catch (err: any) {
-                console.error("Error fetching event details:", err);
+                console.error("Error fetching event data:", err);
                 setError(err.response?.data?.message || "Failed to load event details");
             } finally {
                 setIsEventLoading(false);
             }
         };
-        fetchEvent();
+
+        fetchAllData();
     }, [eventId]);
 
     // Hold countdown timer
@@ -607,7 +649,7 @@ const BookTicketPage = () => {
                                     animate={{ opacity: 1, x: 0 }}
                                     exit={{ opacity: 0, x: -20 }}
                                 >
-                                    <SeatSelector eventId={event._id} onSeatsSelected={handleSeatsSelected} maxSeats={10} />
+                                    <SeatSelector eventId={event._id} onSeatsSelected={handleSeatsSelected} maxSeats={10} highlightedSeats={existingSeats} initialSeatsData={initialSeatsData} />
                                 </motion.div>
                             ) : (
                                 <motion.div

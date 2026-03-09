@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     FiCalendar, FiMapPin, FiTag, FiUsers,
@@ -73,6 +74,8 @@ const EventDetailsPage = ({ id }: EventDetailsPageProps) => {
 
     const [seatData, setSeatData] = useState<SeatData | null>(null);
     const [seatLoading, setSeatLoading] = useState<boolean>(false);
+    const [existingSeats, setExistingSeats] = useState<{ row: string; seatNumber: number; section: string }[]>([]);
+    const [initialSeatsData, setInitialSeatsData] = useState<any>(null);
 
     useEffect(() => {
         if (!id) {
@@ -81,15 +84,55 @@ const EventDetailsPage = ({ id }: EventDetailsPageProps) => {
             return;
         }
 
-        const fetchEventDetails = async () => {
+        const fetchAllData = async () => {
             try {
-                const response = await api.get(`/event/${id}`);
+                // Fetch event details
+                const eventPromise = api.get(`/event/${id}`);
 
-                if (response.data.success && response.data.data) {
-                    setEvent(response.data.data);
+                // Check logged in to fetch user bookings (optional)
+                const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+                const bookingsPromise = token ? api.get('/user/bookings').catch(e => null) : Promise.resolve(null);
+
+                // Fetch theater seats eagerly (we don't know if it's a theater event yet, but fetch anyway to save time)
+                const seatsPromise = api.get(`/booking/event/${id}/seats`).catch(e => null);
+
+                // Wait for all three
+                const [eventResponse, bookingsResponse, seatsResponse] = await Promise.all([eventPromise, bookingsPromise, seatsPromise]);
+
+                if (eventResponse.data.success && eventResponse.data.data) {
+                    const eventData = eventResponse.data.data;
+                    setEvent(eventData);
+
+                    // If it is a theater event, process the eager seats data
+                    if (eventData.hasTheaterSeating && seatsResponse?.data?.success) {
+                        setSeatData(seatsResponse.data.data);
+                        setInitialSeatsData(seatsResponse.data.data);
+                    }
                 } else {
                     throw new Error('Failed to load event details');
                 }
+
+                // Process bookings (if logged in and successful)
+                if (bookingsResponse && bookingsResponse.data) {
+                    let bookingsData: any[] = [];
+                    if (bookingsResponse.data.success !== undefined) {
+                        bookingsData = bookingsResponse.data.data;
+                    } else if (Array.isArray(bookingsResponse.data)) {
+                        bookingsData = bookingsResponse.data;
+                    }
+
+                    const bookedSeats: { row: string; seatNumber: number; section: string }[] = [];
+                    bookingsData.forEach(booking => {
+                        const bEventId = typeof booking.eventId === 'object' ? booking.eventId._id : booking.eventId;
+                        if (bEventId === id && booking.status !== 'canceled' && booking.status !== 'rejected') {
+                            if (booking.selectedSeats && Array.isArray(booking.selectedSeats)) {
+                                bookedSeats.push(...booking.selectedSeats);
+                            }
+                        }
+                    });
+                    setExistingSeats(bookedSeats);
+                }
+
             } catch (err: any) {
                 console.error("Error fetching event:", err);
                 setError(err.response?.data?.message || err.message);
@@ -98,27 +141,8 @@ const EventDetailsPage = ({ id }: EventDetailsPageProps) => {
             }
         };
 
-        fetchEventDetails();
+        fetchAllData();
     }, [id]);
-
-    useEffect(() => {
-        if (event?.hasTheaterSeating && event?._id) {
-            const fetchSeatData = async () => {
-                try {
-                    setSeatLoading(true);
-                    const response = await api.get(`/booking/event/${event._id}/seats`);
-                    if (response.data.success) {
-                        setSeatData(response.data.data);
-                    }
-                } catch (err) {
-                    console.error('Error fetching seat data:', err);
-                } finally {
-                    setSeatLoading(false);
-                }
-            };
-            fetchSeatData();
-        }
-    }, [event]);
 
     const formatDate = (dateString: string): DateInfo => {
         const date = new Date(dateString);
@@ -374,6 +398,8 @@ const EventDetailsPage = ({ id }: EventDetailsPageProps) => {
                                                     <SeatSelector
                                                         eventId={event._id}
                                                         readOnly={true}
+                                                        highlightedSeats={existingSeats}
+                                                        initialSeatsData={initialSeatsData}
                                                     />
                                                 </div>
                                             </div>
@@ -397,32 +423,36 @@ const EventDetailsPage = ({ id }: EventDetailsPageProps) => {
                             </div>
 
                             {user?.role === "Standard User" && (
-                                <motion.button
-                                    className={`book-now-btn-detail ${ticketInfo.status === 'sold-out' ? 'disabled' : ''}`}
-                                    onClick={() => router.push(`/bookings/new/${event._id}`)}
-                                    disabled={ticketInfo.status === 'sold-out'}
-                                    whileHover={ticketInfo.status !== 'sold-out' ? { scale: 1.03 } : {}}
-                                    whileTap={ticketInfo.status !== 'sold-out' ? { scale: 0.98 } : {}}
-                                >
-                                    {event.hasTheaterSeating ? <FiGrid /> : <FiShoppingCart />}
-                                    {ticketInfo.status === 'sold-out'
-                                        ? 'Sold Out'
-                                        : event.hasTheaterSeating
-                                            ? 'Select Seats'
-                                            : 'Book Tickets'
-                                    }
-                                </motion.button>
+                                <Link href={`/bookings/new/${event._id}`} prefetch={true} passHref style={{ textDecoration: 'none', display: 'block' }}>
+                                    <motion.button
+                                        className={`book-now-btn-detail ${ticketInfo.status === 'sold-out' ? 'disabled' : ''}`}
+                                        disabled={ticketInfo.status === 'sold-out'}
+                                        whileHover={ticketInfo.status !== 'sold-out' ? { scale: 1.03 } : {}}
+                                        whileTap={ticketInfo.status !== 'sold-out' ? { scale: 0.98 } : {}}
+                                        style={{ width: '100%' }}
+                                    >
+                                        {event.hasTheaterSeating ? <FiGrid /> : <FiShoppingCart />}
+                                        {ticketInfo.status === 'sold-out'
+                                            ? 'Sold Out'
+                                            : event.hasTheaterSeating
+                                                ? 'Select Seats'
+                                                : 'Book Tickets'
+                                        }
+                                    </motion.button>
+                                </Link>
                             )}
                             {!user && ticketInfo.status !== 'sold-out' && (
-                                <motion.button
-                                    className="book-now-btn-detail"
-                                    onClick={() => router.push('/login')}
-                                    whileHover={{ scale: 1.03 }}
-                                    whileTap={{ scale: 0.98 }}
-                                >
-                                    <FiShoppingCart />
-                                    Login to Book
-                                </motion.button>
+                                <Link href="/login" prefetch={true} passHref style={{ textDecoration: 'none', display: 'block' }}>
+                                    <motion.button
+                                        className="book-now-btn-detail"
+                                        whileHover={{ scale: 1.03 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        style={{ width: '100%' }}
+                                    >
+                                        <FiShoppingCart />
+                                        Login to Book
+                                    </motion.button>
+                                </Link>
                             )}
                         </div>
                     </motion.div>

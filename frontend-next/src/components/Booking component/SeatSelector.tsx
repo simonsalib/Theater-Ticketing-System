@@ -25,6 +25,7 @@ interface SeatSelectorProps {
     maxSeats?: number;
     readOnly?: boolean;
     highlightedSeats?: { row: string; seatNumber: number; section: string }[];
+    initialSeatsData?: any;
 }
 
 const SeatSelector: React.FC<SeatSelectorProps> = ({
@@ -32,13 +33,14 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
     onSeatsSelected,
     maxSeats = 10,
     readOnly = false,
-    highlightedSeats = []
+    highlightedSeats = [],
+    initialSeatsData
 }) => {
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(!initialSeatsData);
     const [error, setError] = useState<string | null>(null);
-    const [theaterData, setTheaterData] = useState<Theater | null>(null);
-    const [seats, setSeats] = useState<Seat[]>([]);
-    const [seatPricing, setSeatPricing] = useState<SeatPricing[]>([]);
+    const [theaterData, setTheaterData] = useState<Theater | null>(initialSeatsData?.theater || null);
+    const [seats, setSeats] = useState<Seat[]>(initialSeatsData?.seats || []);
+    const [seatPricing, setSeatPricing] = useState<SeatPricing[]>(initialSeatsData?.seatPricing || []);
     const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
     const [hoveredSeat, setHoveredSeat] = useState<Seat | null>(null);
     const [scale, setScale] = useState(1);
@@ -47,6 +49,8 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
 
     // Fetch seat availability
     useEffect(() => {
+        if (initialSeatsData) return;
+
         const fetchSeats = async () => {
             try {
                 setLoading(true);
@@ -248,11 +252,11 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
             pointerEvents: 'none' as const,
         } : {};
 
-        const isSeatDisabled = isConfirmedBooked || isPending || !seat.isActive || readOnly;
+        const isSeatDisabled = isConfirmedBooked || isPending || !seat.isActive || readOnly || isHighlighted;
 
         return (
             <React.Fragment key={seatKey}>
-                <motion.button
+                <button
                     className={`seat-btn ${seat.seatType} ${isSelected ? 'selected' : ''} ${isHighlighted ? 'highlighted' : ''} ${isConfirmedBooked ? 'booked' : ''} ${isPending ? 'pending' : ''} ${!seat.isActive ? 'disabled' : ''}`}
                     style={{
                         '--seat-bg': typeColors.bg,
@@ -263,8 +267,6 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                     onMouseEnter={() => !readOnly && setHoveredSeat(seat)}
                     onMouseLeave={() => setHoveredSeat(null)}
                     disabled={isSeatDisabled}
-                    whileHover={!isConfirmedBooked && !isPending && seat.isActive && !readOnly ? { scale: 1.15 } : {}}
-                    whileTap={!isConfirmedBooked && !isPending && seat.isActive && !readOnly ? { scale: 0.95 } : {}}
                 >
                     {(isSelected || isHighlighted) ? (
                         <FiCheck className="check-icon" />
@@ -275,7 +277,7 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                     ) : (
                         <span className="seat-num">{seat.seatNumber}</span>
                     )}
-                </motion.button>
+                </button>
                 {vCorridorSpaces}
             </React.Fragment>
         );
@@ -370,12 +372,30 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                         </div>
                     );
                 })}
-                <div className="legend-item"><div className="legend-color booked" style={{ background: '#1a1a1a', borderColor: '#ef4444' }} /><span>Confirmed</span></div>
-                <div className="legend-item"><div className="legend-color" style={{ background: '#78650d', borderColor: '#fbbf24', border: '2px solid #fbbf24' }} /><span>Pending</span></div>
                 <div className="legend-item">
-                    <div className={`legend-color ${readOnly ? 'highlighted' : 'selected-legend'}`} />
-                    <span>{readOnly ? 'Your Seats' : 'Selected'}</span>
+                    <div className="legend-color booked" style={{ background: '#1a1a1a', borderColor: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ color: '#ef4444', fontSize: '10px', fontWeight: 'bold' }}>X</span>
+                    </div>
+                    <span>Booked</span>
                 </div>
+                <div className="legend-item">
+                    <div className="legend-color" style={{ background: '#78650d', borderColor: '#fbbf24', border: '2px solid #fbbf24', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <FiLoader style={{ color: '#fbbf24', fontSize: '9px' }} />
+                    </div>
+                    <span>Pending</span>
+                </div>
+                {highlightedSeats.length > 0 && (
+                    <div className="legend-item">
+                        <div className="legend-color highlighted" />
+                        <span>Your Seats</span>
+                    </div>
+                )}
+                {!readOnly && (
+                    <div className="legend-item">
+                        <div className="legend-color selected-legend" />
+                        <span>Selected</span>
+                    </div>
+                )}
             </div>
 
             <div className="theater-frame">

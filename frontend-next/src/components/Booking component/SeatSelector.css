@@ -414,10 +414,10 @@
 }
 
 .seat-btn.highlighted {
-    background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%) !important;
-    border: 2px solid #a78bfa !important;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+    border: 2px solid #34d399 !important;
     color: white !important;
-    box-shadow: 0 0 15px rgba(124, 58, 237, 0.6);
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.6);
     z-index: 2;
     transform: scale(1.05);
 }
@@ -527,6 +527,12 @@
     background: #22d3ee;
     border-color: #06b6d4;
     box-shadow: 0 0 8px rgba(34, 211, 238, 0.5);
+}
+
+.legend-color.highlighted {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-color: #34d399;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
 }
 
 .legend-price {
@@ -710,7 +716,7 @@
     }
 
     .theater-canvas-container {
-        padding: 0 16px !important;
+        padding: 0 8px !important;
         width: 100% !important;
         margin: 0 !important;
         overflow-x: auto !important;
@@ -725,7 +731,7 @@
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
-        margin: 0 auto !important;
+        margin: 0 !important;
         align-items: center !important;
     }
 
