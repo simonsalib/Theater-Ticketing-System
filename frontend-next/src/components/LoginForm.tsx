@@ -3,6 +3,7 @@
 import { useState, ChangeEvent, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { FiEye, FiEyeOff } from "react-icons/fi";
 import { useAuth } from "@/auth/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { toast } from "react-toastify";
@@ -22,6 +23,7 @@ export default function LoginForm() {
     });
     const [error, setError] = useState<string>("");
     const [loading, setLoading] = useState<boolean>(false);
+    const [showPassword, setShowPassword] = useState<boolean>(false);
     const router = useRouter();
     const { login } = useAuth();
 
@@ -185,15 +187,37 @@ export default function LoginForm() {
                             </label>
                             <div className="input-container">
                                 <input
-                                    type="password"
+                                    type={showPassword ? "text" : "password"}
                                     name="password"
                                     placeholder={t('login.password.placeholder')}
                                     className="form-input"
                                     value={formData.password}
                                     onChange={handleChange}
                                     required
+                                    style={{ paddingRight: '2.5rem' }}
                                 />
                                 <i className="input-icon fas fa-lock"></i>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="password-toggle-btn"
+                                    style={{
+                                        position: 'absolute',
+                                        right: '1.2rem',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'var(--text-muted)',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        padding: '0',
+                                    }}
+                                >
+                                    {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                                </button>
                             </div>
                         </div>
 

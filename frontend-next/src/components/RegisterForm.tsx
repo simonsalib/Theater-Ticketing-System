@@ -3,6 +3,7 @@
 import { useState, ChangeEvent, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { FiEye, FiEyeOff } from "react-icons/fi";
 import api from "@/services/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { toast } from "react-toastify";
@@ -30,6 +31,8 @@ export default function RegisterForm() {
     });
     const [error, setError] = useState<string>("");
     const [loading, setLoading] = useState<boolean>(false);
+    const [showPassword, setShowPassword] = useState<boolean>(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
     const router = useRouter();
 
     // States for OTP verification
@@ -199,15 +202,37 @@ export default function RegisterForm() {
                             </label>
                             <div className="input-container">
                                 <input
-                                    type="password"
+                                    type={showPassword ? "text" : "password"}
                                     name="password"
                                     placeholder={t('login.password.placeholder')}
                                     className="form-input"
                                     value={form.password}
                                     onChange={handleChange}
                                     required
+                                    style={{ paddingRight: '2.5rem' }}
                                 />
                                 <i className="input-icon fas fa-lock"></i>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="password-toggle-btn"
+                                    style={{
+                                        position: 'absolute',
+                                        right: '1.2rem',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'var(--text-muted)',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        padding: '0',
+                                    }}
+                                >
+                                    {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                                </button>
                             </div>
                             <PasswordStrengthIndicator password={form.password} />
                         </div>
@@ -218,15 +243,37 @@ export default function RegisterForm() {
                             </label>
                             <div className="input-container">
                                 <input
-                                    type="password"
+                                    type={showConfirmPassword ? "text" : "password"}
                                     name="confirmPassword"
                                     placeholder={t('register.confirmPassword.placeholder')}
                                     className="form-input"
                                     value={form.confirmPassword}
                                     onChange={handleChange}
                                     required
+                                    style={{ paddingRight: '2.5rem' }}
                                 />
                                 <i className="input-icon fas fa-lock"></i>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    className="password-toggle-btn"
+                                    style={{
+                                        position: 'absolute',
+                                        right: '1.2rem',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'var(--text-muted)',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        padding: '0',
+                                    }}
+                                >
+                                    {showConfirmPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                                </button>
                             </div>
                             {form.confirmPassword && form.password !== form.confirmPassword && (
                                 <div className="password-mismatch">{t('register.passwordMismatch')}</div>

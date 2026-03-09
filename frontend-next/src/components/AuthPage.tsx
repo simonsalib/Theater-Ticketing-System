@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from 'next/link';
 import { useAuth } from "@/auth/AuthContext";
 import { toast } from "react-toastify";
+import { FiEye, FiEyeOff } from 'react-icons/fi';
 import api from "@/services/api";
 import './AuthPage.css';
 
@@ -22,6 +23,7 @@ export default function AuthPage({ initialSide = 'login' }: AuthPageProps) {
     const [showLoginOtp, setShowLoginOtp] = useState(false);
     const [loginOtp, setLoginOtp] = useState(['', '', '', '', '', '']);
     const [loginVerifyLoading, setLoginVerifyLoading] = useState(false);
+    const [showLoginPassword, setShowLoginPassword] = useState(false);
 
     const [registerData, setRegisterData] = useState({ name: "", email: "", password: "", role: "Standard User" });
     const [registerError, setRegisterError] = useState("");
@@ -29,6 +31,7 @@ export default function AuthPage({ initialSide = 'login' }: AuthPageProps) {
     const [showRegisterOtp, setShowRegisterOtp] = useState(false);
     const [registerOtp, setRegisterOtp] = useState(['', '', '', '', '', '']);
     const [registerVerifyLoading, setRegisterVerifyLoading] = useState(false);
+    const [showRegisterPassword, setShowRegisterPassword] = useState(false);
 
     const handleMouseMove = (e: React.MouseEvent) => {
         if (typeof window === 'undefined') return;
@@ -173,7 +176,12 @@ export default function AuthPage({ initialSide = 'login' }: AuthPageProps) {
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Password</label>
-                                <input type="password" name="password" placeholder="Enter your password" className="form-input" value={loginData.password} onChange={handleLoginChange} required />
+                                <div style={{ position: 'relative' }}>
+                                    <input type={showLoginPassword ? "text" : "password"} name="password" placeholder="Enter your password" className="form-input" value={loginData.password} onChange={handleLoginChange} required style={{ paddingRight: '2.5rem' }} />
+                                    <button type="button" onClick={() => setShowLoginPassword(!showLoginPassword)} style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'rgba(255, 255, 255, 0.5)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        {showLoginPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                                    </button>
+                                </div>
                             </div>
                             <button type="submit" className="btn-primary" disabled={loginLoading}>
                                 {loginLoading ? <><span className="form-loader"></span> Signing In...</> : 'Sign In'}
@@ -217,7 +225,12 @@ export default function AuthPage({ initialSide = 'login' }: AuthPageProps) {
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Password</label>
-                                <input type="password" name="password" placeholder="Create a secure password" className="form-input" value={registerData.password} onChange={handleRegisterChange} required />
+                                <div style={{ position: 'relative' }}>
+                                    <input type={showRegisterPassword ? "text" : "password"} name="password" placeholder="Create a secure password" className="form-input" value={registerData.password} onChange={handleRegisterChange} required style={{ paddingRight: '2.5rem' }} />
+                                    <button type="button" onClick={() => setShowRegisterPassword(!showRegisterPassword)} style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'rgba(255, 255, 255, 0.5)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        {showRegisterPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                                    </button>
+                                </div>
                             </div>
                             <button type="submit" className="btn-primary" disabled={registerLoading}>
                                 {registerLoading ? <><span className="form-loader"></span> Creating Account...</> : 'Join Now'}

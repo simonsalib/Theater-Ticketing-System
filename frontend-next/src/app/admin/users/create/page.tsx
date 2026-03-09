@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
     FiArrowLeft, FiUserPlus, FiMail, FiLock, FiUser,
-    FiShield, FiStar, FiCheck, FiAlertCircle, FiUpload, FiX, FiCamera
+    FiShield, FiStar, FiCheck, FiAlertCircle, FiUpload, FiX, FiCamera,
+    FiEye, FiEyeOff
 } from 'react-icons/fi';
 import api from '@/services/api';
 import { toast } from 'react-toastify';
@@ -33,6 +34,8 @@ const CreateUserPage = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [qrPreview, setQrPreview] = useState<string | null>(null);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const qrInputRef = useRef<HTMLInputElement>(null);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -464,20 +467,20 @@ const CreateUserPage = () => {
                     )}
 
                     {/* Password Field */}
-                    <div style={{ marginBottom: '1.5rem' }}>
+                    <div style={{ marginBottom: '1.5rem', position: 'relative' }}>
                         <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
                             <FiLock style={{ marginRight: '0.5rem' }} />
                             Password *
                         </label>
                         <input
-                            type="password"
+                            type={showPassword ? "text" : "password"}
                             name="password"
                             value={formData.password}
                             onChange={handleChange}
                             placeholder="Enter password (min 6 characters)"
                             style={{
                                 width: '100%',
-                                padding: '0.75rem 1rem',
+                                padding: '0.75rem 2.5rem 0.75rem 1rem',
                                 borderRadius: '8px',
                                 border: '1px solid rgba(255, 255, 255, 0.1)',
                                 background: 'rgba(255, 255, 255, 0.05)',
@@ -485,23 +488,42 @@ const CreateUserPage = () => {
                                 fontSize: '1rem'
                             }}
                         />
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            style={{
+                                position: 'absolute',
+                                right: '1rem',
+                                bottom: '0.75rem',
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                cursor: 'pointer',
+                                padding: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}
+                        >
+                            {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                        </button>
                     </div>
 
                     {/* Confirm Password Field */}
-                    <div style={{ marginBottom: '1.5rem' }}>
+                    <div style={{ marginBottom: '1.5rem', position: 'relative' }}>
                         <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
                             <FiLock style={{ marginRight: '0.5rem' }} />
                             Confirm Password *
                         </label>
                         <input
-                            type="password"
+                            type={showConfirmPassword ? "text" : "password"}
                             name="confirmPassword"
                             value={formData.confirmPassword}
                             onChange={handleChange}
-                            placeholder="Confirm password"
+                            placeholder="Confirm your password"
                             style={{
                                 width: '100%',
-                                padding: '0.75rem 1rem',
+                                padding: '0.75rem 2.5rem 0.75rem 1rem',
                                 borderRadius: '8px',
                                 border: '1px solid rgba(255, 255, 255, 0.1)',
                                 background: 'rgba(255, 255, 255, 0.05)',
@@ -509,6 +531,25 @@ const CreateUserPage = () => {
                                 fontSize: '1rem'
                             }}
                         />
+                        <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            style={{
+                                position: 'absolute',
+                                right: '1rem',
+                                bottom: '0.75rem',
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                cursor: 'pointer',
+                                padding: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}
+                        >
+                            {showConfirmPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                        </button>
                     </div>
 
                     {/* Role Selection moved to top */}

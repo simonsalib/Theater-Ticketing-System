@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FiAlertCircle } from 'react-icons/fi';
+import { FiAlertCircle, FiEye, FiEyeOff } from 'react-icons/fi';
 import api from '@/services/api';
 import { toast } from 'react-toastify';
 import PasswordStrengthIndicator from '@/components/shared/PasswordStrengthIndicator';
@@ -20,6 +20,8 @@ const SetPasswordContent = () => {
     const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     useEffect(() => {
         const emailParam = searchParams.get('email');
@@ -165,7 +167,7 @@ const SetPasswordContent = () => {
                             </label>
                             <div className="input-container">
                                 <input
-                                    type="password"
+                                    type={showPassword ? "text" : "password"}
                                     name="password"
                                     placeholder="Create a secure password"
                                     className="form-input"
@@ -173,8 +175,30 @@ const SetPasswordContent = () => {
                                     onChange={(e) => setNewPassword(e.target.value)}
                                     autoComplete="new-password"
                                     required
+                                    style={{ paddingRight: '2.5rem' }}
                                 />
                                 <i className="input-icon fas fa-lock"></i>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="password-toggle-btn"
+                                    style={{
+                                        position: 'absolute',
+                                        right: '1.2rem',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'var(--text-muted)',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        padding: '0',
+                                    }}
+                                >
+                                    {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                                </button>
                             </div>
                             <PasswordStrengthIndicator password={newPassword} />
                         </div>
@@ -185,7 +209,7 @@ const SetPasswordContent = () => {
                             </label>
                             <div className="input-container">
                                 <input
-                                    type="password"
+                                    type={showConfirmPassword ? "text" : "password"}
                                     name="confirmPassword"
                                     placeholder="Confirm your new password"
                                     className="form-input"
@@ -193,8 +217,30 @@ const SetPasswordContent = () => {
                                     onChange={(e) => setConfirmPassword(e.target.value)}
                                     autoComplete="new-password"
                                     required
+                                    style={{ paddingRight: '2.5rem' }}
                                 />
                                 <i className="input-icon fas fa-shield-alt"></i>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    className="password-toggle-btn"
+                                    style={{
+                                        position: 'absolute',
+                                        right: '1.2rem',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'var(--text-muted)',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        padding: '0',
+                                    }}
+                                >
+                                    {showConfirmPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                                </button>
                             </div>
                             {confirmPassword && newPassword !== confirmPassword && (
                                 <div style={{
