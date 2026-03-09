@@ -9,6 +9,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Booking, BookingDocument } from './schemas/booking.schema';
+import { SeatHold, SeatHoldDocument } from './schemas/seat-hold.schema';
 import { Event, EventDocument } from '../events/schemas/event.schema';
 import { Theater, TheaterDocument } from '../theaters/schemas/theater.schema';
 import { TicketsService } from '../tickets/tickets.service';
@@ -19,6 +20,7 @@ export class BookingsService implements OnModuleInit {
 
     constructor(
         @InjectModel(Booking.name) private bookingModel: Model<BookingDocument>,
+        @InjectModel(SeatHold.name) private seatHoldModel: Model<SeatHoldDocument>,
         @InjectModel(Event.name) private eventModel: Model<EventDocument>,
         @InjectModel(Theater.name) private theaterModel: Model<TheaterDocument>,
         private readonly ticketsService: TicketsService,
@@ -33,6 +35,21 @@ export class BookingsService implements OnModuleInit {
 
     private async cleanupExpiredBookings() {
         try {
+            // 1. Cleanup expired seat holds
+            const expiredHolds = await this.seatHoldModel.find({
+                expiresAt: { $lte: new Date() },
+            }).exec();
+
+            for (const hold of expiredHolds) {
+                await this.eventModel.findByIdAndUpdate(hold.eventId, {
+                    $pull: { bookedSeats: { holdId: hold._id } },
+                    $inc: { remainingTickets: hold.seats.length },
+                });
+                await this.seatHoldModel.findByIdAndDelete(hold._id).exec();
+                this.logger.log(`Expired seat hold ${hold._id} cleaned up (${hold.seats.length} seats released)`);
+            }
+
+            // 2. Cleanup expired pending bookings
             const expiredBookings = await this.bookingModel.find({
                 status: 'pending',
                 pendingExpiresAt: { $lte: new Date() },
@@ -55,13 +72,156 @@ export class BookingsService implements OnModuleInit {
                 this.logger.log(`Expired pending booking ${booking._id} cleaned up`);
             }
         } catch (err) {
-            this.logger.error('Error cleaning up expired bookings', err);
+            this.logger.error('Error cleaning up expired bookings/holds', err);
+        }
+    }
+
+    // ─── Seat Hold Methods ────────────────────────────────────────────
+
+    /**
+     * Hold seats temporarily (5 min) while user fills attendee info.
+     * Uses atomic findOneAndUpdate to prevent race conditions.
+     */
+    async holdSeats(
+        eventId: string,
+        seats: { row: string; seatNumber: number; section: string }[],
+        userId: string,
+    ): Promise<{ holdId: string; expiresAt: Date; seats: any[] }> {
+        const event = await this.eventModel.findById(eventId).exec();
+        if (!event) {
+            throw new NotFoundException('Event not found');
+        }
+
+        if (!event.hasTheaterSeating) {
+            throw new BadRequestException('This event does not have theater seating');
+        }
+
+        if (!seats || seats.length === 0) {
+            throw new BadRequestException('No seats selected');
+        }
+
+        if (seats.length > 10) {
+            throw new BadRequestException('Cannot hold more than 10 seats at once');
+        }
+
+        // Release any existing holds by this user for this event first
+        await this.releaseUserHolds(eventId, userId);
+
+        // Create the SeatHold document to get the holdId
+        const holdExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+        const normalizedSeats = seats.map(s => ({
+            row: String(s.row),
+            seatNumber: Number(s.seatNumber),
+            section: s.section || 'main',
+        }));
+
+        const seatHold = new this.seatHoldModel({
+            userId,
+            eventId,
+            seats: normalizedSeats,
+            expiresAt: holdExpiresAt,
+        });
+        const savedHold = await seatHold.save();
+
+        // Atomic: push seats to event.bookedSeats ONLY if none of them exist yet
+        const seatConditions = normalizedSeats.map(s => ({
+            bookedSeats: {
+                $elemMatch: {
+                    row: s.row,
+                    seatNumber: s.seatNumber,
+                    section: s.section,
+                },
+            },
+        }));
+
+        const holdEntries = normalizedSeats.map(s => ({
+            row: s.row,
+            seatNumber: s.seatNumber,
+            section: s.section,
+            holdId: savedHold._id,
+        }));
+
+        const result = await this.eventModel.findOneAndUpdate(
+            {
+                _id: eventId,
+                $nor: seatConditions,
+            },
+            {
+                $push: { bookedSeats: { $each: holdEntries } },
+                $inc: { remainingTickets: -normalizedSeats.length },
+            },
+            { new: true },
+        );
+
+        if (!result) {
+            // Atomic check failed — some seats already taken
+            await this.seatHoldModel.findByIdAndDelete(savedHold._id).exec();
+
+            // Find which specific seats conflict
+            const currentEvent = await this.eventModel.findById(eventId).exec();
+            const bookedSet = new Set(
+                (currentEvent?.bookedSeats || []).map(
+                    (s: any) => `${s.section}-${s.row}-${s.seatNumber}`,
+                ),
+            );
+            const conflicting = normalizedSeats
+                .filter(s => bookedSet.has(`${s.section}-${s.row}-${s.seatNumber}`))
+                .map(s => `${s.row}${s.seatNumber}`);
+
+            throw new BadRequestException(
+                `Seats no longer available: ${conflicting.join(', ')}`,
+            );
+        }
+
+        return {
+            holdId: savedHold._id.toString(),
+            expiresAt: holdExpiresAt,
+            seats: normalizedSeats,
+        };
+    }
+
+    /**
+     * Release a specific seat hold.
+     */
+    async releaseHold(holdId: string, userId: string): Promise<void> {
+        const hold = await this.seatHoldModel.findById(holdId).exec();
+        if (!hold) {
+            return; // Already released or expired — no-op
+        }
+
+        if (hold.userId.toString() !== userId.toString()) {
+            throw new ForbiddenException('You cannot release this hold');
+        }
+
+        await this.eventModel.findByIdAndUpdate(hold.eventId, {
+            $pull: { bookedSeats: { holdId: hold._id } },
+            $inc: { remainingTickets: hold.seats.length },
+        });
+
+        await this.seatHoldModel.findByIdAndDelete(hold._id).exec();
+    }
+
+    /**
+     * Release all holds by a user for a specific event.
+     */
+    private async releaseUserHolds(eventId: string, userId: string): Promise<void> {
+        const existingHolds = await this.seatHoldModel.find({
+            eventId,
+            userId,
+        } as any).exec();
+
+        for (const hold of existingHolds) {
+            await this.eventModel.findByIdAndUpdate(hold.eventId, {
+                $pull: { bookedSeats: { holdId: hold._id } },
+                $inc: { remainingTickets: hold.seats.length },
+            });
+            await this.seatHoldModel.findByIdAndDelete(hold._id).exec();
         }
     }
 
 
     async create(createDto: any, userId: string): Promise<BookingDocument> {
-        const { eventId, numberOfTickets, status, selectedSeats } = createDto;
+        const { eventId, numberOfTickets, status, selectedSeats, holdId } = createDto;
 
         const event = await this.eventModel.findById(eventId).exec();
         if (!event) {
@@ -77,23 +237,72 @@ export class BookingsService implements OnModuleInit {
         };
 
         if (event.hasTheaterSeating && selectedSeats && selectedSeats.length > 0) {
-            const unavailableSeats = [];
-            for (const seat of selectedSeats) {
-                const isBooked = event.bookedSeats.some(
-                    (bs: any) =>
-                        bs.row === seat.row &&
-                        bs.seatNumber === seat.seatNumber &&
-                        bs.section === seat.section,
-                );
-                if (isBooked) {
-                    unavailableSeats.push(`${seat.row}${seat.seatNumber}`);
+            // ── Validate hold if provided ───────────────────────────────
+            let hold: SeatHoldDocument | null = null;
+            if (holdId) {
+                hold = await this.seatHoldModel.findById(holdId).exec();
+                if (!hold) {
+                    throw new BadRequestException('Seat hold expired or not found. Please select seats again.');
                 }
-            }
+                if (hold.userId.toString() !== userId.toString()) {
+                    throw new ForbiddenException('This hold does not belong to you');
+                }
+                if (hold.eventId.toString() !== eventId.toString()) {
+                    throw new BadRequestException('Hold does not match this event');
+                }
+                if (new Date() > hold.expiresAt) {
+                    // Hold expired — clean it up
+                    await this.eventModel.findByIdAndUpdate(hold.eventId, {
+                        $pull: { bookedSeats: { holdId: hold._id } },
+                        $inc: { remainingTickets: hold.seats.length },
+                    });
+                    await this.seatHoldModel.findByIdAndDelete(hold._id).exec();
+                    throw new BadRequestException('Seat hold has expired. Please select seats again.');
+                }
 
-            if (unavailableSeats.length > 0) {
-                throw new BadRequestException(
-                    `Seats already booked: ${unavailableSeats.join(', ')}`,
+                // Verify all selected seats match the hold
+                const holdSeatKeys = new Set(
+                    hold.seats.map((s: any) => `${s.section || 'main'}-${s.row}-${s.seatNumber}`),
                 );
+                for (const seat of selectedSeats) {
+                    const key = `${seat.section || 'main'}-${seat.row}-${seat.seatNumber}`;
+                    if (!holdSeatKeys.has(key)) {
+                        throw new BadRequestException(
+                            `Seat ${seat.row}${seat.seatNumber} is not in your hold. Please select seats again.`,
+                        );
+                    }
+                }
+            } else {
+                // No hold — use atomic check to prevent race conditions
+                const seatConditions = selectedSeats.map((seat: any) => ({
+                    bookedSeats: {
+                        $elemMatch: {
+                            row: String(seat.row),
+                            seatNumber: Number(seat.seatNumber),
+                            section: seat.section || 'main',
+                        },
+                    },
+                }));
+
+                // Dry-run: check if any seats are taken (for detailed error)
+                const unavailableSeats = [];
+                for (const seat of selectedSeats) {
+                    const isBooked = event.bookedSeats.some(
+                        (bs: any) =>
+                            bs.row === String(seat.row) &&
+                            bs.seatNumber === Number(seat.seatNumber) &&
+                            (bs.section || 'main') === (seat.section || 'main'),
+                    );
+                    if (isBooked) {
+                        unavailableSeats.push(`${seat.row}${seat.seatNumber}`);
+                    }
+                }
+
+                if (unavailableSeats.length > 0) {
+                    throw new BadRequestException(
+                        `Seats already booked: ${unavailableSeats.join(', ')}`,
+                    );
+                }
             }
 
             const theater = await this.theaterModel.findById(event.theater).exec();
@@ -159,17 +368,65 @@ export class BookingsService implements OnModuleInit {
             const booking = new this.bookingModel(bookingData);
             const savedBooking = await booking.save();
 
-            const seatUpdates = seatsWithPrices.map((seat: any) => ({
-                row: seat.row,
-                seatNumber: seat.seatNumber,
-                section: seat.section,
-                bookingId: savedBooking._id,
-            }));
+            if (hold) {
+                // Convert hold entries → booking entries in bookedSeats
+                // First pull the hold entries, then push booking entries
+                await this.eventModel.findByIdAndUpdate(eventId, {
+                    $pull: { bookedSeats: { holdId: hold._id } },
+                });
 
-            await this.eventModel.findByIdAndUpdate(eventId, {
-                $push: { bookedSeats: { $each: seatUpdates } },
-                $inc: { remainingTickets: -selectedSeats.length },
-            });
+                const seatUpdates = seatsWithPrices.map((seat: any) => ({
+                    row: seat.row,
+                    seatNumber: seat.seatNumber,
+                    section: seat.section,
+                    bookingId: savedBooking._id,
+                }));
+
+                await this.eventModel.findByIdAndUpdate(eventId, {
+                    $push: { bookedSeats: { $each: seatUpdates } },
+                });
+
+                // Delete the hold
+                await this.seatHoldModel.findByIdAndDelete(hold._id).exec();
+            } else {
+                // No hold — atomic push with $nor guard
+                const seatUpdates = seatsWithPrices.map((seat: any) => ({
+                    row: seat.row,
+                    seatNumber: seat.seatNumber,
+                    section: seat.section,
+                    bookingId: savedBooking._id,
+                }));
+
+                const atomicSeatConditions = seatsWithPrices.map((seat: any) => ({
+                    bookedSeats: {
+                        $elemMatch: {
+                            row: seat.row,
+                            seatNumber: seat.seatNumber,
+                            section: seat.section,
+                        },
+                    },
+                }));
+
+                const atomicResult = await this.eventModel.findOneAndUpdate(
+                    {
+                        _id: eventId,
+                        $nor: atomicSeatConditions,
+                    },
+                    {
+                        $push: { bookedSeats: { $each: seatUpdates } },
+                        $inc: { remainingTickets: -selectedSeats.length },
+                    },
+                    { new: true },
+                );
+
+                if (!atomicResult) {
+                    // Race condition: seats were taken between check and update
+                    await this.bookingModel.findByIdAndDelete(savedBooking._id).exec();
+                    throw new BadRequestException(
+                        'Some seats were just booked by another user. Please refresh and try again.',
+                    );
+                }
+            }
 
             return savedBooking;
         } else {
@@ -388,6 +645,18 @@ export class BookingsService implements OnModuleInit {
             }
         }
 
+        // Find active seat holds to also mark as pending
+        const activeHolds = await this.seatHoldModel.find({
+            eventId,
+            expiresAt: { $gt: new Date() },
+        } as any).exec();
+        const heldSeatsSet = new Set<string>();
+        for (const hold of activeHolds) {
+            for (const s of hold.seats as any[]) {
+                heldSeatsSet.add(`${(s.section || 'main')}-${s.row}-${s.seatNumber}`);
+            }
+        }
+
         const mergedSeatConfig = [...(theater.seatConfig || [])];
         if (event.seatConfig && event.seatConfig.length > 0) {
             event.seatConfig.forEach((eventSeat: any) => {
@@ -439,7 +708,7 @@ export class BookingsService implements OnModuleInit {
                     seatType,
                     isActive,
                     isBooked: bookedSeatsSet.has(seatKey),
-                    isPending: pendingSeatsSet.has(seatKey),
+                    isPending: pendingSeatsSet.has(seatKey) || heldSeatsSet.has(seatKey),
                     price: pricingRecord ? pricingRecord.price : (event.ticketPrice || 0),
                 });
             }
@@ -476,7 +745,7 @@ export class BookingsService implements OnModuleInit {
                         seatType,
                         isActive,
                         isBooked: bookedSeatsSet.has(seatKey),
-                        isPending: pendingSeatsSet.has(seatKey),
+                        isPending: pendingSeatsSet.has(seatKey) || heldSeatsSet.has(seatKey),
                         price: pricingRecord ? pricingRecord.price : (event.ticketPrice || 0),
                     });
                 }

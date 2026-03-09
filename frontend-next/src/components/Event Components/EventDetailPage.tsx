@@ -122,12 +122,14 @@ const EventDetailsPage = ({ id }: EventDetailsPageProps) => {
 
     const formatDate = (dateString: string): DateInfo => {
         const date = new Date(dateString);
+        const tz = 'Africa/Cairo';
         return {
-            day: date.toLocaleDateString('en-US', { day: 'numeric' }),
-            month: date.toLocaleDateString('en-US', { month: 'short' }),
-            year: date.getFullYear(),
-            time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+            day: date.toLocaleDateString('en-US', { timeZone: tz, day: 'numeric' }),
+            month: date.toLocaleDateString('en-US', { timeZone: tz, month: 'short' }),
+            year: parseInt(date.toLocaleDateString('en-US', { timeZone: tz, year: 'numeric' })),
+            time: date.toLocaleTimeString('en-US', { timeZone: tz, hour: '2-digit', minute: '2-digit' }),
             full: date.toLocaleString('en-US', {
+                timeZone: tz,
                 weekday: 'long',
                 year: 'numeric',
                 month: 'long',

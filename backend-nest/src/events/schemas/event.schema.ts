@@ -30,6 +30,9 @@ class BookedSeat {
 
     @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Booking' })
     bookingId: MongooseSchema.Types.ObjectId;
+
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'SeatHold' })
+    holdId: MongooseSchema.Types.ObjectId;
 }
 
 @Schema()

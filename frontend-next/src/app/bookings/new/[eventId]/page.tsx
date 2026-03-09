@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import api from '@/services/api';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -54,6 +54,12 @@ const BookTicketPage = () => {
     const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
     const [receiptUploaded, setReceiptUploaded] = useState(false);
     const receiptInputRef = React.useRef<HTMLInputElement>(null);
+
+    // Seat hold state
+    const [holdId, setHoldId] = useState<string | null>(null);
+    const [holdExpiresAt, setHoldExpiresAt] = useState<Date | null>(null);
+    const [holdCountdown, setHoldCountdown] = useState<number>(0);
+    const holdIdRef = useRef<string | null>(null); // for cleanup in useEffect
 
     // Compress image to reduce payload size (same as UploadReceiptPage)
     const compressImage = (file: File, maxDimension = 1200, quality = 0.7): Promise<string> => {
@@ -110,6 +116,58 @@ const BookTicketPage = () => {
         fetchEvent();
     }, [eventId]);
 
+    // Hold countdown timer
+    useEffect(() => {
+        if (!holdExpiresAt || !showAttendeeForm) return;
+
+        const tick = () => {
+            const remaining = Math.max(0, Math.floor((holdExpiresAt.getTime() - Date.now()) / 1000));
+            setHoldCountdown(remaining);
+
+            if (remaining <= 0) {
+                // Hold expired — go back to seat selection
+                toast.warning('Your seat hold has expired. Please select seats again.');
+                setShowAttendeeForm(false);
+                setHoldId(null);
+                holdIdRef.current = null;
+                setHoldExpiresAt(null);
+            }
+        };
+
+        tick(); // run immediately
+        const interval = setInterval(tick, 1000);
+        return () => clearInterval(interval);
+    }, [holdExpiresAt, showAttendeeForm]);
+
+    // Release hold on page unload/navigation
+    useEffect(() => {
+        holdIdRef.current = holdId;
+    }, [holdId]);
+
+    useEffect(() => {
+        const releaseOnUnload = () => {
+            if (holdIdRef.current) {
+                // Use sendBeacon for reliable cleanup on page close
+                const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+                if (token) {
+                    navigator.sendBeacon(
+                        `/api/v1/booking/hold-seats/${holdIdRef.current}`,
+                        '' // sendBeacon can't do DELETE, but we'll handle via the API proxy
+                    );
+                }
+            }
+        };
+
+        window.addEventListener('beforeunload', releaseOnUnload);
+        return () => {
+            window.removeEventListener('beforeunload', releaseOnUnload);
+            // Cleanup hold when component unmounts
+            if (holdIdRef.current) {
+                api.delete(`/booking/hold-seats/${holdIdRef.current}`).catch(() => { });
+            }
+        };
+    }, []);
+
     const handleTicketChange = (delta: number) => {
         if (!event) return;
         const max = event.remainingTickets || event.totalTickets || 0;
@@ -124,24 +182,59 @@ const BookTicketPage = () => {
         setSeatTotalPrice(totalPrice);
     }, []);
 
-    // Step 1 → Step 2: Click "Next" to go to attendee form
-    const handleNext = () => {
+    // Step 1 → Step 2: Click "Next" to hold seats and go to attendee form
+    const handleNext = async () => {
         if (selectedSeats.length === 0) {
             toast.error("Please select at least one seat");
             return;
         }
         setError(null);
+        setIsLoading(true);
 
-        // Initialize attendee info for each seat (preserve existing data)
-        const newAttendeeInfo = selectedSeats.map((_seat, index) => {
-            const existing = attendeeInfo[index];
-            return existing || { attendeeName: '', attendeePhone: '' };
-        });
-        setAttendeeInfo(newAttendeeInfo);
-        setShowAttendeeForm(true);
+        try {
+            // Call hold-seats API for atomic seat reservation
+            const response = await api.post('/booking/hold-seats', {
+                eventId: event?._id,
+                seats: selectedSeats.map(s => ({
+                    row: s.row,
+                    seatNumber: s.seatNumber,
+                    section: s.section || 'main',
+                })),
+            });
+
+            if (response.data.success) {
+                const { holdId: newHoldId, expiresAt } = response.data.data;
+                setHoldId(newHoldId);
+                holdIdRef.current = newHoldId;
+                setHoldExpiresAt(new Date(expiresAt));
+
+                // Initialize attendee info for each seat (preserve existing data)
+                const newAttendeeInfo = selectedSeats.map((_seat, index) => {
+                    const existing = attendeeInfo[index];
+                    return existing || { attendeeName: '', attendeePhone: '' };
+                });
+                setAttendeeInfo(newAttendeeInfo);
+                setShowAttendeeForm(true);
+            }
+        } catch (err: any) {
+            const msg = err.response?.data?.message || 'Failed to hold seats. Please try again.';
+            setError(msg);
+            toast.error(msg);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const handleBackToSeats = () => {
+    const handleBackToSeats = async () => {
+        // Release hold when going back to seat selection
+        if (holdId) {
+            try {
+                await api.delete(`/booking/hold-seats/${holdId}`);
+            } catch { /* ignore — hold may have already expired */ }
+            setHoldId(null);
+            holdIdRef.current = null;
+            setHoldExpiresAt(null);
+        }
         setShowAttendeeForm(false);
     };
 
@@ -196,7 +289,8 @@ const BookTicketPage = () => {
         try {
             const payload: any = {
                 eventId: event._id,
-                status: 'confirmed'
+                status: 'confirmed',
+                holdId: holdId || undefined,
             };
 
             if (event.hasTheaterSeating) {
@@ -216,6 +310,9 @@ const BookTicketPage = () => {
 
             if (response.data.success) {
                 setBookingId(response.data.data?._id || '');
+                setHoldId(null);
+                holdIdRef.current = null;
+                setHoldExpiresAt(null);
                 setSuccess(true);
             }
         } catch (err: any) {
@@ -231,6 +328,7 @@ const BookTicketPage = () => {
     const formatDate = (dateString?: string) => {
         if (!dateString) return 'TBA';
         return new Date(dateString).toLocaleDateString('en-US', {
+            timeZone: 'Africa/Cairo',
             weekday: 'short',
             month: 'short',
             day: 'numeric',
@@ -526,6 +624,30 @@ const BookTicketPage = () => {
                                                 <h3>Attendee Information</h3>
                                                 <p>Enter name and phone for each seat</p>
                                             </div>
+                                            {holdExpiresAt && holdCountdown > 0 && (
+                                                <div style={{
+                                                    marginLeft: 'auto',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px',
+                                                    padding: '8px 16px',
+                                                    borderRadius: '12px',
+                                                    background: holdCountdown <= 60
+                                                        ? 'rgba(239, 68, 68, 0.15)'
+                                                        : 'rgba(139, 92, 246, 0.12)',
+                                                    border: `1px solid ${holdCountdown <= 60
+                                                        ? 'rgba(239, 68, 68, 0.4)'
+                                                        : 'rgba(139, 92, 246, 0.3)'}`,
+                                                    color: holdCountdown <= 60 ? '#ef4444' : '#a78bfa',
+                                                    fontWeight: 600,
+                                                    fontSize: '0.95rem',
+                                                    fontVariantNumeric: 'tabular-nums',
+                                                    animation: holdCountdown <= 30 ? 'pulse 1s infinite' : undefined,
+                                                }}>
+                                                    <FiClock size={16} />
+                                                    {Math.floor(holdCountdown / 60)}:{String(holdCountdown % 60).padStart(2, '0')}
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="attendee-cards-list">
@@ -614,15 +736,21 @@ const BookTicketPage = () => {
                                     type="button"
                                     className="confirm-booking-btn"
                                     onClick={handleNext}
-                                    disabled={selectedSeats.length === 0}
+                                    disabled={selectedSeats.length === 0 || isLoading}
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}
                                 >
-                                    <FiArrowRight />
-                                    {selectedSeats.length > 0
-                                        ? `Next — ${selectedSeats.length} Seat${selectedSeats.length !== 1 ? 's' : ''} — ${seatTotalPrice.toFixed(2)} EGP`
-                                        : 'Select Seats to Continue'
-                                    }
+                                    {isLoading ? (
+                                        <><span className="btn-spinner"></span>Reserving seats...</>
+                                    ) : (
+                                        <>
+                                            <FiArrowRight />
+                                            {selectedSeats.length > 0
+                                                ? `Next — ${selectedSeats.length} Seat${selectedSeats.length !== 1 ? 's' : ''} — ${seatTotalPrice.toFixed(2)} EGP`
+                                                : 'Select Seats to Continue'
+                                            }
+                                        </>
+                                    )}
                                 </motion.button>
                             ) : (
                                 <motion.button

@@ -209,6 +209,7 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
     const formatDate = (dateString: string | undefined): string => {
         if (!dateString) return 'TBA';
         return new Date(dateString).toLocaleDateString('en-US', {
+            timeZone: 'Africa/Cairo',
             weekday: 'short',
             month: 'short',
             day: 'numeric',

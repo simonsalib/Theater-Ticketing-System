@@ -171,6 +171,7 @@ const BookingDetails = ({ id }: BookingDetailsProps) => {
     const formatDate = (dateString: string): string => {
         const date = new Date(dateString);
         return date.toLocaleString('en-US', {
+            timeZone: 'Africa/Cairo',
             weekday: 'long',
             year: 'numeric',
             month: 'long',
@@ -197,7 +198,7 @@ const BookingDetails = ({ id }: BookingDetailsProps) => {
     const eventData = event || booking.event || {};
 
     const bookingDate = booking.createdAt
-        ? new Date(booking.createdAt).toLocaleDateString()
+        ? new Date(booking.createdAt).toLocaleDateString('en-US', { timeZone: 'Africa/Cairo' })
         : 'Date not available';
 
     return (

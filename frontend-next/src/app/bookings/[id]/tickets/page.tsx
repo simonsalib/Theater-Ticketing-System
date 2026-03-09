@@ -129,7 +129,7 @@ const BookingTicketsPage = () => {
         ctx.font = '16px Arial, sans-serif';
         ctx.fillStyle = '#6b7280';
         if (eventDate) {
-            ctx.fillText(`📅  ${new Date(eventDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`, width / 2, y);
+            ctx.fillText(`📅  ${new Date(eventDate).toLocaleDateString('en-US', { timeZone: 'Africa/Cairo', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`, width / 2, y);
             y += 24;
         }
         if (eventLocation) {
@@ -344,7 +344,7 @@ const BookingTicketsPage = () => {
                             <h2>{eventTitle}</h2>
                             <div className="tickets-meta">
                                 {eventLocation && <span>📍 {eventLocation}</span>}
-                                {eventDate && <span>📅 {new Date(eventDate).toLocaleDateString()}</span>}
+                                {eventDate && <span>📅 {new Date(eventDate).toLocaleDateString('en-US', { timeZone: 'Africa/Cairo' })}</span>}
                                 <span><FiGrid size={14} /> {tickets.length} ticket{tickets.length > 1 ? 's' : ''}</span>
                             </div>
                         </div>

@@ -206,7 +206,7 @@ const ProfilePage = () => {
                         )}
                         <div className="detail-item">
                             <FiCalendar className="detail-icon" />
-                            <span>Joined {displayUser?.createdAt ? new Date(displayUser.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : "Unknown"}</span>
+                            <span>Joined {displayUser?.createdAt ? new Date(displayUser.createdAt).toLocaleDateString('en-US', { timeZone: 'Africa/Cairo', month: 'long', year: 'numeric' }) : "Unknown"}</span>
                         </div>
                     </div>
 

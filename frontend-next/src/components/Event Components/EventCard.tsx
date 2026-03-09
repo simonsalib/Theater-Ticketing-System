@@ -29,6 +29,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, index = 0 }) => {
         if (!dateString) return 'TBA';
         const date = new Date(dateString);
         return date.toLocaleDateString('en-US', {
+            timeZone: 'Africa/Cairo',
             month: 'short',
             day: 'numeric',
             year: 'numeric'

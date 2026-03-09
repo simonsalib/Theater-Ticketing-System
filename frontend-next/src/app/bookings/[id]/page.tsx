@@ -130,7 +130,7 @@ const BookingDetailsPage = () => {
                                     <h2>{eventData.title}</h2>
                                     <div className="event-meta-compact">
                                         <span>📍 {eventData.location || 'TBA'}</span>
-                                        <span>📅 {new Date(eventData.date).toLocaleDateString()}</span>
+                                        <span>📅 {new Date(eventData.date).toLocaleDateString('en-US', { timeZone: 'Africa/Cairo' })}</span>
                                     </div>
                                 </div>
                             </div>
@@ -270,7 +270,7 @@ const BookingDetailsPage = () => {
                                 <h3>{eventData.title}</h3>
                                 <div className="detail-meta">
                                     <p><strong>📍 Location:</strong> {eventData.location}</p>
-                                    <p><strong>📅 Date:</strong> {new Date(eventData.date).toLocaleString()}</p>
+                                    <p><strong>📅 Date:</strong> {new Date(eventData.date).toLocaleString('en-US', { timeZone: 'Africa/Cairo' })}</p>
                                 </div>
                             </div>
                         </div>

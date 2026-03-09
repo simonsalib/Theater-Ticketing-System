@@ -222,7 +222,7 @@ export class TicketsService {
         attendeeName: ticket.attendeeName,
         attendeePhone: ticket.attendeePhone,
         isFree: false,
-        message: `⚠️ This ticket was already scanned on ${ticket.scannedAt?.toLocaleString()}. This seat is NOT free.`,
+        message: `⚠️ This ticket was already scanned on ${ticket.scannedAt?.toLocaleString('en-US', { timeZone: 'Africa/Cairo' })}. This seat is NOT free.`,
       };
     }
 

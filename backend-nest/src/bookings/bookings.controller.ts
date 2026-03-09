@@ -18,6 +18,27 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 export class BookingsController {
     constructor(private readonly bookingsService: BookingsService) { }
 
+    // ─── Seat Hold Endpoints ─────────────────────────────────────────
+
+    @Post('hold-seats')
+    @UseGuards(JwtAuthGuard)
+    async holdSeats(
+        @Body() body: { eventId: string; seats: { row: string; seatNumber: number; section: string }[] },
+        @Req() req: any,
+    ) {
+        const data = await this.bookingsService.holdSeats(body.eventId, body.seats, req.user._id);
+        return { success: true, data };
+    }
+
+    @Delete('hold-seats/:id')
+    @UseGuards(JwtAuthGuard)
+    async releaseHold(@Param('id') id: string, @Req() req: any) {
+        await this.bookingsService.releaseHold(id, req.user._id);
+        return { success: true, message: 'Hold released' };
+    }
+
+    // ─── Booking Endpoints ───────────────────────────────────────────
+
     @Post()
     @UseGuards(JwtAuthGuard)
     async create(@Body() createDto: any, @Req() req: any) {

@@ -79,7 +79,7 @@ const Homepage = () => {
                     const events: EventData[] = eventsData.map((event: any) => ({
                         id: event._id,
                         title: event.title,
-                        date: new Date(event.date).toLocaleDateString(),
+                        date: new Date(event.date).toLocaleDateString('en-US', { timeZone: 'Africa/Cairo' }),
                         location: event.location,
                         image: getImageUrl(event.image) || '/placeholder-image.jpg',
                         ticketPrice: event.ticketPrice,
