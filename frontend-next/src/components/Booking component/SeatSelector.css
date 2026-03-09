@@ -833,7 +833,8 @@
 /* Fix for Booking page redundant scrollbars */
 .theater-seat-area .theater-canvas-container,
 .theater-seat-container .theater-canvas-container {
-    overflow: auto !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
     padding: 0 !important;
     margin: 0 !important;
     width: 100% !important;
