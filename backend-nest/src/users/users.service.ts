@@ -125,9 +125,14 @@ export class UsersService {
             }
 
             const hashedPassword = await bcrypt.hash(password, 10);
+
+            // Generate a dummy email to prevent MongoDB E11000 duplicate key error on null emails
+            const dummyEmail = `scanner_${sanitizedUsername}_${Date.now()}@system.local`;
+
             const newScanner = new this.userModel({
                 name,
                 username: sanitizedUsername,
+                email: dummyEmail,
                 password: hashedPassword,
                 role: UserRole.SCANNER,
                 isVerified: true,

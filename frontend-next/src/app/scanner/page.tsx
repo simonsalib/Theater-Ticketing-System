@@ -28,7 +28,7 @@ const ScannerDashboard = () => {
 
     const fetchEvents = async () => {
         try {
-            const res = await api.get('/event');
+            const res = await api.get('/event/approved');
             const data = res.data.success ? res.data.data : (res.data.events || res.data || []);
             const eventsList = Array.isArray(data) ? data : [];
             setEvents(eventsList);
