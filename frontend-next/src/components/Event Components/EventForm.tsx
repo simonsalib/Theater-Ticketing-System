@@ -233,7 +233,7 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
                     requestData.preBookedSeats = preBookedSeats;
                 }
             }
-
+            
             let response;
             if (isEdit && eventId) {
                 response = await api.put(`/event/${eventId}`, requestData);
