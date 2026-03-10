@@ -51,7 +51,11 @@ interface EventData {
     };
 }
 
-const UserBookingsPage = () => {
+interface UserBookingsPageProps {
+    isPrevious?: boolean;
+}
+
+const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false }) => {
     const router = useRouter();
     const { t } = useLanguage();
     const [bookings, setBookings] = useState<Booking[]>([]);
@@ -130,7 +134,6 @@ const UserBookingsPage = () => {
                 bookingsData = response.data;
             }
 
-            setBookings(bookingsData);
 
             // Extract and map event details
             const events: Record<string, EventData> = {};
@@ -169,7 +172,22 @@ const UserBookingsPage = () => {
                 );
             }
 
+            // Re-filter bookings based on active vs expired events
+            const now = new Date();
+            const relevantBookings = bookingsData.filter(booking => {
+                const bEventId = typeof booking.eventId === 'object' ? (booking.eventId as any)._id : booking.eventId;
+                const event = events[bEventId];
+                if (!event || !event.date) return false;
+
+                const eventDate = new Date(event.date);
+                const expirationDate = new Date(eventDate.getTime() + 24 * 60 * 60 * 1000);
+                const isExpired = now >= expirationDate;
+
+                return isPrevious ? isExpired : !isExpired;
+            });
+
             setEventDetails(events);
+            setBookings(relevantBookings);
             console.log('DEBUG: eventDetails populated:', events);
         } catch (err: any) {
             console.error("Error fetching bookings:", err);
@@ -302,18 +320,52 @@ const UserBookingsPage = () => {
     return (
         <div className="user-bookings-container">
             <div className="bookings-hero">
-                <h1>My Bookings</h1>
-                <p>Manage your event reservations and tickets</p>
-                <div className="hero-stats">
-                    <div className="stat-card">
-                        <span className="stat-value">{bookings.length}</span>
-                        <span className="stat-label">Total</span>
-                    </div>
-                    <div className="stat-card">
-                        <span className="stat-value">{bookings.filter(b => b.status === 'confirmed').length}</span>
-                        <span className="stat-label">Confirmed</span>
-                    </div>
+                <h1>{isPrevious ? 'Previous Bookings' : 'My Bookings'}</h1>
+                <p>{isPrevious ? 'Review your past event reservations' : 'Manage your event reservations and tickets'}</p>
+                <div style={{ marginTop: '20px', display: 'flex', gap: '12px' }}>
+                    <Link
+                        href="/bookings"
+                        style={{
+                            padding: '10px 20px',
+                            background: !isPrevious ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                            color: !isPrevious ? '#a78bfa' : '#9ca3af',
+                            borderRadius: '12px',
+                            border: `1px solid ${!isPrevious ? 'rgba(139, 92, 246, 0.4)' : 'transparent'}`,
+                            textDecoration: 'none',
+                            fontWeight: 600,
+                            letterSpacing: '0.5px'
+                        }}
+                    >
+                        Active Bookings
+                    </Link>
+                    <Link
+                        href="/bookings/previous"
+                        style={{
+                            padding: '10px 20px',
+                            background: isPrevious ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                            color: isPrevious ? '#a78bfa' : '#9ca3af',
+                            borderRadius: '12px',
+                            border: `1px solid ${isPrevious ? 'rgba(139, 92, 246, 0.4)' : 'transparent'}`,
+                            textDecoration: 'none',
+                            fontWeight: 600,
+                            letterSpacing: '0.5px'
+                        }}
+                    >
+                        Previous Bookings
+                    </Link>
                 </div>
+                {!isPrevious && (
+                    <div className="hero-stats">
+                        <div className="stat-card">
+                            <span className="stat-value">{bookings.length}</span>
+                            <span className="stat-label">Total Active</span>
+                        </div>
+                        <div className="stat-card">
+                            <span className="stat-value">{bookings.filter(b => b.status === 'confirmed').length}</span>
+                            <span className="stat-label">Confirmed Active</span>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Pending bookings banner at top */}
@@ -593,7 +645,7 @@ const UserBookingsPage = () => {
                                         <Link href={`/bookings/${booking._id}`} className="view-details-btn">
                                             <FiEye /> Details
                                         </Link>
-                                        {!isCancelled && isPending && !booking.isReceiptUploaded && (
+                                        {!isCancelled && booking.status === 'confirmed' && !isPrevious && (
                                             isPastCancellationDeadline ? (
                                                 <span style={{ fontSize: '0.85rem', color: '#ef4444', fontStyle: 'italic', padding: '0.5rem 0' }}>
                                                     Cancellation deadline passed
