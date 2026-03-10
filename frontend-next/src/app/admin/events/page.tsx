@@ -36,7 +36,24 @@ const AdminEventsPage = () => {
     };
 
     const filteredEvents = useMemo(() => {
-        let filtered = events.filter(event => (event.status as any) === activeFilter);
+        const now = new Date();
+
+        // Filter out expired events for the main dashboard views
+        const activeEvents = events.filter(event => {
+            if (!event.date) return false;
+            const eventDate = new Date(event.date);
+            const expirationDate = new Date(eventDate.getTime() + 24 * 60 * 60 * 1000); // 1 day after
+
+            // If the event is expired AND it was declined, it's purged from existence entirely on this list
+            if (now >= expirationDate && event.status === 'declined') {
+                return false;
+            }
+
+            // Otherwise, it's just considered expired and we return false (meaning don't show on active views)
+            return now < expirationDate;
+        });
+
+        let filtered = activeEvents.filter(event => (event.status as any) === activeFilter);
         if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase();
             filtered = filtered.filter(event => event.title?.toLowerCase().includes(query) || event.location?.toLowerCase().includes(query));
@@ -44,12 +61,44 @@ const AdminEventsPage = () => {
         return filtered;
     }, [events, activeFilter, searchQuery]);
 
-    const stats = useMemo(() => ({
-        pending: events.filter(e => e.status === 'pending').length,
-        approved: events.filter(e => e.status === 'approved').length,
-        declined: events.filter(e => e.status === 'declined').length,
-        total: events.length
-    }), [events]);
+    const stats = useMemo(() => {
+        const now = new Date();
+
+        let pending = 0;
+        let approved = 0;
+        let declined = 0;
+        // Total should probably only reflect non-purged active events, or everything minus purged?
+        // Let's count active unexpired logic for approve, and pending.
+
+        events.forEach(event => {
+            // Calculate expiration exactly as in the filter
+            let isExpired = false;
+            if (event.date) {
+                const expirationDate = new Date(new Date(event.date).getTime() + 24 * 60 * 60 * 1000);
+                isExpired = now >= expirationDate;
+            }
+
+            if (event.status === 'declined' && isExpired) {
+                // Completely purged, don't count it anywhere
+                return;
+            }
+
+            if (event.status === 'pending' && !isExpired) {
+                pending++;
+            } else if (event.status === 'approved' && !isExpired) {
+                approved++;
+            } else if (event.status === 'declined' && !isExpired) {
+                declined++;
+            }
+        });
+
+        return {
+            pending,
+            approved,
+            declined,
+            total: pending + approved + declined // Active non-expired total across all categories
+        };
+    }, [events]);
 
     const handleStatusChange = async (eventId: string, newStatus: string) => {
         try {
@@ -69,6 +118,9 @@ const AdminEventsPage = () => {
                 <div className="admin-page-header">
                     <div className="header-left"><FiCalendar /><div><h1>{t('admin.eventAdmin')}</h1><p>{t('admin.manageSubmissions')}</p></div></div>
                     <div className="header-actions">
+                        <Link href="/admin/events/previous" className="nav-btn" style={{ background: 'rgba(139, 92, 246, 0.15)', color: '#8B5CF6' }}>
+                            <FiClock /> Previous Events
+                        </Link>
                         <Link href="/admin/users" className="nav-btn"><FiUsers /> {t('admin.users')}</Link>
                         <Link href="/admin/theaters" className="nav-btn"><FiGrid /> {t('admin.theaters')}</Link>
                         <button className="refresh-btn" onClick={fetchEvents} disabled={loading}><FiRefreshCw className={loading ? 'spinning' : ''} /></button>

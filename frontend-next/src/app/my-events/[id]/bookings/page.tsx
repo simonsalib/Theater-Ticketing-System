@@ -57,6 +57,7 @@ const EventBookingsPage = () => {
     const [eventTitle, setEventTitle] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
+    const [isExpired, setIsExpired] = useState(false);
 
     // Receipt Modal State
     const [selectedReceipt, setSelectedReceipt] = useState<string | null>(null);
@@ -83,6 +84,12 @@ const EventBookingsPage = () => {
             const eData = eventRes.data.success ? eventRes.data.data : eventRes.data;
             setBookings(bData);
             setEventTitle(eData.title || '');
+
+            if (eData.date) {
+                const eventDate = new Date(eData.date);
+                const expirationDate = new Date(eventDate.getTime() + 24 * 60 * 60 * 1000);
+                setIsExpired(new Date() >= expirationDate);
+            }
         } catch (err: any) {
             console.error('Error fetching bookings:', err);
             toast.error(err.response?.data?.message || 'Failed to load bookings');
@@ -185,21 +192,23 @@ const EventBookingsPage = () => {
                             <FiArrowLeft size={18} /> Back to My Events
                         </motion.button>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                            <h1 style={{ margin: 0 }}>Bookings for &quot;{eventTitle}&quot;</h1>
-                            <motion.button
-                                onClick={() => router.push(`/my-events/${eventId}/scan`)}
-                                whileHover={{ scale: 1.03 }}
-                                whileTap={{ scale: 0.97 }}
-                                style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px',
-                                    background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: 'white', border: 'none',
-                                    padding: '10px 20px', borderRadius: '12px', cursor: 'pointer', fontWeight: 600,
-                                    fontSize: '0.9rem', boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)',
-                                    whiteSpace: 'nowrap'
-                                }}
-                            >
-                                <FiCamera size={16} /> Scan QR Codes
-                            </motion.button>
+                            <h1 style={{ margin: 0 }}>Bookings for &quot;{eventTitle}&quot; {isExpired && <span style={{ color: '#ef4444', fontSize: '1rem', marginLeft: '10px' }}>(Read-Only)</span>}</h1>
+                            {!isExpired && (
+                                <motion.button
+                                    onClick={() => router.push(`/my-events/${eventId}/scan`)}
+                                    whileHover={{ scale: 1.03 }}
+                                    whileTap={{ scale: 0.97 }}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '8px',
+                                        background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: 'white', border: 'none',
+                                        padding: '10px 20px', borderRadius: '12px', cursor: 'pointer', fontWeight: 600,
+                                        fontSize: '0.9rem', boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)',
+                                        whiteSpace: 'nowrap'
+                                    }}
+                                >
+                                    <FiCamera size={16} /> Scan QR Codes
+                                </motion.button>
+                            )}
                         </div>
 
                         {/* Stats */}
@@ -269,126 +278,126 @@ const EventBookingsPage = () => {
 
                     {/* Bookings List */}
                     {activeTab === 'bookings' && (
-                    <>
-                    {isLoading ? (
-                        <div className="eb-loading">
-                            <div className="spinner-ring"></div>
-                            <p>Loading bookings...</p>
-                        </div>
-                    ) : bookings.length === 0 ? (
-                        <div className="eb-empty">
-                            <FiGrid size={48} />
-                            <h3>No bookings yet</h3>
-                            <p>No one has booked tickets for this event.</p>
-                        </div>
-                    ) : (
-                        <div className="eb-list">
-                            <AnimatePresence>
-                                {bookings.map((booking, index) => (
-                                    <motion.div
-                                        key={booking._id}
-                                        className="eb-card"
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: index * 0.05 }}
-                                    >
-                                        <div className="eb-card-top">
-                                            <div className="eb-user-info">
-                                                <div className="eb-user-avatar">
-                                                    {booking.StandardId?.name?.charAt(0)?.toUpperCase() || '?'}
-                                                </div>
-                                                <div>
-                                                    <h3>{booking.StandardId?.name || 'Unknown User'}</h3>
-                                                    <div className="eb-user-meta">
-                                                        <span><FiMail size={13} /> {booking.StandardId?.email || 'N/A'}</span>
-                                                        {booking.StandardId?.phone && (
-                                                            <span><FiPhone size={13} /> {booking.StandardId.phone}</span>
-                                                        )}
+                        <>
+                            {isLoading ? (
+                                <div className="eb-loading">
+                                    <div className="spinner-ring"></div>
+                                    <p>Loading bookings...</p>
+                                </div>
+                            ) : bookings.length === 0 ? (
+                                <div className="eb-empty">
+                                    <FiGrid size={48} />
+                                    <h3>No bookings yet</h3>
+                                    <p>No one has booked tickets for this event.</p>
+                                </div>
+                            ) : (
+                                <div className="eb-list">
+                                    <AnimatePresence>
+                                        {bookings.map((booking, index) => (
+                                            <motion.div
+                                                key={booking._id}
+                                                className="eb-card"
+                                                initial={{ opacity: 0, y: 20 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: index * 0.05 }}
+                                            >
+                                                <div className="eb-card-top">
+                                                    <div className="eb-user-info">
+                                                        <div className="eb-user-avatar">
+                                                            {booking.StandardId?.name?.charAt(0)?.toUpperCase() || '?'}
+                                                        </div>
+                                                        <div>
+                                                            <h3>{booking.StandardId?.name || 'Unknown User'}</h3>
+                                                            <div className="eb-user-meta">
+                                                                <span><FiMail size={13} /> {booking.StandardId?.email || 'N/A'}</span>
+                                                                {booking.StandardId?.phone && (
+                                                                    <span><FiPhone size={13} /> {booking.StandardId.phone}</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="eb-card-right">
+                                                        {getStatusBadge(booking.status)}
+                                                        <span className="eb-price">{booking.totalPrice?.toFixed(2)} EGP</span>
                                                     </div>
                                                 </div>
-                                            </div>
-                                            <div className="eb-card-right">
-                                                {getStatusBadge(booking.status)}
-                                                <span className="eb-price">{booking.totalPrice?.toFixed(2)} EGP</span>
-                                            </div>
-                                        </div>
 
-                                        {/* Seat details */}
-                                        {booking.hasTheaterSeating && booking.selectedSeats?.length > 0 && (
-                                            <div className="eb-seats-section">
-                                                <h4><FiGrid size={14} /> {booking.selectedSeats.length} Seat{booking.selectedSeats.length > 1 ? 's' : ''} Booked</h4>
-                                                <div className="eb-seats-grid">
-                                                    {booking.selectedSeats.map((seat, sIdx) => (
-                                                        <div key={sIdx} className="eb-seat-item">
-                                                            <span className="eb-seat-label">{seat.row}{seat.seatNumber}</span>
-                                                            <span className="eb-seat-type">{seat.seatType}</span>
-                                                            <span className="eb-seat-price">{seat.price} EGP</span>
-                                                            {seat.attendeeName && (
-                                                                <div className="eb-seat-attendee">
-                                                                    <FiUser size={12} /> {seat.attendeeName}
-                                                                    {seat.attendeePhone && (
-                                                                        <span className="eb-att-phone"><FiPhone size={11} /> {seat.attendeePhone}</span>
+                                                {/* Seat details */}
+                                                {booking.hasTheaterSeating && booking.selectedSeats?.length > 0 && (
+                                                    <div className="eb-seats-section">
+                                                        <h4><FiGrid size={14} /> {booking.selectedSeats.length} Seat{booking.selectedSeats.length > 1 ? 's' : ''} Booked</h4>
+                                                        <div className="eb-seats-grid">
+                                                            {booking.selectedSeats.map((seat, sIdx) => (
+                                                                <div key={sIdx} className="eb-seat-item">
+                                                                    <span className="eb-seat-label">{seat.row}{seat.seatNumber}</span>
+                                                                    <span className="eb-seat-type">{seat.seatType}</span>
+                                                                    <span className="eb-seat-price">{seat.price} EGP</span>
+                                                                    {seat.attendeeName && (
+                                                                        <div className="eb-seat-attendee">
+                                                                            <FiUser size={12} /> {seat.attendeeName}
+                                                                            {seat.attendeePhone && (
+                                                                                <span className="eb-att-phone"><FiPhone size={11} /> {seat.attendeePhone}</span>
+                                                                            )}
+                                                                        </div>
                                                                     )}
                                                                 </div>
-                                                            )}
+                                                            ))}
                                                         </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
+                                                    </div>
+                                                )}
 
-                                        <div className="eb-card-bottom">
-                                            <span className="eb-date">Booked: {formatDate(booking.createdAt)}</span>
+                                                <div className="eb-card-bottom">
+                                                    <span className="eb-date">Booked: {formatDate(booking.createdAt)}</span>
 
-                                            {booking.status === 'pending' && (
-                                                <div className="eb-actions">
-                                                    {booking.isReceiptUploaded && (
-                                                        <motion.button
-                                                            className="eb-view-receipt-btn"
-                                                            onClick={() => handleViewReceipt(booking.instapayReceipt)}
-                                                            whileHover={{ scale: 1.03 }}
-                                                            whileTap={{ scale: 0.97 }}
-                                                            style={{
-                                                                background: 'rgba(139, 92, 246, 0.2)',
-                                                                color: '#a78bfa',
-                                                                border: '1px solid rgba(139, 92, 246, 0.4)',
-                                                                display: 'flex', alignItems: 'center', gap: '6px',
-                                                                padding: '6px 12px', borderRadius: '6px',
-                                                                fontSize: '0.85rem'
-                                                            }}
-                                                        >
-                                                            <FiEye /> View Receipt
-                                                        </motion.button>
+                                                    {booking.status === 'pending' && !isExpired && (
+                                                        <div className="eb-actions">
+                                                            {booking.isReceiptUploaded && (
+                                                                <motion.button
+                                                                    className="eb-view-receipt-btn"
+                                                                    onClick={() => handleViewReceipt(booking.instapayReceipt)}
+                                                                    whileHover={{ scale: 1.03 }}
+                                                                    whileTap={{ scale: 0.97 }}
+                                                                    style={{
+                                                                        background: 'rgba(139, 92, 246, 0.2)',
+                                                                        color: '#a78bfa',
+                                                                        border: '1px solid rgba(139, 92, 246, 0.4)',
+                                                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                                                        padding: '6px 12px', borderRadius: '6px',
+                                                                        fontSize: '0.85rem'
+                                                                    }}
+                                                                >
+                                                                    <FiEye /> View Receipt
+                                                                </motion.button>
+                                                            )}
+                                                            <motion.button
+                                                                className="eb-approve-btn"
+                                                                onClick={() => handleStatusUpdate(booking._id, 'confirmed')}
+                                                                disabled={actionLoading === booking._id || !booking.isReceiptUploaded}
+                                                                whileHover={booking.isReceiptUploaded ? { scale: 1.03 } : {}}
+                                                                whileTap={booking.isReceiptUploaded ? { scale: 0.97 } : {}}
+                                                                title={!booking.isReceiptUploaded ? 'Waiting for user to upload receipt' : 'Approve this booking'}
+                                                                style={{ opacity: !booking.isReceiptUploaded ? 0.4 : 1, cursor: !booking.isReceiptUploaded ? 'not-allowed' : 'pointer' }}
+                                                            >
+                                                                {actionLoading === booking._id ? '...' : <><FiCheckCircle /> Approve</>}
+                                                            </motion.button>
+                                                            <motion.button
+                                                                className="eb-reject-btn"
+                                                                onClick={() => handleStatusUpdate(booking._id, 'rejected')}
+                                                                disabled={actionLoading === booking._id}
+                                                                whileHover={{ scale: 1.03 }}
+                                                                whileTap={{ scale: 0.97 }}
+                                                            >
+                                                                {actionLoading === booking._id ? '...' : <><FiXCircle /> Reject</>}
+                                                            </motion.button>
+                                                        </div>
                                                     )}
-                                                    <motion.button
-                                                        className="eb-approve-btn"
-                                                        onClick={() => handleStatusUpdate(booking._id, 'confirmed')}
-                                                        disabled={actionLoading === booking._id || !booking.isReceiptUploaded}
-                                                        whileHover={booking.isReceiptUploaded ? { scale: 1.03 } : {}}
-                                                        whileTap={booking.isReceiptUploaded ? { scale: 0.97 } : {}}
-                                                        title={!booking.isReceiptUploaded ? 'Waiting for user to upload receipt' : 'Approve this booking'}
-                                                        style={{ opacity: !booking.isReceiptUploaded ? 0.4 : 1, cursor: !booking.isReceiptUploaded ? 'not-allowed' : 'pointer' }}
-                                                    >
-                                                        {actionLoading === booking._id ? '...' : <><FiCheckCircle /> Approve</>}
-                                                    </motion.button>
-                                                    <motion.button
-                                                        className="eb-reject-btn"
-                                                        onClick={() => handleStatusUpdate(booking._id, 'rejected')}
-                                                        disabled={actionLoading === booking._id}
-                                                        whileHover={{ scale: 1.03 }}
-                                                        whileTap={{ scale: 0.97 }}
-                                                    >
-                                                        {actionLoading === booking._id ? '...' : <><FiXCircle /> Reject</>}
-                                                    </motion.button>
                                                 </div>
-                                            )}
-                                        </div>
-                                    </motion.div>
-                                ))}
-                            </AnimatePresence>
-                        </div>
-                    )}
-                    </>
+                                            </motion.div>
+                                        ))}
+                                    </AnimatePresence>
+                                </div>
+                            )}
+                        </>
                     )}
 
                     {/* Cancellation Requests Tab */}
@@ -526,26 +535,28 @@ const EventBookingsPage = () => {
                                                             ? formatDate(booking.cancellationRequest.requestedAt)
                                                             : 'N/A'}
                                                     </span>
-                                                    <div className="eb-actions">
-                                                        <motion.button
-                                                            className="eb-approve-btn"
-                                                            onClick={() => handleCancellationAction(booking._id, 'approve')}
-                                                            disabled={cancellationLoading}
-                                                            whileHover={{ scale: 1.03 }}
-                                                            whileTap={{ scale: 0.97 }}
-                                                        >
-                                                            <FiCheckCircle /> Approve Return
-                                                        </motion.button>
-                                                        <motion.button
-                                                            className="eb-reject-btn"
-                                                            onClick={() => handleCancellationAction(booking._id, 'reject')}
-                                                            disabled={cancellationLoading}
-                                                            whileHover={{ scale: 1.03 }}
-                                                            whileTap={{ scale: 0.97 }}
-                                                        >
-                                                            <FiXCircle /> Reject
-                                                        </motion.button>
-                                                    </div>
+                                                    {!isExpired && (
+                                                        <div className="eb-actions">
+                                                            <motion.button
+                                                                className="eb-approve-btn"
+                                                                onClick={() => handleCancellationAction(booking._id, 'approve')}
+                                                                disabled={cancellationLoading}
+                                                                whileHover={{ scale: 1.03 }}
+                                                                whileTap={{ scale: 0.97 }}
+                                                            >
+                                                                <FiCheckCircle /> Approve Return
+                                                            </motion.button>
+                                                            <motion.button
+                                                                className="eb-reject-btn"
+                                                                onClick={() => handleCancellationAction(booking._id, 'reject')}
+                                                                disabled={cancellationLoading}
+                                                                whileHover={{ scale: 1.03 }}
+                                                                whileTap={{ scale: 0.97 }}
+                                                            >
+                                                                <FiXCircle /> Reject
+                                                            </motion.button>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </motion.div>
                                         ))}

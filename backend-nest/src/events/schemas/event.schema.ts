@@ -70,8 +70,17 @@ export class Event {
     @Prop({ required: true, trim: true })
     location: string;
 
-    @Prop({ required: true })
+    @Prop({ default: 'theater' })
     category: string;
+
+    @Prop()
+    startTime: string;
+
+    @Prop()
+    endTime: string;
+
+    @Prop({ type: Date })
+    cancellationDeadline: Date;
 
     @Prop({ default: 'default-image.jpg' })
     image: string;

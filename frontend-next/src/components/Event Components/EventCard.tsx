@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiCalendar, FiMapPin, FiTag, FiX, FiMaximize2, FiShoppingCart, FiInfo } from 'react-icons/fi';
+import { FiCalendar, FiMapPin, FiTag, FiX, FiMaximize2, FiShoppingCart, FiInfo, FiAlertCircle } from 'react-icons/fi';
 import './EventCard.css';
 import { getImageUrl } from '@/utils/imageHelper';
 import { Event } from '@/types/event';
@@ -46,6 +46,13 @@ const EventCard: React.FC<EventCardProps> = ({ event, index = 0 }) => {
     const ticketStatus = getTicketStatus();
     const isSoldOut = (event.remainingTickets ?? 0) === 0;
 
+    const isExpired = useMemo(() => {
+        if (!event.date) return false;
+        const eventDate = new Date(event.date);
+        const expirationDate = new Date(eventDate.getTime() + 24 * 60 * 60 * 1000); // 1 day after event date
+        return new Date() >= expirationDate;
+    }, [event.date]);
+
     // Get price from standard chairs if it's a theater event
     const standardPrice = useMemo(() => {
         if (event.hasTheaterSeating && event.seatPricing) {
@@ -87,7 +94,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, index = 0 }) => {
                             onLoad={() => setImageLoaded(true)}
                         />
                         <div className="image-gradient-overlay"></div>
-                        <div className={`ticket-badge ${ticketStatus.class}`}>{ticketStatus.text}</div>
+                        {!isExpired && <div className={`ticket-badge ${ticketStatus.class}`}>{ticketStatus.text}</div>}
                         <motion.div className="expand-icon" initial={{ opacity: 0 }} whileHover={{ opacity: 1, scale: 1.1 }}>
                             <FiMaximize2 size={20} />
                         </motion.div>
@@ -102,9 +109,16 @@ const EventCard: React.FC<EventCardProps> = ({ event, index = 0 }) => {
 
                 <div className="card-content">
                     <div className="card-info-header">
-                        <h3 className="card-title">{event.title}</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <h3 className="card-title">{event.title}</h3>
+                            {isExpired && (
+                                <div className="expired-event-badge">
+                                    <FiAlertCircle size={15} /> <span>Expired Event</span>
+                                </div>
+                            )}
+                        </div>
                         {standardPrice !== undefined && (
-                            <div className="price-tag">
+                            <div className="price-tag" style={{ alignSelf: 'flex-start' }}>
                                 <span className="price-amount">{standardPrice.toFixed(2)} EGP</span>
                             </div>
                         )}
@@ -142,7 +156,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, index = 0 }) => {
                             <FiInfo /> <span>{t('card.details')}</span>
                         </button>
 
-                        {(user?.role === "Standard User" || !user) && !isSoldOut && (
+                        {(user?.role === "Standard User" || !user) && !isSoldOut && !isExpired && (
                             <button
                                 className="card-action-btn primary"
                                 onClick={(e) => {
@@ -154,7 +168,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, index = 0 }) => {
                             </button>
                         )}
 
-                        {isSoldOut && (
+                        {(isSoldOut && !isExpired) && (
                             <button className="card-action-btn disabled" disabled>
                                 {t('card.soldOut')}
                             </button>

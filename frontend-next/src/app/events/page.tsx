@@ -68,7 +68,14 @@ const EventListPage = () => {
             const response = await api.get<any>('/event/approved');
             const data = response.data.success ? response.data.data : response.data;
             if (Array.isArray(data)) {
-                setEvents(data);
+                const now = new Date();
+                const unexpiredEvents = data.filter((event: any) => {
+                    if (!event.date) return true;
+                    const eventDate = new Date(event.date);
+                    const expirationDate = new Date(eventDate.getTime() + 24 * 60 * 60 * 1000);
+                    return now < expirationDate;
+                });
+                setEvents(unexpiredEvents);
             } else {
                 setEvents([]);
             }
@@ -197,6 +204,9 @@ const EventListPage = () => {
                                 </div>
                             )}
                             {user?.role === "Standard User" && <Link href="/bookings" className="action-btn secondary"><FiUser /> <span>{t('nav.bookings')}</span></Link>}
+                            <Link href="/events/previous" className="action-btn secondary" style={{ background: 'rgba(255,255,255,0.1)', borderColor: 'rgba(255,255,255,0.2)' }}>
+                                <FiCalendar /> <span>Previous Events</span>
+                            </Link>
                         </div>
                     </div>
                 </motion.div>

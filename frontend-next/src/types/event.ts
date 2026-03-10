@@ -21,6 +21,9 @@ export interface Event {
     date: string;
     location: string;
     category: string;
+    startTime?: string;
+    endTime?: string;
+    cancellationDeadline?: string;
     image?: string;
     ticketPrice: number;
     remainingTickets: number;

@@ -31,7 +31,16 @@ const ScannerDashboard = () => {
             const res = await api.get('/event/approved');
             const data = res.data.success ? res.data.data : (res.data.events || res.data || []);
             const eventsList = Array.isArray(data) ? data : [];
-            setEvents(eventsList);
+
+            const now = new Date();
+            const activeEvents = eventsList.filter((event: Event) => {
+                if (!event.date) return false;
+                const eventDate = new Date(event.date);
+                const expirationDate = new Date(eventDate.getTime() + 24 * 60 * 60 * 1000);
+                return now < expirationDate;
+            });
+
+            setEvents(activeEvents);
         } catch (err) {
             console.error('Error fetching events:', err);
             toast.error('Failed to load events');

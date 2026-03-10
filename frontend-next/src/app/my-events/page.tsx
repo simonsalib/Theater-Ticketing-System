@@ -46,9 +46,19 @@ const MyEventsPage = () => {
         }
     };
 
-    const filteredEvents = events.filter(event =>
-        (event.title || '').toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredEvents = events.filter(event => {
+        const matchesSearch = (event.title || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+        // Filter out expired events (event date + 1 day at midnight)
+        let isExpired = false;
+        if (event.date) {
+            const eventDate = new Date(event.date);
+            const expirationDate = new Date(eventDate.getTime() + 24 * 60 * 60 * 1000);
+            isExpired = new Date() >= expirationDate;
+        }
+
+        return matchesSearch && !isExpired;
+    });
 
     const handleDelete = async (eventId: string, isApproved: boolean) => {
         if (!window.confirm('Are you sure you want to delete this event?')) return;
@@ -108,6 +118,9 @@ const MyEventsPage = () => {
                         <input type="text" placeholder={t('myEvents.search')} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="search-input" />
                     </div>
                     <div className="organizer-buttons">
+                        <Link href="/my-events/previous" className="view-events-button" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', borderColor: 'rgba(239, 68, 68, 0.2)' }}>
+                            Previous Events
+                        </Link>
                         <Link href="/events" className="view-events-button">{t('myEvents.viewAll')}</Link>
                         <Link href="/my-events/new" className="create-event-button">{t('myEvents.create')}</Link>
                         <Link href="/my-events/analytics" className="analytics-button">{t('myEvents.analytics')}</Link>

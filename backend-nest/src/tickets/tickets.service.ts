@@ -198,6 +198,17 @@ export class TicketsService {
       }
     }
 
+    // Check if event is expired
+    const eventData = ticket.eventId as any;
+    if (eventData && eventData.date) {
+      const eventDate = new Date(eventData.date);
+      const expirationDate = new Date(eventDate.getTime() + 24 * 60 * 60 * 1000); // 1 day after event date
+      const now = new Date();
+      if (now >= expirationDate) {
+        throw new BadRequestException('This event has already expired. Tickets cannot be scanned anymore.');
+      }
+    }
+
     // Check if booking is confirmed
     const booking = ticket.bookingId as any;
     if (booking && booking.status !== 'confirmed') {

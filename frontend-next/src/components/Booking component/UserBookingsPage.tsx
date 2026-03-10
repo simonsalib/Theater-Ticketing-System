@@ -41,6 +41,7 @@ interface EventData {
     location: string;
     image: string;
     ticketPrice: number;
+    cancellationDeadline?: string;
     organizerId?: {
         _id: string;
         name: string;
@@ -515,6 +516,10 @@ const UserBookingsPage = () => {
                             const isPending = booking.status === 'pending';
                             const timeLeft = timers[booking._id];
 
+                            const isPastCancellationDeadline = event?.cancellationDeadline
+                                ? new Date() > new Date(event.cancellationDeadline)
+                                : false;
+
                             return (
                                 <motion.div
                                     key={booking._id}
@@ -589,13 +594,19 @@ const UserBookingsPage = () => {
                                             <FiEye /> Details
                                         </Link>
                                         {!isCancelled && isPending && !booking.isReceiptUploaded && (
-                                            <button
-                                                onClick={() => handleCancelClick(booking._id)}
-                                                className="cancel-btn"
-                                                disabled={cancellationLoading}
-                                            >
-                                                <FiTrash2 /> Cancel
-                                            </button>
+                                            isPastCancellationDeadline ? (
+                                                <span style={{ fontSize: '0.85rem', color: '#ef4444', fontStyle: 'italic', padding: '0.5rem 0' }}>
+                                                    Cancellation deadline passed
+                                                </span>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleCancelClick(booking._id)}
+                                                    className="cancel-btn"
+                                                    disabled={cancellationLoading}
+                                                >
+                                                    <FiTrash2 /> Cancel
+                                                </button>
+                                            )
                                         )}
                                         {!isCancelled && isPending && booking.isReceiptUploaded && booking.hasTheaterSeating && (
                                             <>
@@ -617,7 +628,14 @@ const UserBookingsPage = () => {
                                                     const unrequestedSeats = (booking.selectedSeats || []).filter(s => !pendingKeys.has(`${s.section}-${s.row}-${s.seatNumber}`));
                                                     const showButton = booking.cancellationRequest?.status !== 'pending'
                                                         || (booking.cancellationRequest?.status === 'pending' && unrequestedSeats.length > 0);
-                                                    return showButton ? (
+
+                                                    if (!showButton) return null;
+
+                                                    if (isPastCancellationDeadline) {
+                                                        return <span style={{ fontSize: '0.85rem', color: '#ef4444', fontStyle: 'italic', padding: '0.5rem 0' }}>Cancellation deadline passed</span>;
+                                                    }
+
+                                                    return (
                                                         <button
                                                             onClick={() => handleRequestCancellationClick(booking._id)}
                                                             style={{
@@ -630,7 +648,7 @@ const UserBookingsPage = () => {
                                                         >
                                                             <FiRotateCcw size={14} /> {booking.cancellationRequest?.status === 'pending' ? 'Cancel More Seats' : 'Request Cancellation'}
                                                         </button>
-                                                    ) : null;
+                                                    );
                                                 })()}
                                             </>
                                         )}
@@ -678,7 +696,7 @@ const UserBookingsPage = () => {
                                                         <FiClock size={14} /> Cancellation Pending
                                                     </span>
                                                 )}
-                                                {booking.cancellationRequest?.status === 'rejected' && (
+                                                {booking.cancellationRequest?.status === 'rejected' && !isPastCancellationDeadline && (
                                                     <button
                                                         onClick={() => handleRequestCancellationClick(booking._id)}
                                                         style={{
@@ -697,6 +715,11 @@ const UserBookingsPage = () => {
                                                         (booking.cancellationRequest?.seatsToCancel || []).map(s => `${s.section}-${s.row}-${s.seatNumber}`)
                                                     );
                                                     const unrequestedSeats = (booking.selectedSeats || []).filter(s => !pendingKeys.has(`${s.section}-${s.row}-${s.seatNumber}`));
+
+                                                    if (isPastCancellationDeadline && booking.cancellationRequest?.status !== 'rejected') {
+                                                        return <span style={{ fontSize: '0.85rem', color: '#ef4444', fontStyle: 'italic', padding: '0.5rem 0' }}>Cancellation deadline passed</span>;
+                                                    }
+
                                                     if (booking.cancellationRequest?.status === 'pending' && unrequestedSeats.length > 0) {
                                                         return (
                                                             <button

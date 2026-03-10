@@ -418,6 +418,39 @@
     backdrop-filter: blur(10px);
 }
 
+/* Expired Event Badge below Title */
+.expired-event-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.05));
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    color: #F87171;
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    box-shadow: 0 4px 15px rgba(239, 68, 68, 0.2);
+    margin-top: 6px;
+    width: fit-content;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(4px);
+}
+
+.expired-event-badge:hover {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(220, 38, 38, 0.15));
+    border-color: rgba(239, 68, 68, 0.5);
+    box-shadow: 0 6px 20px rgba(239, 68, 68, 0.35);
+    transform: translateY(-2px);
+    color: #FCA5A5;
+}
+
+.expired-event-badge svg {
+    filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.5));
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
     .event-card-modern {

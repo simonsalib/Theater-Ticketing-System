@@ -27,7 +27,10 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
         description: initialData?.description || '',
         date: initialData?.date ? new Date(initialData.date).toISOString().split('T')[0] : '',
         location: initialData?.location || '',
-        category: initialData?.category || '',
+        category: initialData?.category || 'theater',
+        startTime: initialData?.startTime || '',
+        endTime: initialData?.endTime || '',
+        cancellationDeadline: initialData?.cancellationDeadline ? new Date(initialData.cancellationDeadline).toISOString().split('T')[0] : '',
         ticketPrice: initialData?.ticketPrice || 0,
         totalTickets: initialData?.totalTickets || 0,
         imageFile: null as File | null,
@@ -208,6 +211,9 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
                 date: formData.date,
                 location: formData.location,
                 category: formData.category,
+                startTime: formData.startTime,
+                endTime: formData.endTime,
+                cancellationDeadline: formData.cancellationDeadline ? new Date(formData.cancellationDeadline).toISOString() : undefined,
                 ticketPrice: formData.hasTheaterSeating ? 0 : formData.ticketPrice,
                 totalTickets: formData.totalTickets,
                 hasTheaterSeating: formData.hasTheaterSeating,
@@ -278,12 +284,23 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
 
                 <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div className="form-group">
-                        <label htmlFor="date">Date*</label>
+                        <label htmlFor="date">Event Date*</label>
                         <input type="date" id="date" name="date" value={formData.date} onChange={handleChange} required />
                     </div>
                     <div className="form-group">
-                        <label htmlFor="category">Category*</label>
-                        <input type="text" id="category" name="category" value={formData.category} onChange={handleChange} required placeholder="e.g. Movie, Play, Concert" />
+                        <label htmlFor="cancellationDeadline">Ticket Cancellation Request Deadline*</label>
+                        <input type="date" id="cancellationDeadline" name="cancellationDeadline" value={formData.cancellationDeadline} onChange={handleChange} required />
+                    </div>
+                </div>
+
+                <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div className="form-group">
+                        <label htmlFor="startTime">Start Time*</label>
+                        <input type="time" id="startTime" name="startTime" value={formData.startTime} onChange={handleChange} required />
+                    </div>
+                    <div className="form-group">
+                        <label htmlFor="endTime">End Time*</label>
+                        <input type="time" id="endTime" name="endTime" value={formData.endTime} onChange={handleChange} required />
                     </div>
                 </div>
 
