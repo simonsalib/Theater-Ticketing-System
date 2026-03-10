@@ -40,6 +40,9 @@ const BookingTicketsPage = () => {
     const [eventLocation, setEventLocation] = useState('');
     const [payerEmail, setPayerEmail] = useState('');
     const [payerName, setPayerName] = useState('');
+    const [startTime, setStartTime] = useState('');
+    const [endTime, setEndTime] = useState('');
+    const [cancellationDeadline, setCancellationDeadline] = useState('');
 
     useEffect(() => {
         if (!bookingId) return;
@@ -53,6 +56,9 @@ const BookingTicketsPage = () => {
                     setEventTitle(data[0].eventId.title || '');
                     setEventDate(data[0].eventId.date || '');
                     setEventLocation(data[0].eventId.location || '');
+                    setStartTime(data[0].eventId.startTime || '');
+                    setEndTime(data[0].eventId.endTime || '');
+                    setCancellationDeadline(data[0].eventId.cancellationDeadline || '');
                 }
                 if (data.length > 0 && data[0].userId) {
                     setPayerEmail(data[0].userId.email || '');
@@ -132,9 +138,20 @@ const BookingTicketsPage = () => {
             ctx.fillText(`📅  ${new Date(eventDate).toLocaleDateString('en-US', { timeZone: 'Africa/Cairo', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`, width / 2, y);
             y += 24;
         }
+        if (startTime) {
+            ctx.fillText(`⏰  ${startTime} ${endTime ? `- ${endTime}` : ''}`, width / 2, y);
+            y += 24;
+        }
         if (eventLocation) {
             ctx.fillText(`📍  ${eventLocation}`, width / 2, y);
             y += 24;
+        }
+        if (cancellationDeadline) {
+            ctx.fillStyle = '#ef4444'; // red for deadline
+            ctx.font = 'bold 15px Arial, sans-serif';
+            ctx.fillText(`⚠️ Cancel Before: ${new Date(cancellationDeadline).toLocaleString('en-US', { timeZone: 'Africa/Cairo', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`, width / 2, y);
+            y += 24;
+            ctx.fillStyle = '#6b7280';
         }
 
         // Separator
@@ -208,7 +225,14 @@ const BookingTicketsPage = () => {
 
         ctx.textAlign = 'center';
         ctx.font = '12px Arial, sans-serif';
+        if (ticket.isScanned) {
+            ctx.fillStyle = '#10b981';
+            ctx.font = 'bold 16px Arial, sans-serif';
+            ctx.fillText(`✅ Scanned at: ${ticket.scannedAt ? new Date(ticket.scannedAt).toLocaleString('en-US', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit' }) : 'Entrance'}`, width / 2, y);
+            y += 20;
+        }
         ctx.fillStyle = '#9ca3af';
+        ctx.font = '12px Arial, sans-serif';
         ctx.fillText('Scan this QR code at the entrance', width / 2, y);
 
         // Footer
@@ -342,10 +366,12 @@ const BookingTicketsPage = () => {
                         <div className="tickets-event-info">
                             <h1>🎫 Your Tickets</h1>
                             <h2>{eventTitle}</h2>
-                            <div className="tickets-meta">
-                                {eventLocation && <span>📍 {eventLocation}</span>}
-                                {eventDate && <span>📅 {new Date(eventDate).toLocaleDateString('en-US', { timeZone: 'Africa/Cairo' })}</span>}
-                                <span><FiGrid size={14} /> {tickets.length} ticket{tickets.length > 1 ? 's' : ''}</span>
+                            <div className="tickets-meta" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
+                                {eventLocation && <span style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }}>📍 {eventLocation}</span>}
+                                {eventDate && <span style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }}>📅 {new Date(eventDate).toLocaleDateString('en-US', { timeZone: 'Africa/Cairo' })}</span>}
+                                {startTime && <span style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }}>⏰ {startTime} {endTime ? `- ${endTime}` : ''}</span>}
+                                {cancellationDeadline && <span style={{ padding: '4px 8px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '6px', color: '#ef4444', fontWeight: 600 }}>⚠️ Cancel Before: {new Date(cancellationDeadline).toLocaleString('en-US', { timeZone: 'Africa/Cairo', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>}
+                                <span style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }}><FiGrid size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} /> {tickets.length} ticket{tickets.length > 1 ? 's' : ''}</span>
                             </div>
                         </div>
 

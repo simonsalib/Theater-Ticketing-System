@@ -24,6 +24,12 @@ interface ScanResult {
     attendeePhone: string;
     isFree: boolean;
     message: string;
+    eventId: string;
+    eventTitle: string;
+    eventDate: string;
+    eventLocation: string;
+    startTime: string;
+    endTime: string;
 }
 
 interface ScanStats {
@@ -254,6 +260,34 @@ const ScannerEventPage = () => {
                                     <p className="result-message">{scanResult.message}</p>
 
                                     <div className="result-details">
+                                        <div className="result-section">
+                                            <h4><FiGrid size={16} /> Event Details</h4>
+                                            <div className="result-grid">
+                                                <div className="result-field" style={{ gridColumn: '1 / -1' }}>
+                                                    <span className="field-label">Title</span>
+                                                    <span className="field-value" style={{ fontWeight: 'bold' }}>{scanResult.eventTitle || eventTitle}</span>
+                                                </div>
+                                                {scanResult.eventLocation && (
+                                                    <div className="result-field">
+                                                        <span className="field-label">Location</span>
+                                                        <span className="field-value">{scanResult.eventLocation}</span>
+                                                    </div>
+                                                )}
+                                                {scanResult.eventDate && (
+                                                    <div className="result-field">
+                                                        <span className="field-label">Date</span>
+                                                        <span className="field-value">{new Date(scanResult.eventDate).toLocaleDateString('en-US', { timeZone: 'Africa/Cairo', year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                                                    </div>
+                                                )}
+                                                {scanResult.startTime && (
+                                                    <div className="result-field" style={{ gridColumn: '1 / -1' }}>
+                                                        <span className="field-label">Time</span>
+                                                        <span className="field-value">{scanResult.startTime} {scanResult.endTime ? `- ${scanResult.endTime}` : ''}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
                                         <div className="result-section">
                                             <h4><FiGrid size={16} /> Seat Information</h4>
                                             <div className="result-grid">

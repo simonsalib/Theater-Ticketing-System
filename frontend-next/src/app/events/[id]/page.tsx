@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     FiCalendar, FiMapPin, FiTag, FiUsers,
-    FiInfo, FiArrowLeft, FiX, FiMaximize2, FiShoppingCart, FiCheck, FiGrid, FiDollarSign
+    FiInfo, FiArrowLeft, FiX, FiMaximize2, FiShoppingCart, FiCheck, FiGrid, FiDollarSign, FiClock, FiShieldOff
 } from 'react-icons/fi';
 import '@/components/Event Components/EventDetailPage.css';
 import '@/components/Booking component/BookingTicketForm.css';
@@ -103,8 +103,31 @@ const EventDetailsPage = () => {
         return { status: 'available', text: `${remaining} tickets available`, color: '#10B981' };
     };
 
+    const formatDeadline = (dateString?: string) => {
+        if (!dateString) return null;
+        const date = new Date(dateString);
+        return date.toLocaleString('en-US', {
+            timeZone: 'Africa/Cairo',
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+
     const ticketInfo: any = getTicketStatus();
     const dateInfo = event?.date ? formatDate(event.date) : null;
+    const deadlineStr = event?.cancellationDeadline ? formatDeadline(event.cancellationDeadline) : null;
+    const isPastDeadline = event?.cancellationDeadline ? new Date() > new Date(event.cancellationDeadline) : false;
+
+    const mainSeatCounts = React.useMemo(() => {
+        if (!seatData || !seatData.seats) return { available: 0, booked: 0, total: 0 };
+        const mainSeats = seatData.seats.filter((s: any) => s.section !== 'balcony' && s.isActive);
+        const available = mainSeats.filter((s: any) => !s.isBooked).length;
+        const booked = mainSeats.filter((s: any) => s.isBooked).length;
+        return { available, booked, total: mainSeats.length };
+    }, [seatData]);
 
     if (loading) {
         return <div className="detail-page"><div className="loading-detail"><div className="loading-shimmer"></div><div className="loading-content"><div className="shimmer-line large"></div><div className="shimmer-line medium"></div><div className="shimmer-line small"></div></div></div></div>;
@@ -136,6 +159,8 @@ const EventDetailsPage = () => {
                                 <h2>{event.title}</h2>
                                 <div className="event-meta-compact">
                                     <span><FiCalendar /> {dateInfo?.full || 'TBA'}</span>
+                                    {event.startTime && <span><FiClock /> {event.startTime} {event.endTime ? `- ${event.endTime}` : ''}</span>}
+                                    {deadlineStr && <span style={{ color: isPastDeadline ? '#ef4444' : 'inherit' }}>⚠️ Cancel Before: {deadlineStr}</span>}
                                     <span><FiMapPin /> {event.location || 'TBA'}</span>
                                 </div>
                             </div>
@@ -143,8 +168,8 @@ const EventDetailsPage = () => {
                         <div className="booking-summary-compact">
                             {seatData && (
                                 <>
-                                    <span className="seats-count">{seatData.availableCount} available</span>
-                                    <span className="seats-count" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}>{seatData.bookedCount} booked</span>
+                                    <span className="seats-count">{mainSeatCounts.available} available of {mainSeatCounts.total}</span>
+                                    <span className="seats-count" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}>{mainSeatCounts.booked} booked</span>
                                 </>
                             )}
                             {user?.role === "Standard User" && (
@@ -225,11 +250,21 @@ const EventDetailsPage = () => {
                             <div className={`status-badge ${ticketInfo.status}`}>{ticketInfo.status === 'available' && <FiCheck />}{ticketInfo.text}</div>
                         </div>
                         <div className="info-grid">
-                            <motion.div className="info-card" whileHover={{ y: -3, scale: 1.02 }}><div className="info-icon"><FiCalendar /></div><div className="info-text"><span className="info-label">Date & Time</span><span className="info-value">{dateInfo?.full || 'TBA'}</span></div></motion.div>
+                            <motion.div className="info-card" whileHover={{ y: -3, scale: 1.02 }}><div className="info-icon"><FiCalendar /></div><div className="info-text"><span className="info-label">Date</span><span className="info-value">{dateInfo?.full || 'TBA'}</span></div></motion.div>
+                            {event.startTime && <motion.div className="info-card" whileHover={{ y: -3, scale: 1.02 }}><div className="info-icon"><FiClock /></div><div className="info-text"><span className="info-label">Time</span><span className="info-value">{event.startTime} {event.endTime ? `- ${event.endTime}` : ''}</span></div></motion.div>}
                             <motion.div className="info-card" whileHover={{ y: -3, scale: 1.02 }}><div className="info-icon"><FiMapPin /></div><div className="info-text"><span className="info-label">Location</span><span className="info-value">{event.location || 'TBA'}</span></div></motion.div>
                             <motion.div className="info-card" whileHover={{ y: -3, scale: 1.02 }}><div className="info-icon"><FiTag /></div><div className="info-text"><span className="info-label">Category</span><span className="info-value">{event.category || 'General'}</span></div></motion.div>
-                            <motion.div className="info-card" whileHover={{ y: -3, scale: 1.02 }}><div className="info-icon"><FiUsers /></div><div className="info-text"><span className="info-label">Available</span><span className="info-value" style={{ color: ticketInfo.color }}>{event.remainingTickets ?? 'N/A'}</span></div></motion.div>
+                            <motion.div className="info-card" whileHover={{ y: -3, scale: 1.02 }}><div className="info-icon"><FiUsers /></div><div className="info-text"><span className="info-label">Tickets</span><span className="info-value" style={{ color: ticketInfo.color }}>{event.remainingTickets ?? 'N/A'} available of {event.totalTickets || 'N/A'}</span></div></motion.div>
                         </div>
+                        {deadlineStr && (
+                            <div className="deadline-banner" style={{ marginTop: '16px', padding: '12px 16px', borderRadius: '12px', background: isPastDeadline ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)', border: `1px solid ${isPastDeadline ? 'rgba(239, 68, 68, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`, color: isPastDeadline ? '#ef4444' : '#f59e0b', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <FiShieldOff size={20} />
+                                <div>
+                                    <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{isPastDeadline ? 'Cancellation Deadline Passed' : 'Cancellation Policy'}</div>
+                                    <div style={{ fontSize: '0.85rem', opacity: 0.9 }}>{isPastDeadline ? `No returns accepted after ${deadlineStr}.` : `Tickets can be cancelled until ${deadlineStr}.`}</div>
+                                </div>
+                            </div>
+                        )}
                         <div className="description-section"><h3><FiInfo /> About This Event</h3><p>{event.description || 'No description available.'}</p></div>
 
                         <div className="action-section">

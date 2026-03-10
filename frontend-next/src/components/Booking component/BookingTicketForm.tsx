@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     FiCalendar, FiMapPin, FiTag, FiMinus, FiPlus,
     FiShoppingCart, FiArrowLeft, FiCheckCircle, FiAlertCircle,
-    FiCreditCard, FiUsers, FiGrid, FiUser, FiPhone, FiArrowRight
+    FiCreditCard, FiUsers, FiGrid, FiUser, FiPhone, FiArrowRight, FiClock
 } from 'react-icons/fi';
 import api from '@/services/api';
 import { getImageUrl } from '@/utils/imageHelper';
@@ -29,6 +29,8 @@ interface Event {
     _id: string;
     title: string;
     date?: string;
+    startTime?: string;
+    endTime?: string;
     location?: string;
     category?: string;
     image?: string;
@@ -36,6 +38,7 @@ interface Event {
     totalTickets?: number;
     remainingTickets?: number;
     hasTheaterSeating?: boolean;
+    cancellationDeadline?: string;
 }
 
 interface BookTicketFormProps {
@@ -90,7 +93,7 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
     };
 
     const handleTicketChange = (delta: number) => {
-        const maxTickets = selectedEvent?.remainingTickets || selectedEvent?.totalTickets || 0;
+        const maxTickets = selectedEvent?.remainingTickets ?? selectedEvent?.totalTickets ?? 0;
         const newValue = numberOfTickets + delta;
 
         if (newValue >= 1 && newValue <= Math.min(maxTickets, 10)) {
@@ -201,7 +204,7 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
         }
     };
 
-    const maxTickets = selectedEvent?.remainingTickets || selectedEvent?.totalTickets || 0;
+    const maxTickets = selectedEvent?.remainingTickets ?? selectedEvent?.totalTickets ?? 0;
     const ticketPrice = selectedEvent?.ticketPrice || 0;
     const totalPrice = selectedEvent?.hasTheaterSeating ? seatTotalPrice : numberOfTickets * ticketPrice;
     const ticketCount = selectedEvent?.hasTheaterSeating ? selectedSeats.length : numberOfTickets;
@@ -520,8 +523,10 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
                                     <h3>{selectedEvent?.title}</h3>
                                     <div className="preview-meta">
                                         <span><FiCalendar /> {formatDate(selectedEvent?.date)}</span>
+                                        {selectedEvent?.startTime && <span><FiClock /> {selectedEvent.startTime} {selectedEvent.endTime ? `- ${selectedEvent.endTime}` : ''}</span>}
                                         <span><FiMapPin /> {selectedEvent?.location || 'TBA'}</span>
                                         <span><FiTag /> {selectedEvent?.category || 'General'}</span>
+                                        {selectedEvent?.cancellationDeadline && <span style={{ color: new Date() > new Date(selectedEvent.cancellationDeadline) ? '#ef4444' : 'inherit' }}><FiAlertCircle /> Cancel Before: {new Date(selectedEvent.cancellationDeadline).toLocaleString('en-US', { timeZone: 'Africa/Cairo', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>}
                                     </div>
                                 </div>
                             </motion.div>

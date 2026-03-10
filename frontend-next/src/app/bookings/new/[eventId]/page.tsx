@@ -213,7 +213,7 @@ const BookTicketPage = () => {
 
     const handleTicketChange = (delta: number) => {
         if (!event) return;
-        const max = event.remainingTickets || event.totalTickets || 0;
+        const max = event.remainingTickets ?? event.totalTickets ?? 0;
         const newVal = numberOfTickets + delta;
         if (newVal >= 1 && newVal <= Math.min(max, 10)) {
             setNumberOfTickets(newVal);
@@ -533,15 +533,38 @@ const BookTicketPage = () => {
                                 accept="image/*"
                                 ref={receiptInputRef}
                                 style={{ display: 'none' }}
-                                onChange={(e) => {
+                                onChange={async (e) => {
                                     const file = e.target.files?.[0];
                                     if (!file) return;
                                     if (!file.type.startsWith('image/')) { toast.error('Please select an image file'); return; }
                                     if (file.size > 5 * 1024 * 1024) { toast.error('Image must be less than 5MB'); return; }
+
                                     setReceiptFile(file);
                                     const reader = new FileReader();
                                     reader.onloadend = () => setReceiptPreview(reader.result as string);
                                     reader.readAsDataURL(file);
+
+                                    if (!bookingId) return;
+                                    try {
+                                        setIsUploadingReceipt(true);
+                                        const compressedBase64 = await compressImage(file);
+                                        const response = await api.post(`/booking/${bookingId}/receipt`, { receiptBase64: compressedBase64 });
+                                        if (response.data?.success) {
+                                            toast.success('Receipt uploaded! Awaiting organizer verification.');
+                                            setReceiptUploaded(true);
+                                        } else {
+                                            toast.error(response.data?.message || 'Upload failed');
+                                            setReceiptFile(null);
+                                            setReceiptPreview(null);
+                                        }
+                                    } catch (err: any) {
+                                        toast.error(err.response?.data?.message || 'Failed to upload receipt');
+                                        setReceiptFile(null);
+                                        setReceiptPreview(null);
+                                    } finally {
+                                        setIsUploadingReceipt(false);
+                                        if (receiptInputRef.current) receiptInputRef.current.value = '';
+                                    }
                                 }}
                             />
 
@@ -568,66 +591,37 @@ const BookTicketPage = () => {
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                     <div style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', maxHeight: '200px' }}>
-                                        <img src={receiptPreview} alt="Receipt" style={{ width: '100%', maxHeight: '200px', objectFit: 'contain', background: '#000', borderRadius: '10px' }} />
-                                        <button
-                                            type="button"
-                                            onClick={() => { setReceiptFile(null); setReceiptPreview(null); if (receiptInputRef.current) receiptInputRef.current.value = ''; }}
-                                            style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(239, 68, 68, 0.9)', color: 'white', border: 'none', width: '28px', height: '28px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                        >
-                                            ✕
-                                        </button>
+                                        <img src={receiptPreview} alt="Receipt" style={{ width: '100%', maxHeight: '200px', objectFit: 'contain', background: '#000', borderRadius: '10px', opacity: isUploadingReceipt ? 0.5 : 1 }} />
+                                        {isUploadingReceipt && (
+                                            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', color: 'white', fontWeight: 600, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+                                                <div className="spinner-ring" style={{ width: '30px', height: '30px', border: '3px solid rgba(255,255,255,0.3)', borderTopColor: 'white' }}></div>
+                                                Uploading...
+                                            </div>
+                                        )}
                                     </div>
-                                    <motion.button
-                                        type="button"
-                                        onClick={async () => {
-                                            if (!receiptFile || !bookingId) return;
-                                            try {
-                                                setIsUploadingReceipt(true);
-                                                const compressedBase64 = await compressImage(receiptFile);
-                                                const response = await api.post(`/booking/${bookingId}/receipt`, { receiptBase64: compressedBase64 });
-                                                if (response.data?.success) {
-                                                    toast.success('Receipt uploaded! Awaiting organizer verification.');
-                                                    setReceiptUploaded(true);
-                                                } else {
-                                                    toast.error(response.data?.message || 'Upload failed');
-                                                }
-                                            } catch (err: any) {
-                                                toast.error(err.response?.data?.message || 'Failed to upload receipt');
-                                            } finally {
-                                                setIsUploadingReceipt(false);
-                                            }
-                                        }}
-                                        disabled={isUploadingReceipt}
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
-                                        style={{
-                                            padding: '10px 20px', borderRadius: '10px',
-                                            background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: 'white',
-                                            border: 'none', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600,
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
-                                        }}
-                                    >
-                                        {isUploadingReceipt ? 'Uploading...' : 'Submit Receipt'}
-                                    </motion.button>
                                 </div>
                             )}
                         </div>
                     </div>
 
                     <motion.button
-                        className="view-bookings-btn"
-                        onClick={() => router.push('/bookings')}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                        className={`view-bookings-btn ${isUploadingReceipt ? 'disabled' : ''}`}
+                        onClick={() => {
+                            if (!isUploadingReceipt) router.push('/bookings');
+                        }}
+                        disabled={isUploadingReceipt}
+                        whileHover={!isUploadingReceipt ? { scale: 1.02 } : {}}
+                        whileTap={!isUploadingReceipt ? { scale: 0.98 } : {}}
+                        style={{ opacity: isUploadingReceipt ? 0.7 : 1, cursor: isUploadingReceipt ? 'not-allowed' : 'pointer' }}
                     >
-                        Done — View My Bookings
+                        {isUploadingReceipt ? 'Uploading Receipt...' : 'Done — View My Bookings'}
                     </motion.button>
                 </motion.div>
             </motion.div>
         );
     }
 
-    const maxTickets = event.remainingTickets || event.totalTickets || 0;
+    const maxTickets = event.remainingTickets ?? event.totalTickets ?? 0;
     const ticketPrice = event.ticketPrice || 0;
     const totalDisplayPrice = event.hasTheaterSeating ? seatTotalPrice : numberOfTickets * ticketPrice;
 
@@ -655,6 +649,7 @@ const BookTicketPage = () => {
                                     <h2>{event.title}</h2>
                                     <div className="event-meta-compact">
                                         <span><FiCalendar /> {formatDate(event.date)}</span>
+                                        {event.startTime && <span><FiClock /> {event.startTime} {event.endTime ? `- ${event.endTime}` : ''}</span>}
                                         <span><FiMapPin /> {event.location || 'TBA'}</span>
                                     </div>
                                 </div>
@@ -865,6 +860,7 @@ const BookTicketPage = () => {
                                         <h3>{event.title}</h3>
                                         <div className="preview-meta">
                                             <span><FiCalendar /> {formatDate(event.date)}</span>
+                                            {event.startTime && <span><FiClock /> {event.startTime} {event.endTime ? `- ${event.endTime}` : ''}</span>}
                                             <span><FiMapPin /> {event.location || 'TBA'}</span>
                                             <span><FiTag /> {event.category || 'General'}</span>
                                         </div>

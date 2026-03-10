@@ -175,11 +175,17 @@ export class TicketsService {
     attendeePhone: string;
     isFree: boolean;
     message: string;
+    eventId: string;
+    eventTitle: string;
+    eventDate: string;
+    eventLocation: string;
+    startTime: string;
+    endTime: string;
   }> {
     const ticket = await this.ticketModel
       .findOne({ qrData })
       .populate('userId', 'name email phone')
-      .populate('eventId', 'title date location')
+      .populate('eventId', 'title date location startTime endTime')
       .populate('bookingId', 'status')
       .exec();
 
@@ -187,11 +193,13 @@ export class TicketsService {
       throw new NotFoundException('Invalid QR code - no ticket found');
     }
 
+    const eventData = ticket.eventId as any;
+
     // Check that the ticket belongs to the expected event
     if (expectedEventId) {
-      const ticketEventId = (ticket.eventId as any)?._id?.toString() || ticket.eventId?.toString();
+      const ticketEventId = eventData?._id?.toString() || ticket.eventId?.toString();
       if (ticketEventId !== expectedEventId) {
-        const eventTitle = (ticket.eventId as any)?.title || 'another event';
+        const eventTitle = eventData?.title || 'another event';
         throw new BadRequestException(
           `This ticket belongs to "${eventTitle}", not this event.`,
         );
@@ -199,7 +207,6 @@ export class TicketsService {
     }
 
     // Check if event is expired
-    const eventData = ticket.eventId as any;
     if (eventData && eventData.date) {
       const eventDate = new Date(eventData.date);
       const expirationDate = new Date(eventDate.getTime() + 24 * 60 * 60 * 1000); // 1 day after event date
@@ -219,19 +226,29 @@ export class TicketsService {
 
     const user = ticket.userId as any;
 
+    const baseResponse = {
+      ticket,
+      userEmail: user?.email || '',
+      userPhone: user?.phone || '',
+      userName: user?.name || '',
+      seatRow: ticket.seatRow,
+      seatNumber: ticket.seatNumber,
+      section: ticket.section,
+      seatType: ticket.seatType,
+      attendeeName: ticket.attendeeName,
+      attendeePhone: ticket.attendeePhone,
+      eventId: eventData?._id?.toString() || '',
+      eventTitle: eventData?.title || '',
+      eventDate: eventData?.date || '',
+      eventLocation: eventData?.location || '',
+      startTime: eventData?.startTime || '',
+      endTime: eventData?.endTime || '',
+    };
+
     if (ticket.isScanned) {
       // Already scanned - not free
       return {
-        ticket,
-        userEmail: user?.email || '',
-        userPhone: user?.phone || '',
-        userName: user?.name || '',
-        seatRow: ticket.seatRow,
-        seatNumber: ticket.seatNumber,
-        section: ticket.section,
-        seatType: ticket.seatType,
-        attendeeName: ticket.attendeeName,
-        attendeePhone: ticket.attendeePhone,
+        ...baseResponse,
         isFree: false,
         message: `⚠️ This ticket was already scanned on ${ticket.scannedAt?.toLocaleString('en-US', { timeZone: 'Africa/Cairo' })}. This seat is NOT free.`,
       };
@@ -271,16 +288,7 @@ export class TicketsService {
     }
 
     return {
-      ticket,
-      userEmail: user?.email || '',
-      userPhone: user?.phone || '',
-      userName: user?.name || '',
-      seatRow: ticket.seatRow,
-      seatNumber: ticket.seatNumber,
-      section: ticket.section,
-      seatType: ticket.seatType,
-      attendeeName: ticket.attendeeName,
-      attendeePhone: ticket.attendeePhone,
+      ...baseResponse,
       isFree: true,
       message: '✅ Valid ticket! This is the first scan. Seat is free to enter.',
     };

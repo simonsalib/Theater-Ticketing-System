@@ -42,6 +42,8 @@ interface EventData {
     image: string;
     ticketPrice: number;
     cancellationDeadline?: string;
+    startTime?: string;
+    endTime?: string;
     organizerId?: {
         _id: string;
         name: string;
@@ -602,6 +604,12 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                             <FiCalendar />
                                             <span>{event ? formatDate(event.date) : '...'}</span>
                                         </div>
+                                        {event?.startTime && (
+                                            <div className="info-item">
+                                                <FiClock />
+                                                <span>{event.startTime} {event.endTime ? ` - ${event.endTime}` : ''}</span>
+                                            </div>
+                                        )}
                                         <div className="info-item">
                                             <FiMapPin />
                                             <span>{event?.location || '...'}</span>
@@ -610,6 +618,12 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                             <FiClock />
                                             <span>Booked on {formatDate(booking.createdAt)}</span>
                                         </div>
+                                        {event?.cancellationDeadline && (
+                                            <div className="info-item" style={{ color: isPastCancellationDeadline ? '#ef4444' : '#f59e0b' }}>
+                                                <FiAlertCircle />
+                                                <span>Cancel Before: {new Date(event.cancellationDeadline).toLocaleString('en-US', { timeZone: 'Africa/Cairo', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                            </div>
+                                        )}
 
                                         {isPending && booking.isReceiptUploaded && (
                                             <div style={{

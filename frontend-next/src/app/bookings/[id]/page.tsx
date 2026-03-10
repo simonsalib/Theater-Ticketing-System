@@ -131,6 +131,8 @@ const BookingDetailsPage = () => {
                                     <div className="event-meta-compact">
                                         <span>📍 {eventData.location || 'TBA'}</span>
                                         <span>📅 {new Date(eventData.date).toLocaleDateString('en-US', { timeZone: 'Africa/Cairo' })}</span>
+                                        {eventData.startTime && <span>🕕 {eventData.startTime} {eventData.endTime ? `- ${eventData.endTime}` : ''}</span>}
+                                        {eventData.cancellationDeadline && <span style={{ color: new Date() > new Date(eventData.cancellationDeadline) ? '#ef4444' : 'inherit' }}>⚠️ Cancel Before: {new Date(eventData.cancellationDeadline).toLocaleString('en-US', { timeZone: 'Africa/Cairo', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>}
                                     </div>
                                 </div>
                             </div>
@@ -270,7 +272,9 @@ const BookingDetailsPage = () => {
                                 <h3>{eventData.title}</h3>
                                 <div className="detail-meta">
                                     <p><strong>📍 Location:</strong> {eventData.location}</p>
-                                    <p><strong>📅 Date:</strong> {new Date(eventData.date).toLocaleString('en-US', { timeZone: 'Africa/Cairo' })}</p>
+                                    <p><strong>📅 Date:</strong> {new Date(eventData.date).toLocaleDateString('en-US', { timeZone: 'Africa/Cairo' })}</p>
+                                    {eventData.startTime && <p><strong>🕕 Time:</strong> {eventData.startTime} {eventData.endTime ? `- ${eventData.endTime}` : ''}</p>}
+                                    {eventData.cancellationDeadline && <p style={{ color: new Date() > new Date(eventData.cancellationDeadline) ? '#ef4444' : '#f59e0b' }}><strong>⚠️ Cancel Before:</strong> {new Date(eventData.cancellationDeadline).toLocaleString('en-US', { timeZone: 'Africa/Cairo', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>}
                                 </div>
                             </div>
                         </div>
