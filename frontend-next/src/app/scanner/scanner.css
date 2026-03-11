@@ -225,22 +225,25 @@
 /* Responsive */
 @media (max-width: 640px) {
     .scanner-dashboard {
-        padding: 12px;
+        padding: 10px;
     }
 
     .scanner-dash-header {
         flex-direction: column;
         gap: 14px;
         text-align: center;
+        padding: 15px;
     }
 
     .scanner-dash-header-left {
         flex-direction: column;
+        width: 100%;
     }
 
     .scanner-event-card {
         flex-direction: column;
         text-align: center;
+        padding: 15px;
     }
 
     .scanner-event-details {
@@ -250,6 +253,25 @@
     .scanner-scan-btn {
         width: 100%;
         justify-content: center;
+    }
+
+    .scanner-area {
+        padding: 10px;
+        min-height: 350px;
+    }
+
+    #scanner-qr-element {
+        max-width: 100%;
+        border-radius: 8px;
+    }
+
+    .scan-result {
+        padding: 15px;
+    }
+
+    .result-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
     }
 }
 
@@ -263,12 +285,37 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 400px;
+    min-height: 500px;
     background: rgba(21, 21, 28, 0.8);
     border: 1px solid rgba(16, 185, 129, 0.12);
     border-radius: 16px;
-    padding: 30px;
+    padding: 20px;
     backdrop-filter: blur(20px);
+    width: 100%;
+}
+
+.scanner-active {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+#scanner-qr-element {
+    width: 100%;
+    max-width: 600px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 2px solid rgba(16, 185, 129, 0.3);
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+}
+
+#scanner-qr-element video {
+    width: 100% !important;
+    height: auto !important;
+    border-radius: 10px;
+    object-fit: cover;
 }
 
 /* ===== Scanner Buttons ===== */
@@ -357,7 +404,7 @@
 
 .scan-result {
     width: 100%;
-    max-width: 500px;
+    max-width: 700px;
     background: rgba(30, 41, 59, 0.5);
     border-radius: 16px;
     padding: 25px;

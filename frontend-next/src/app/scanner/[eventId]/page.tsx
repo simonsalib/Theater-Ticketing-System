@@ -105,7 +105,11 @@ const ScannerEventPage = () => {
                 { facingMode: 'environment' },
                 {
                     fps: 10,
-                    qrbox: { width: 250, height: 250 },
+                    qrbox: (viewfinderWidth, viewfinderHeight) => {
+                        const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+                        const qrboxSize = Math.floor(minEdgeSize * 0.7);
+                        return { width: qrboxSize, height: qrboxSize };
+                    },
                 },
                 async (decodedText) => {
                     if (isProcessingRef.current) return;
