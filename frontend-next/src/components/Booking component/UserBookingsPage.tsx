@@ -304,6 +304,24 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
         });
     };
 
+    const formatSeatLabel = (seat: { seatLabel?: string; row: string; seatNumber: number }) => {
+        const raw = seat.seatLabel || `${seat.row}${seat.seatNumber}`;
+        const lower = raw.toLowerCase();
+
+        let side = '';
+        if (lower.includes('left side')) side = 'Left Side';
+        else if (lower.includes('right side')) side = 'Right Side';
+
+        if (!side) return raw;
+
+        const base = raw
+            .replace(/-?\s*left side/i, '')
+            .replace(/-?\s*right side/i, '')
+            .trim();
+
+        return `${base} (${side})`;
+    };
+
     if (loading) return (
         <div className="bookings-page-loading">
             <div className="spinner"></div>
@@ -412,7 +430,8 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                                 <span>{booking.numberOfTickets} ticket{booking.numberOfTickets > 1 ? 's' : ''}</span>
                                                 {booking.selectedSeats && booking.selectedSeats.length > 0 && (
                                                     <span style={{ color: '#a78bfa' }}>
-                                                        Seats: {booking.selectedSeats.map(s => s.seatLabel || `${s.row}${s.seatNumber}`).join(', ')}
+                                                        Seats:{' '}
+                                                        {booking.selectedSeats.map(formatSeatLabel).join(', ')}
                                                     </span>
                                                 )}
                                             </span>
@@ -644,7 +663,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                                 <div className="summary-row seats">
                                                     <span>Seats</span>
                                                     <div className="seats-list">
-                                                        {booking.selectedSeats.map(s => s.seatLabel || `${s.row}${s.seatNumber}`).join(', ')}
+                                                        {booking.selectedSeats.map(formatSeatLabel).join(', ')}
                                                     </div>
                                                 </div>
                                             )}

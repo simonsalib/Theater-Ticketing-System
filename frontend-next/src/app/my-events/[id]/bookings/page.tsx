@@ -160,6 +160,24 @@ const EventBookingsPage = () => {
         });
     };
 
+    const formatSeatLabel = (seat: { seatLabel?: string; row: string; seatNumber: number }) => {
+        const raw = seat.seatLabel || `${seat.row}${seat.seatNumber}`;
+        const lower = raw.toLowerCase();
+
+        let side = '';
+        if (lower.includes('left side')) side = 'Left Side';
+        else if (lower.includes('right side')) side = 'Right Side';
+
+        if (!side) return raw;
+
+        const base = raw
+            .replace(/-?\s*left side/i, '')
+            .replace(/-?\s*right side/i, '')
+            .trim();
+
+        return `${base} (${side})`;
+    };
+
     const handleViewReceipt = (receiptBase64?: string) => {
         if (receiptBase64) {
             setSelectedReceipt(receiptBase64);
@@ -330,7 +348,9 @@ const EventBookingsPage = () => {
                                                         <div className="eb-seats-grid">
                                                             {booking.selectedSeats.map((seat, sIdx) => (
                                                                 <div key={sIdx} className="eb-seat-item">
-                                                                    <span className="eb-seat-label">{seat.seatLabel || `${seat.row}${seat.seatNumber}`}</span>
+                                                                    <span className="eb-seat-label">
+                                                                        {formatSeatLabel(seat)}
+                                                                    </span>
                                                                     <span className="eb-seat-type">{seat.seatType}</span>
                                                                     <span className="eb-seat-price">{seat.price} EGP</span>
                                                                     {seat.attendeeName && (
@@ -509,7 +529,9 @@ const EventBookingsPage = () => {
                                                                         borderColor: isRequestedForCancel ? 'rgba(239, 68, 68, 0.4)' : undefined,
                                                                         background: isRequestedForCancel ? 'rgba(239, 68, 68, 0.08)' : undefined,
                                                                     }}>
-                                                                        <span className="eb-seat-label">{seat.seatLabel || `${seat.row}${seat.seatNumber}`}</span>
+                                                                        <span className="eb-seat-label">
+                                                                            {formatSeatLabel(seat)}
+                                                                        </span>
                                                                         <span className="eb-seat-type">{seat.seatType}</span>
                                                                         <span className="eb-seat-price">{seat.price} EGP</span>
                                                                         {isRequestedForCancel && (

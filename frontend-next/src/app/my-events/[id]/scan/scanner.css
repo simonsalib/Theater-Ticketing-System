@@ -432,6 +432,25 @@
         grid-template-columns: 1fr;
     }
 
+    .scanner-area {
+        padding: 16px;
+        min-height: 320px;
+    }
+
+    .scan-result {
+        padding: 20px;
+    }
+
+    .history-item {
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+
+    .history-seat,
+    .history-section {
+        min-width: auto;
+    }
+
     .start-scan-btn {
         padding: 32px;
     }

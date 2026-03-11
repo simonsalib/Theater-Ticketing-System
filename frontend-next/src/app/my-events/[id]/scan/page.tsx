@@ -21,6 +21,7 @@ interface ScanResult {
     seatNumber: number;
     section: string;
     seatType: string;
+    seatLabel?: string;
     attendeeName: string;
     attendeePhone: string;
     isFree: boolean;
@@ -342,8 +343,21 @@ const QRScannerPage = () => {
                                                         <span className="field-value">{scanResult.seatNumber}</span>
                                                     </div>
                                                     <div className="result-field">
-                                                        <span className="field-label">Seat Name</span>
-                                                        <span className="field-value seat-name">{scanResult.seatRow}{scanResult.seatNumber}</span>
+                                                        <span className="field-label">Seat</span>
+                                                        <span className="field-value seat-name">
+                                                            {scanResult.seatLabel || `${scanResult.seatRow}${scanResult.seatNumber}`}
+                                                        </span>
+                                                    </div>
+                                                    <div className="result-field">
+                                                        <span className="field-label">Side</span>
+                                                        <span className="field-value">
+                                                            {(() => {
+                                                                const label = (scanResult.seatLabel || `${scanResult.seatRow}${scanResult.seatNumber}`).toLowerCase();
+                                                                if (label.includes('left')) return 'Left Side';
+                                                                if (label.includes('right')) return 'Right Side';
+                                                                return '—';
+                                                            })()}
+                                                        </span>
                                                     </div>
                                                     <div className="result-field">
                                                         <span className="field-label">Type</span>
@@ -419,7 +433,9 @@ const QRScannerPage = () => {
                                 <div className="history-list">
                                     {scanHistory.map((item, index) => (
                                         <div key={index} className={`history-item ${item.isFree ? 'valid' : 'invalid'}`}>
-                                            <span className="history-seat">{item.seatRow}{item.seatNumber}</span>
+                                            <span className="history-seat">
+                                                {item.seatLabel || `${item.seatRow}${item.seatNumber}`}
+                                            </span>
                                             <span className="history-section">{item.section}</span>
                                             <span className="history-name">{item.attendeeName || item.userName}</span>
                                             <span className={`history-status ${item.isFree ? 'free' : 'not-free'}`}>
