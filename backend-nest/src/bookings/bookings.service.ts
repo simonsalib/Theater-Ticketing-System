@@ -108,7 +108,7 @@ export class BookingsService implements OnModuleInit {
         await this.releaseUserHolds(eventId, userId);
 
         // Create the SeatHold document to get the holdId
-        const holdExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+        const holdExpiresAt = new Date(Date.now() + 3 * 60 * 1000); // 3 minutes
         const normalizedSeats = seats.map(s => ({
             row: String(s.row),
             seatNumber: Number(s.seatNumber),
