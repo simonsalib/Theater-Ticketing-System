@@ -438,6 +438,21 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
                         initial={{ y: 50, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                     >
+                        {selectedSeats.length > 0 && !showAttendeeForm && (
+                            <div className="seat-context-label">
+                                {(() => {
+                                    const lastSeat = selectedSeats[selectedSeats.length - 1];
+                                    const label = lastSeat.seatLabel || `${lastSeat.row}${lastSeat.seatNumber}`;
+                                    return (
+                                        <>
+                                            <span className="seat-context-title">Selected Seat:</span>
+                                            <span className="seat-context-value">{label}</span>
+                                        </>
+                                    );
+                                })()}
+                            </div>
+                        )}
+
                         {error && (
                             <div className="error-inline">
                                 <FiAlertCircle /> {error}

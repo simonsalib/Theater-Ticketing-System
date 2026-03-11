@@ -23,6 +23,7 @@ interface Ticket {
     price: number;
     attendeeName: string;
     attendeePhone: string;
+    seatLabel?: string;
     qrData: string;
     qrCodeImage: string;
     isScanned: boolean;
@@ -185,8 +186,23 @@ const BookingTicketsPage = () => {
         drawInfoRow('Seat Number', String(ticket.seatNumber), rightCol, y);
         y += 55;
         drawInfoRow('Price', `${ticket.price.toFixed(2)} EGP`, leftCol, y);
-        drawInfoRow('Seat', `${ticket.seatRow}${ticket.seatNumber}`, rightCol, y);
+
+        const seatDisplay = ticket.seatLabel || `${ticket.seatRow}${ticket.seatNumber}`;
+        // Derive side text from the label if present
+        const lowerLabel = seatDisplay.toLowerCase();
+        const derivedSide = lowerLabel.includes('left')
+            ? 'Left Side'
+            : lowerLabel.includes('right')
+                ? 'Right Side'
+                : '';
+
+        drawInfoRow('Seat', seatDisplay, rightCol, y);
         y += 55;
+
+        if (derivedSide) {
+            drawInfoRow('Side', derivedSide, leftCol, y);
+            y += 55;
+        }
 
         if (ticket.attendeeName) {
             drawInfoRow('Attendee', ticket.attendeeName, leftCol, y);
@@ -416,7 +432,9 @@ const BookingTicketsPage = () => {
                                     {/* Ticket Info */}
                                     <div className="ticket-info">
                                         <div className="ticket-seat-badge">
-                                            <span className="seat-label">{ticket.seatRow}{ticket.seatNumber}</span>
+                                            <span className="seat-label">
+                                                {ticket.seatLabel || `${ticket.seatRow}${ticket.seatNumber}`}
+                                            </span>
                                             <span className={`seat-type-tag ${ticket.seatType}`}>{ticket.seatType}</span>
                                         </div>
 

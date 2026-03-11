@@ -707,6 +707,30 @@ export class BookingsService implements OnModuleInit {
         const removedSeatsSet = new Set(theater.layout.removedSeats || []);
         const disabledSeatsSet = new Set(theater.layout.disabledSeats || []);
 
+        // Helper to compute human-readable left/right side relative to the stage
+        const computeSeatSide = (
+            section: 'main' | 'balcony',
+            seatNumber: number,
+        ): 'Left Side' | 'Right Side' => {
+            const stagePos = (theater.layout.stage?.position || 'top') as 'top' | 'bottom';
+            const floorLayout = section === 'balcony'
+                ? theater.layout.balcony
+                : theater.layout.mainFloor;
+            const seatsPerRow = floorLayout?.seatsPerRow || 0;
+            if (!seatsPerRow) {
+                return 'Left Side';
+            }
+            const mid = (seatsPerRow + 1) / 2;
+            const isLogicalLeft = seatNumber <= mid;
+
+            // When the stage is at the top, lower seat numbers are visually on the left.
+            // When the stage is at the bottom, flip the visual left/right.
+            if (stagePos === 'top') {
+                return isLogicalLeft ? 'Left Side' : 'Right Side';
+            }
+            return isLogicalLeft ? 'Right Side' : 'Left Side';
+        };
+
         // Main floor
         const mainRows = theater.layout.mainFloor.rows;
         const mainRowLabels = theater.layout.mainFloor.rowLabels || [];
@@ -725,6 +749,7 @@ export class BookingsService implements OnModuleInit {
                 const isDisabled = disabledSeatsSet.has(seatKey);
                 const isActive = !isDisabled && seatConfig?.isActive !== false;
                 const seatType = (seatConfig?.seatType || 'standard').toLowerCase();
+                const side = computeSeatSide('main', s);
 
                 const pricingRecord = event.seatPricing.find(
                     (p: any) => String(p.seatType).toLowerCase() === seatType
@@ -739,7 +764,9 @@ export class BookingsService implements OnModuleInit {
                     isBooked: bookedSeatsSet.has(seatKey),
                     isPending: pendingSeatsSet.has(seatKey) || heldSeatsSet.has(seatKey),
                     price: pricingRecord ? pricingRecord.price : (event.ticketPrice || 0),
-                    seatLabel: seatConfig?.seatLabel,
+                    // Preserve any custom label from the theater config, otherwise enrich with side info
+                    seatLabel: seatConfig?.seatLabel || `${rowLabel}${s} - ${side}`,
+                    side,
                 });
             }
         }
@@ -763,6 +790,7 @@ export class BookingsService implements OnModuleInit {
                     const isDisabled = disabledSeatsSet.has(seatKey);
                     const isActive = !isDisabled && seatConfig?.isActive !== false;
                     const seatType = (seatConfig?.seatType || 'standard').toLowerCase();
+                    const side = computeSeatSide('balcony', s);
 
                     const pricingRecord = event.seatPricing.find(
                         (p: any) => String(p.seatType).toLowerCase() === seatType
@@ -777,7 +805,8 @@ export class BookingsService implements OnModuleInit {
                         isBooked: bookedSeatsSet.has(seatKey),
                         isPending: pendingSeatsSet.has(seatKey) || heldSeatsSet.has(seatKey),
                         price: pricingRecord ? pricingRecord.price : (event.ticketPrice || 0),
-                        seatLabel: seatConfig?.seatLabel,
+                        seatLabel: seatConfig?.seatLabel || `${rowLabel}${s} - ${side}`,
+                        side,
                     });
                 }
             }

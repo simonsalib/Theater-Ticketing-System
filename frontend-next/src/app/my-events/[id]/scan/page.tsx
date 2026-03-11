@@ -25,6 +25,11 @@ interface ScanResult {
     attendeePhone: string;
     isFree: boolean;
     message: string;
+    eventTitle?: string;
+    eventDate?: string;
+    eventLocation?: string;
+    startTime?: string;
+    endTime?: string;
 }
 
 interface ScanStats {
@@ -43,6 +48,10 @@ const QRScannerPage = () => {
     const [scanError, setScanError] = useState<string | null>(null);
     const [stats, setStats] = useState<ScanStats | null>(null);
     const [eventTitle, setEventTitle] = useState('');
+    const [eventDate, setEventDate] = useState('');
+    const [eventLocation, setEventLocation] = useState('');
+    const [startTime, setStartTime] = useState('');
+    const [endTime, setEndTime] = useState('');
     const [scanHistory, setScanHistory] = useState<ScanResult[]>([]);
     const scannerRef = useRef<any>(null);
     const scannerContainerRef = useRef<HTMLDivElement>(null);
@@ -74,6 +83,10 @@ const QRScannerPage = () => {
             const res = await api.get(`/event/${eventId}`);
             const data = res.data.success ? res.data.data : res.data;
             setEventTitle(data.title || '');
+            setEventDate(data.date || '');
+            setEventLocation(data.location || '');
+            setStartTime(data.startTime || '');
+            setEndTime(data.endTime || '');
         } catch (err) {
             console.error('Error fetching event:', err);
         }
@@ -192,6 +205,37 @@ const QRScannerPage = () => {
 
                         <h1>📷 QR Code Scanner</h1>
                         <h2>{eventTitle}</h2>
+                        <div className="scanner-stats" style={{ marginTop: '8px' }}>
+                            {eventDate && (
+                                <div className="stat-item">
+                                    <span className="stat-number" style={{ fontSize: '0.9rem' }}>
+                                        {new Date(eventDate).toLocaleDateString('en-US', {
+                                            timeZone: 'Africa/Cairo',
+                                            year: 'numeric',
+                                            month: 'short',
+                                            day: 'numeric',
+                                        })}
+                                    </span>
+                                    <span className="stat-label">Date</span>
+                                </div>
+                            )}
+                            {startTime && (
+                                <div className="stat-item">
+                                    <span className="stat-number" style={{ fontSize: '0.9rem' }}>
+                                        {startTime} {endTime ? `- ${endTime}` : ''}
+                                    </span>
+                                    <span className="stat-label">Time</span>
+                                </div>
+                            )}
+                            {eventLocation && (
+                                <div className="stat-item">
+                                    <span className="stat-number" style={{ fontSize: '0.9rem' }}>
+                                        {eventLocation}
+                                    </span>
+                                    <span className="stat-label">Location</span>
+                                </div>
+                            )}
+                        </div>
 
                         {/* Stats Bar */}
                         {stats && (

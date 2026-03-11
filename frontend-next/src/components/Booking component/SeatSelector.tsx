@@ -42,7 +42,6 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
     const [seats, setSeats] = useState<Seat[]>(initialSeatsData?.seats || []);
     const [seatPricing, setSeatPricing] = useState<SeatPricing[]>(initialSeatsData?.seatPricing || []);
     const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
-    const [hoveredSeat, setHoveredSeat] = useState<Seat | null>(null);
     const [scale, setScale] = useState(1);
     const [activeSection, setActiveSection] = useState<'main' | 'balcony'>('main');
     const containerRef = React.useRef<HTMLDivElement>(null);
@@ -268,8 +267,6 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                         ...bookedStyles
                     } as any}
                     onClick={() => handleSeatClick(seat)}
-                    onMouseEnter={() => !readOnly && setHoveredSeat(seat)}
-                    onMouseLeave={() => setHoveredSeat(null)}
                     disabled={isSeatDisabled}
                 >
                     {(isSelected || isHighlighted) ? (
@@ -295,6 +292,30 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
             </div>
         ));
     };
+
+    const getSeatSide = useCallback(
+        (section: 'main' | 'balcony', seatNumber: number): 'Left Side' | 'Right Side' => {
+            if (!theaterData) return 'Left Side';
+            const floor =
+                section === 'balcony'
+                    ? theaterData.layout.balcony
+                    : theaterData.layout.mainFloor;
+            const seatsPerRow = floor?.seatsPerRow || 0;
+            if (!seatsPerRow) return 'Left Side';
+
+            const stagePos = (theaterData.layout.stage?.position || 'top') as
+                | 'top'
+                | 'bottom';
+            const mid = (seatsPerRow + 1) / 2;
+            const isLogicalLeft = seatNumber <= mid;
+
+            if (stagePos === 'top') {
+                return isLogicalLeft ? 'Left Side' : 'Right Side';
+            }
+            return isLogicalLeft ? 'Right Side' : 'Left Side';
+        },
+        [theaterData],
+    );
 
     const renderRow = (section: 'main' | 'balcony', rowLabel: string, rowIndex: number) => {
         const floor = section === 'balcony' ? theaterData?.layout.balcony : theaterData?.layout.mainFloor;
@@ -483,9 +504,6 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                     </div>
                 </div>
             </div>
-
-
-
         </div>
     );
 };

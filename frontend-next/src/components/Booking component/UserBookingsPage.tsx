@@ -659,21 +659,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                         <Link href={`/bookings/${booking._id}`} className="view-details-btn">
                                             <FiEye /> Details
                                         </Link>
-                                        {!isCancelled && booking.status === 'confirmed' && !isPrevious && (
-                                            isPastCancellationDeadline ? (
-                                                <span style={{ fontSize: '0.85rem', color: '#ef4444', fontStyle: 'italic', padding: '0.5rem 0' }}>
-                                                    Cancellation deadline passed
-                                                </span>
-                                            ) : (
-                                                <button
-                                                    onClick={() => handleCancelClick(booking._id)}
-                                                    className="cancel-btn"
-                                                    disabled={cancellationLoading}
-                                                >
-                                                    <FiTrash2 /> Cancel
-                                                </button>
-                                            )
-                                        )}
+                                        {/* Direct cancel for confirmed bookings has been removed; users should use the request cancellation flow instead */}
                                         {!isCancelled && isPending && booking.isReceiptUploaded && booking.hasTheaterSeating && (
                                             <>
                                                 {booking.cancellationRequest?.status === 'pending' && (

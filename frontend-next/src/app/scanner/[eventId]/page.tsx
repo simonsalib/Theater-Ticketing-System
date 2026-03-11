@@ -300,8 +300,21 @@ const ScannerEventPage = () => {
                                                     <span className="field-value">{scanResult.seatRow}</span>
                                                 </div>
                                                 <div className="result-field">
-                                                    <span className="field-label">Seat</span>
-                                                    <span className="field-value seat-name">{scanResult.seatLabel || `${scanResult.seatRow}${scanResult.seatNumber}`}</span>
+                                                <span className="field-label">Seat</span>
+                                                <span className="field-value seat-name">
+                                                    {scanResult.seatLabel || `${scanResult.seatRow}${scanResult.seatNumber}`}
+                                                </span>
+                                            </div>
+                                            <div className="result-field">
+                                                <span className="field-label">Side</span>
+                                                <span className="field-value">
+                                                    {(() => {
+                                                        const label = (scanResult.seatLabel || `${scanResult.seatRow}${scanResult.seatNumber}`).toLowerCase();
+                                                        if (label.includes('left')) return 'Left Side';
+                                                        if (label.includes('right')) return 'Right Side';
+                                                        return '—';
+                                                    })()}
+                                                </span>
                                                 </div>
                                                 <div className="result-field">
                                                     <span className="field-label">Status</span>
