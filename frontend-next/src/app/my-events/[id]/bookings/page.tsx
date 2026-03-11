@@ -5,7 +5,7 @@ import api from '@/services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     FiArrowLeft, FiCheckCircle, FiXCircle, FiClock,
-    FiUser, FiPhone, FiMail, FiAlertCircle, FiGrid, FiEye, FiX, FiCamera, FiRotateCcw
+    FiUser, FiPhone, FiMail, FiAlertCircle, FiGrid, FiEye, FiX, FiCamera, FiRotateCcw, FiDownload
 } from 'react-icons/fi';
 import { ProtectedRoute } from '@/auth/ProtectedRoute';
 import { toast } from 'react-toastify';
@@ -178,6 +178,62 @@ const EventBookingsPage = () => {
         }
     };
 
+    const handleExportCSV = () => {
+        if (bookings.length === 0) {
+            toast.info('No bookings to export.');
+            return;
+        }
+
+        // CSV Header
+        const headers = ['Seat', 'First Name', 'Last Name', 'Phone Number', 'Status', 'User Name', 'User Email'];
+        
+        // Flatten bookings to one row per seat
+        const rows = bookings.flatMap(booking => {
+            if (booking.hasTheaterSeating && booking.selectedSeats && booking.selectedSeats.length > 0) {
+                return booking.selectedSeats.map(seat => [
+                    formatSeatLabel(seat),
+                    seat.attendeeFirstName || '',
+                    seat.attendeeLastName || '',
+                    seat.attendeePhone || '',
+                    booking.status,
+                    booking.StandardId?.name || '',
+                    booking.StandardId?.email || ''
+                ]);
+            } else {
+                return Array(booking.numberOfTickets).fill(0).map(() => [
+                    'N/A',
+                    '',
+                    '',
+                    '',
+                    booking.status,
+                    booking.StandardId?.name || '',
+                    booking.StandardId?.email || ''
+                ]);
+            }
+        });
+
+        // Combine headers and rows
+        const BOM = '\uFEFF';
+        const csvContent = BOM + [
+            `"Event:","${eventTitle.replace(/"/g, '""')}"`,
+            `"Exported Details for all chairs"`,
+            '',
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(','))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${eventTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_guest_list.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success('Guest list downloaded!');
+    };
+
     const pendingCount = bookings.filter(b => b.status === 'pending').length;
     const confirmedCount = bookings.filter(b => b.status === 'confirmed').length;
     const rejectedCount = bookings.filter(b => b.status === 'rejected').length;
@@ -201,24 +257,45 @@ const EventBookingsPage = () => {
                         >
                             <FiArrowLeft size={18} /> Back to My Events
                         </motion.button>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                            <h1 style={{ margin: 0 }}>Bookings for &quot;{eventTitle}&quot; {isExpired && <span style={{ color: '#ef4444', fontSize: '1rem', marginLeft: '10px' }}>(Read-Only)</span>}</h1>
-                            {!isExpired && (
-                                <motion.button
-                                    onClick={() => router.push(`/my-events/${eventId}/scan`)}
-                                    whileHover={{ scale: 1.03 }}
-                                    whileTap={{ scale: 0.97 }}
-                                    style={{
-                                        display: 'flex', alignItems: 'center', gap: '8px',
-                                        background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: 'white', border: 'none',
-                                        padding: '10px 20px', borderRadius: '12px', cursor: 'pointer', fontWeight: 600,
-                                        fontSize: '0.9rem', boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)',
-                                        whiteSpace: 'nowrap'
-                                    }}
-                                >
-                                    <FiCamera size={16} /> Scan QR Codes
-                                </motion.button>
-                            )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                                <h1 style={{ margin: 0 }}>Bookings for &quot;{eventTitle}&quot; {isExpired && <span style={{ color: '#ef4444', fontSize: '1rem', marginLeft: '10px' }}>(Read-Only)</span>}</h1>
+                                
+                                <div style={{ display: 'flex', gap: '12px' }}>
+                                    <motion.button
+                                        onClick={handleExportCSV}
+                                        whileHover={{ scale: 1.03 }}
+                                        whileTap={{ scale: 0.97 }}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: '8px',
+                                            background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', 
+                                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                                            padding: '10px 20px', borderRadius: '12px', cursor: 'pointer', fontWeight: 600,
+                                            fontSize: '0.9rem', transition: 'all 0.2s',
+                                            whiteSpace: 'nowrap'
+                                        }}
+                                    >
+                                        <FiDownload size={16} /> Download Guest List
+                                    </motion.button>
+
+                                    {!isExpired && (
+                                        <motion.button
+                                            onClick={() => router.push(`/my-events/${eventId}/scan`)}
+                                            whileHover={{ scale: 1.03 }}
+                                            whileTap={{ scale: 0.97 }}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: '8px',
+                                                background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: 'white', border: 'none',
+                                                padding: '10px 20px', borderRadius: '12px', cursor: 'pointer', fontWeight: 600,
+                                                fontSize: '0.9rem', boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)',
+                                                whiteSpace: 'nowrap'
+                                            }}
+                                        >
+                                            <FiCamera size={16} /> Scan QR Codes
+                                        </motion.button>
+                                    )}
+                                </div>
+                            </div>
                         </div>
 
                         {/* Stats */}
