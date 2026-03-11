@@ -122,7 +122,8 @@
 }
 
 .whatsapp-support {
-  color: #25D366 !important; /* WhatsApp Green */
+  color: #25D366 !important;
+  /* WhatsApp Green */
   font-weight: 600;
   display: flex !important;
   align-items: center;
@@ -130,7 +131,7 @@
 }
 
 .whatsapp-icon {
-  font-size: 1.2rem;
+  font-size: 2rem;
 }
 
 .whatsapp-support:hover {
