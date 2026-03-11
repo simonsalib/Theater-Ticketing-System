@@ -178,60 +178,130 @@ const EventBookingsPage = () => {
         }
     };
 
-    const handleExportCSV = () => {
-        if (bookings.length === 0) {
-            toast.info('No bookings to export.');
-            return;
-        }
-
-        // CSV Header
-        const headers = ['Seat', 'First Name', 'Last Name', 'Phone Number', 'Status', 'User Name', 'User Email'];
-        
-        // Flatten bookings to one row per seat
-        const rows = bookings.flatMap(booking => {
-            if (booking.hasTheaterSeating && booking.selectedSeats && booking.selectedSeats.length > 0) {
-                return booking.selectedSeats.map(seat => [
-                    formatSeatLabel(seat),
-                    seat.attendeeFirstName || '',
-                    seat.attendeeLastName || '',
-                    seat.attendeePhone || '',
-                    booking.status,
-                    booking.StandardId?.name || '',
-                    booking.StandardId?.email || ''
-                ]);
-            } else {
-                return Array(booking.numberOfTickets).fill(0).map(() => [
-                    'N/A',
-                    '',
-                    '',
-                    '',
-                    booking.status,
-                    booking.StandardId?.name || '',
-                    booking.StandardId?.email || ''
-                ]);
+    const handleExportFullReport = async () => {
+        try {
+            setActionLoading('export-full');
+            const response = await api.get<any>(`/booking/event/${eventId}/seats`);
+            
+            if (!response.data.success) {
+                throw new Error('Failed to fetch theater layout');
             }
-        });
 
-        // Combine headers and rows
-        const BOM = '\uFEFF';
-        const csvContent = BOM + [
-            `"Event:","${eventTitle.replace(/"/g, '""')}"`,
-            `"Exported Details for all chairs"`,
-            '',
-            headers.join(','),
-            ...rows.map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(','))
-        ].join('\n');
+            const allLayoutSeats: any[] = response.data.data.seats;
+            
+            // Map of active bookings (Confirmed or Pending) by seat key
+            // We ignore Rejected bookings as per user request ("dont give me rejected chairs")
+            const activeBookingsMap = new Map<string, { seat: BookingSeat, status: string, user: BookingUser }>();
+            
+            bookings.forEach(booking => {
+                if (booking.status === 'confirmed' || booking.status === 'pending') {
+                    booking.selectedSeats?.forEach(seat => {
+                        const key = `${seat.section}-${seat.row}-${seat.seatNumber}`;
+                        activeBookingsMap.set(key, { 
+                            seat, 
+                            status: booking.status === 'confirmed' ? 'Confirmed' : 'Pending',
+                            user: booking.StandardId
+                        });
+                    });
+                }
+            });
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', `${eventTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_guest_list.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        toast.success('Guest list downloaded!');
+            // Identity rejected seats to exclude them if needed
+            const rejectedSeatsSet = new Set<string>();
+            bookings.forEach(booking => {
+                if (booking.status === 'rejected') {
+                    booking.selectedSeats?.forEach(seat => {
+                        rejectedSeatsSet.add(`${seat.section}-${seat.row}-${seat.seatNumber}`);
+                    });
+                }
+            });
+
+            // Filter and Map seats for CSV
+            const reportData = allLayoutSeats
+                .filter(layoutSeat => {
+                    const key = `${layoutSeat.section}-${layoutSeat.row}-${layoutSeat.seatNumber}`;
+                    // Exclude seats that are currently rejected
+                    return !rejectedSeatsSet.has(key);
+                })
+                .map(layoutSeat => {
+                    const key = `${layoutSeat.section}-${layoutSeat.row}-${layoutSeat.seatNumber}`;
+                    const activeInfo = activeBookingsMap.get(key);
+                    
+                    if (activeInfo) {
+                        return [
+                            layoutSeat.seatLabel || `${layoutSeat.row}${layoutSeat.seatNumber}`,
+                            activeInfo.seat.attendeeFirstName || '',
+                            activeInfo.seat.attendeeLastName || '',
+                            activeInfo.seat.attendeePhone || '',
+                            activeInfo.status
+                        ];
+                    } else {
+                        return [
+                            layoutSeat.seatLabel || `${layoutSeat.row}${layoutSeat.seatNumber}`,
+                            '',
+                            '',
+                            '',
+                            'Free'
+                        ];
+                    }
+                });
+
+            // Sort: Section (Main > Balcony), Row (A > Z), Seat Number (1 > ...)
+            reportData.sort((a, b) => {
+                // We don't have section info directly in the processed array easily, 
+                // but we can re-derive it or just use the label if it's formatted.
+                // Better to sort by the raw layout seat objects first.
+                return 0; // Handled below by sorting the layout seats first
+            });
+
+            // Re-doing the map with sorting from the start
+            const sortedLayoutSeats = [...allLayoutSeats]
+                .filter(ls => !rejectedSeatsSet.has(`${ls.section}-${ls.row}-${ls.seatNumber}`))
+                .sort((a, b) => {
+                    if (a.section !== b.section) return a.section === 'main' ? -1 : 1;
+                    if (a.row !== b.row) return a.row.localeCompare(b.row);
+                    return a.seatNumber - b.seatNumber;
+                });
+
+            const rows = sortedLayoutSeats.map(ls => {
+                const key = `${ls.section}-${ls.row}-${ls.seatNumber}`;
+                const activeInfo = activeBookingsMap.get(key);
+                return [
+                    ls.seatLabel || `${ls.row}${ls.seatNumber}`,
+                    activeInfo ? (activeInfo.seat.attendeeFirstName || '') : '',
+                    activeInfo ? (activeInfo.seat.attendeeLastName || '') : '',
+                    activeInfo ? (activeInfo.seat.attendeePhone || '') : '',
+                    activeInfo ? activeInfo.status : 'Free'
+                ];
+            });
+
+            // CSV Header
+            const headers = ['Seat', 'First Name', 'Last Name', 'Phone Number', 'Status'];
+            const BOM = '\uFEFF';
+            const csvContent = BOM + [
+                `"Event:","${eventTitle.replace(/"/g, '""')}"`,
+                `"Theater Seating Report (Active & Free Chairs)"`,
+                '',
+                headers.join(','),
+                ...rows.map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(','))
+            ].join('\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `${eventTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_theater_report.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast.success('Full theater report downloaded!');
+        } catch (err: any) {
+            console.error('Error exporting full report:', err);
+            toast.error('Failed to export theater report.');
+        } finally {
+            setActionLoading(null);
+        }
     };
 
     const pendingCount = bookings.filter(b => b.status === 'pending').length;
@@ -263,7 +333,8 @@ const EventBookingsPage = () => {
                                 
                                 <div style={{ display: 'flex', gap: '12px' }}>
                                     <motion.button
-                                        onClick={handleExportCSV}
+                                        onClick={handleExportFullReport}
+                                        disabled={actionLoading === 'export-full'}
                                         whileHover={{ scale: 1.03 }}
                                         whileTap={{ scale: 0.97 }}
                                         style={{
@@ -272,10 +343,11 @@ const EventBookingsPage = () => {
                                             border: '1px solid rgba(16, 185, 129, 0.3)',
                                             padding: '10px 20px', borderRadius: '12px', cursor: 'pointer', fontWeight: 600,
                                             fontSize: '0.9rem', transition: 'all 0.2s',
-                                            whiteSpace: 'nowrap'
+                                            whiteSpace: 'nowrap',
+                                            opacity: actionLoading === 'export-full' ? 0.6 : 1
                                         }}
                                     >
-                                        <FiDownload size={16} /> Download Guest List
+                                        <FiDownload size={16} /> {actionLoading === 'export-full' ? 'Exporting...' : 'Download Full Report'}
                                     </motion.button>
 
                                     {!isExpired && (
