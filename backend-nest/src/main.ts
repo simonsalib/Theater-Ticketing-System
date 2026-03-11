@@ -20,7 +20,7 @@ async function bootstrap() {
   });
 
   // ✅ IMPORTANT: Use Azure-provided port
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 8000;
   await app.listen(port);
 
   console.log(`Backend running on port ${port}`);

@@ -305,21 +305,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
     };
 
     const formatSeatLabel = (seat: { seatLabel?: string; row: string; seatNumber: number }) => {
-        const raw = seat.seatLabel || `${seat.row}${seat.seatNumber}`;
-        const lower = raw.toLowerCase();
-
-        let side = '';
-        if (lower.includes('left side')) side = 'Left Side';
-        else if (lower.includes('right side')) side = 'Right Side';
-
-        if (!side) return raw;
-
-        const base = raw
-            .replace(/-?\s*left side/i, '')
-            .replace(/-?\s*right side/i, '')
-            .trim();
-
-        return `${base} (${side})`;
+        return seat.seatLabel || `${seat.row}${seat.seatNumber}`;
     };
 
     if (loading) return (

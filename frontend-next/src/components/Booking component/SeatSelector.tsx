@@ -114,6 +114,30 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
         return stagePos === 'bottom' ? [...labels].reverse() : labels;
     }, [theaterData, generateRowLabels]);
 
+    const getSeatSide = useCallback(
+        (section: 'main' | 'balcony', seatNumber: number): 'Left Side' | 'Right Side' => {
+            if (!theaterData) return 'Left Side';
+            const floor =
+                section === 'balcony'
+                    ? theaterData.layout.balcony
+                    : theaterData.layout.mainFloor;
+            const seatsPerRow = floor?.seatsPerRow || 0;
+            if (!seatsPerRow) return 'Left Side';
+
+            const stagePos = (theaterData.layout.stage?.position || 'top') as
+                | 'top'
+                | 'bottom';
+            const mid = (seatsPerRow + 1) / 2;
+            const isLogicalLeft = seatNumber <= mid;
+
+            if (stagePos === 'top') {
+                return isLogicalLeft ? 'Left Side' : 'Right Side';
+            }
+            return isLogicalLeft ? 'Right Side' : 'Left Side';
+        },
+        [theaterData],
+    );
+
     // Handle seat click
     const handleSeatClick = useCallback((seat: Seat) => {
         if (readOnly || seat.isBooked || seat.isPending || !seat.isActive) return;
@@ -133,9 +157,14 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                 );
             }
             if (prev.length >= maxSeats) return prev;
-            return [...prev, seat];
+
+            const side = getSeatSide(seat.section as 'main' | 'balcony', seat.seatNumber);
+            const labelWithSide = `${seat.row} (${side}) ${seat.seatNumber}`;
+            const augmentedSeat = { ...seat, seatLabel: labelWithSide };
+
+            return [...prev, augmentedSeat];
         });
-    }, [maxSeats]);
+    }, [maxSeats, getSeatSide, readOnly]);
 
     // Calculate total price
     const totalPrice = useMemo(() => {
@@ -293,29 +322,6 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
         ));
     };
 
-    const getSeatSide = useCallback(
-        (section: 'main' | 'balcony', seatNumber: number): 'Left Side' | 'Right Side' => {
-            if (!theaterData) return 'Left Side';
-            const floor =
-                section === 'balcony'
-                    ? theaterData.layout.balcony
-                    : theaterData.layout.mainFloor;
-            const seatsPerRow = floor?.seatsPerRow || 0;
-            if (!seatsPerRow) return 'Left Side';
-
-            const stagePos = (theaterData.layout.stage?.position || 'top') as
-                | 'top'
-                | 'bottom';
-            const mid = (seatsPerRow + 1) / 2;
-            const isLogicalLeft = seatNumber <= mid;
-
-            if (stagePos === 'top') {
-                return isLogicalLeft ? 'Left Side' : 'Right Side';
-            }
-            return isLogicalLeft ? 'Right Side' : 'Left Side';
-        },
-        [theaterData],
-    );
 
     const renderRow = (section: 'main' | 'balcony', rowLabel: string, rowIndex: number) => {
         const floor = section === 'balcony' ? theaterData?.layout.balcony : theaterData?.layout.mainFloor;

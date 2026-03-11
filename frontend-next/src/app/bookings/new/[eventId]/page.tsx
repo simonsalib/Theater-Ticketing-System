@@ -341,6 +341,7 @@ const BookTicketPage = () => {
                     row: seat.row,
                     seatNumber: seat.seatNumber,
                     section: seat.section,
+                    seatLabel: seat.seatLabel,
                     attendeeName: attendeeInfo[index]?.attendeeName || '',
                     attendeePhone: attendeeInfo[index]?.attendeePhone || '',
                 }));
