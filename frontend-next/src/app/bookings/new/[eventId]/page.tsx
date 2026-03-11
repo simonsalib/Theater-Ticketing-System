@@ -15,6 +15,7 @@ import { Event } from '@/types/event';
 import { Seat } from '@/types/booking';
 import CancelSeatsModal from '@/components/Booking component/CancelSeatsModal';
 import { toast } from 'react-toastify';
+import { API_BASE_URL } from '../../../../config';
 import { useLanguage } from '@/contexts/LanguageContext';
 import '@/components/Booking component/BookingTicketForm.css';
 
@@ -112,8 +113,13 @@ const BookTicketPage = () => {
                 // Fetch theater seats eagerly
                 const seatsPromise = api.get<any>(`/booking/event/${eventId}/seats`).catch(e => null);
 
-                // Wait for all three
-                const [eventResponse, bookingsResponse, seatsResponse] = await Promise.all([eventPromise, bookingsPromise, seatsPromise]);
+                // Fetch active hold if logged in
+                const holdPromise = token ? api.get(`/booking/active-hold/${eventId}`).catch(e => null) : Promise.resolve(null);
+
+                // Wait for all
+                const [eventResponse, bookingsResponse, seatsResponse, holdResponse] = await Promise.all([
+                    eventPromise, bookingsPromise, seatsPromise, holdPromise
+                ]);
 
                 // Process event
                 const eventData = eventResponse.data.success ? eventResponse.data.data : eventResponse.data;
@@ -150,6 +156,30 @@ const BookTicketPage = () => {
                     setInitialSeatsData(seatsResponse.data.data);
                 }
 
+                // Check for active hold to recover session
+                if (holdResponse && holdResponse.data && holdResponse.data.data) {
+                    const activeHold = holdResponse.data.data;
+                    if (activeHold.seats && activeHold.seats.length > 0) {
+                        setHoldId(activeHold._id);
+                        holdIdRef.current = activeHold._id;
+                        setHoldExpiresAt(new Date(activeHold.expiresAt));
+
+                        // Transform held seats to the format expected by the attendee form
+                        const recoveredSeats = activeHold.seats.map((s: any) => ({
+                            row: s.row,
+                            seatNumber: s.seatNumber,
+                            section: s.section,
+                            seatLabel: s.seatLabel || `${s.row}${s.seatNumber}`,
+                            seatType: s.seatType || 'standard',
+                            price: s.price || 0
+                        }));
+
+                        setSelectedSeats(recoveredSeats);
+                        setShowAttendeeForm(true);
+                        setNumberOfTickets(recoveredSeats.length);
+                    }
+                }
+
             } catch (err: any) {
                 console.error("Error fetching event data:", err);
                 setError(err.response?.data?.message || "Failed to load event details");
@@ -165,12 +195,15 @@ const BookTicketPage = () => {
     useEffect(() => {
         if (!holdExpiresAt || !showAttendeeForm) return;
 
-        const tick = () => {
+        const tick = async () => {
             const remaining = Math.max(0, Math.floor((holdExpiresAt.getTime() - Date.now()) / 1000));
             setHoldCountdown(remaining);
 
             if (remaining <= 0) {
-                // Hold expired — go back to seat selection
+                // Hold expired — release explicitly and go back to seat selection
+                if (holdIdRef.current) {
+                    api.delete(`/booking/hold-seats/${holdIdRef.current}`).catch(() => { });
+                }
                 toast.warning('Your seat hold has expired. Please select seats again.');
                 setShowAttendeeForm(false);
                 setHoldId(null);
@@ -190,23 +223,31 @@ const BookTicketPage = () => {
     }, [holdId]);
 
     useEffect(() => {
-        const releaseOnUnload = () => {
+        const releaseHoldReliably = () => {
             if (holdIdRef.current) {
-                // Use sendBeacon for reliable cleanup on page close
                 const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-                if (token) {
-                    navigator.sendBeacon(
-                        `/api/v1/booking/hold-seats/${holdIdRef.current}`,
-                        '' // sendBeacon can't do DELETE, but we'll handle via the API proxy
-                    );
-                }
+                const url = `${API_BASE_URL}/booking/hold-seats/${holdIdRef.current}`;
+
+                // Use fetch with keepalive for maximum reliability on page close/refresh
+                fetch(url, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                    },
+                    keepalive: true
+                }).catch(() => { });
             }
         };
 
-        window.addEventListener('beforeunload', releaseOnUnload);
+        const handleBeforeUnload = () => {
+            releaseHoldReliably();
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+
         return () => {
-            window.removeEventListener('beforeunload', releaseOnUnload);
-            // Cleanup hold when component unmounts
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            // Also cleanup when component unmounts (navigating away within app)
             if (holdIdRef.current) {
                 api.delete(`/booking/hold-seats/${holdIdRef.current}`).catch(() => { });
             }
@@ -325,7 +366,7 @@ const BookTicketPage = () => {
                 holdIdRef.current = newHoldId;
                 setHoldExpiresAt(new Date(expiresAt));
                 setSelectedSeats(remainingSeats);
-                
+
                 // Recalculate total price
                 const newTotal = remainingSeats.reduce((sum, s) => sum + (s.price || 0), 0);
                 setSeatTotalPrice(newTotal);
@@ -774,7 +815,7 @@ const BookTicketPage = () => {
                                                 <h3>Attendee Information</h3>
                                                 <p>Enter name and phone for each seat</p>
                                             </div>
-                                             {holdExpiresAt && holdCountdown > 0 && (
+                                            {holdExpiresAt && holdCountdown > 0 && (
                                                 <div style={{
                                                     marginLeft: 'auto',
                                                     display: 'flex',

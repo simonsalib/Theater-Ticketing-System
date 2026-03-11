@@ -37,6 +37,13 @@ export class BookingsController {
         return { success: true, message: 'Hold released' };
     }
 
+    @Get('active-hold/:eventId')
+    @UseGuards(JwtAuthGuard)
+    async getActiveHold(@Param('eventId') eventId: string, @Req() req: any) {
+        const data = await this.bookingsService.findActiveHold(eventId, req.user._id);
+        return { success: true, data };
+    }
+
     // ─── Booking Endpoints ───────────────────────────────────────────
 
     @Post()

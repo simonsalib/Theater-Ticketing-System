@@ -182,6 +182,17 @@ export class BookingsService implements OnModuleInit {
     }
 
     /**
+     * Find an active seat hold for a specific user and event.
+     */
+    async findActiveHold(eventId: string, userId: string): Promise<SeatHoldDocument | null> {
+        return this.seatHoldModel.findOne({
+            eventId,
+            userId,
+            expiresAt: { $gt: new Date() },
+        } as any).exec();
+    }
+
+    /**
      * Release a specific seat hold.
      */
     async releaseHold(holdId: string, userId: string): Promise<void> {
