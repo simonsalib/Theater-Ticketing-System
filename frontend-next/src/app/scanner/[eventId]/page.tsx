@@ -175,43 +175,39 @@ const ScannerEventPage = () => {
                 <div className="scanner-dash-bg"></div>
 
                 <div className="scanner-dash-container">
-                    {/* Header */}
-                    <div className="scanner-dash-header" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-                        <div className="scanner-dash-header-left" style={{ width: '100%', marginBottom: '15px' }}>
-                            <button
-                                className="scanner-logout-btn"
-                                onClick={() => router.push('/scanner')}
-                                style={{ padding: '8px 12px' }}
-                            >
-                                <FiArrowLeft size={16} /> Back
-                            </button>
-                            <div style={{ marginLeft: '10px' }}>
-                                <h1 style={{ fontSize: '1.2rem', marginBottom: '4px' }}>📷 QR Code Scanner</h1>
-                                <p style={{ fontSize: '0.9rem', color: '#94a3b8', margin: 0 }}>{eventTitle}</p>
+                    {/* Compact App Header */}
+                    <div className="scanner-dash-header-compact">
+                        <div className="scanner-header-main" onClick={() => router.push('/scanner')} style={{ cursor: 'pointer' }}>
+                            <div className="scanner-back-btn">
+                                <FiArrowLeft size={20} />
+                            </div>
+                            <div className="scanner-user-info">
+                                <h1 className="truncate-title">{eventTitle || 'Scanning...'}</h1>
+                                <span className="scanner-role-badge">Event Scanner</span>
                             </div>
                         </div>
-
-                        {stats && (
-                            <div className="scanner-dash-header-left" style={{ width: '100%', justifyContent: 'space-between', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '10px' }}>
-                                <div style={{ textAlign: 'center' }}>
-                                    <span style={{ display: 'block', fontSize: '1.1rem', fontWeight: 'bold', color: '#f8fafc' }}>{stats.total}</span>
-                                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Total</span>
-                                </div>
-                                <div style={{ textAlign: 'center' }}>
-                                    <span style={{ display: 'block', fontSize: '1.1rem', fontWeight: 'bold', color: '#10b981' }}>{stats.scanned}</span>
-                                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Scanned</span>
-                                </div>
-                                <div style={{ textAlign: 'center' }}>
-                                    <span style={{ display: 'block', fontSize: '1.1rem', fontWeight: 'bold', color: '#f59e0b' }}>{stats.remaining}</span>
-                                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Remaining</span>
-                                </div>
-                                <div style={{ textAlign: 'center' }}>
-                                    <span style={{ display: 'block', fontSize: '1.1rem', fontWeight: 'bold', color: '#3b82f6' }}>{stats.percentage}%</span>
-                                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Progress</span>
-                                </div>
-                            </div>
-                        )}
                     </div>
+
+                    {/* Stats HUD - Mobile Optimized */}
+                    {stats && (
+                        <div className="scanner-stats-hud">
+                            <div className="stat-hud-item">
+                                <span className="stat-hud-val">{stats.scanned}</span>
+                                <span className="stat-hud-lbl">Scanned</span>
+                            </div>
+                            <div className="stat-hud-divider"></div>
+                            <div className="stat-hud-item">
+                                <span className="stat-hud-val">{stats.remaining}</span>
+                                <span className="stat-hud-lbl">Left</span>
+                            </div>
+                            <div className="stat-hud-divider"></div>
+                            <div className="stat-hud-item">
+                                <span className="stat-hud-val">{stats.percentage}%</span>
+                                <span className="stat-hud-lbl">Done</span>
+                            </div>
+                        </div>
+                    )}
+
 
                     <div className="scanner-body">
                         <div className="scanner-area">
@@ -305,21 +301,21 @@ const ScannerEventPage = () => {
                                                     <span className="field-value">{scanResult.seatRow}</span>
                                                 </div>
                                                 <div className="result-field">
-                                                <span className="field-label">Seat</span>
-                                                <span className="field-value seat-name">
-                                                    {scanResult.seatLabel || `${scanResult.seatRow}${scanResult.seatNumber}`}
-                                                </span>
-                                            </div>
-                                            <div className="result-field">
-                                                <span className="field-label">Side</span>
-                                                <span className="field-value">
-                                                    {(() => {
-                                                        const label = (scanResult.seatLabel || `${scanResult.seatRow}${scanResult.seatNumber}`).toLowerCase();
-                                                        if (label.includes('left')) return 'Left Side';
-                                                        if (label.includes('right')) return 'Right Side';
-                                                        return '—';
-                                                    })()}
-                                                </span>
+                                                    <span className="field-label">Seat</span>
+                                                    <span className="field-value seat-name">
+                                                        {scanResult.seatLabel || `${scanResult.seatRow}${scanResult.seatNumber}`}
+                                                    </span>
+                                                </div>
+                                                <div className="result-field">
+                                                    <span className="field-label">Side</span>
+                                                    <span className="field-value">
+                                                        {(() => {
+                                                            const label = (scanResult.seatLabel || `${scanResult.seatRow}${scanResult.seatNumber}`).toLowerCase();
+                                                            if (label.includes('left')) return 'Left Side';
+                                                            if (label.includes('right')) return 'Right Side';
+                                                            return '—';
+                                                        })()}
+                                                    </span>
                                                 </div>
                                                 <div className="result-field">
                                                     <span className="field-label">Status</span>

@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/auth/AuthContext';
 import { useLanguage, Language } from '@/contexts/LanguageContext';
 
@@ -11,7 +11,13 @@ const Navbar: React.FC = () => {
     const { user, isAuthenticated, isAdmin, isOrganizer, logout } = useAuth();
     const { language, setLanguage, t } = useLanguage();
     const router = useRouter();
+    const pathname = usePathname();
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+
+    // Hide navbar for scanner routes
+    if (pathname?.startsWith('/scanner')) {
+        return null;
+    }
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [scrolled, setScrolled] = useState(false);
     const [showLangMenu, setShowLangMenu] = useState(false);

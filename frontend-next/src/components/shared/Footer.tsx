@@ -1,12 +1,19 @@
 'use client';
 import React from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import './Footer.css';
 
 const Footer: React.FC = () => {
     const currentYear = new Date().getFullYear();
     const { t } = useLanguage();
+    const pathname = usePathname();
+
+    // Hide footer for scanner routes
+    if (pathname?.startsWith('/scanner')) {
+        return null;
+    }
 
     return (
         <footer className="footer">

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/auth/AuthContext';
 import { ProtectedRoute } from '@/auth/ProtectedRoute';
 import api from '@/services/api';
-import { FiCamera, FiCalendar, FiMapPin, FiClock, FiLogOut } from 'react-icons/fi';
+import { FiCamera, FiCalendar, FiMapPin, FiClock, FiLogOut, FiRefreshCw } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import './scanner.css';
 
@@ -86,21 +86,38 @@ const ScannerDashboard = () => {
                 <div className="scanner-dash-bg"></div>
 
                 <div className="scanner-dash-container">
-                    {/* Header */}
-                    <div className="scanner-dash-header">
-                        <div className="scanner-dash-header-left">
-                            <div className="scanner-dash-avatar">
-                                <FiCamera size={24} />
+                    {/* Modern Standalone Header */}
+                    <div className="scanner-dash-header-compact">
+                        <div className="scanner-header-main">
+                            <div className="scanner-app-badge">
+                                <FiCamera size={22} />
                             </div>
-                            <div>
+                            <div className="scanner-user-info">
                                 <h1>{user?.name || 'Scanner'}</h1>
-                                <p>QR Code Scanner</p>
+                                <span className="scanner-role-badge">Official Scanner</span>
                             </div>
                         </div>
-                        <button className="scanner-logout-btn" onClick={handleLogout}>
-                            <FiLogOut size={18} />
-                            Logout
+                        <button className="scanner-logout-circle" onClick={handleLogout} title="Logout">
+                            <FiLogOut size={20} />
                         </button>
+                    </div>
+
+                    {/* Quick Controls */}
+                    <div className="scanner-quick-controls">
+                        <div className="quick-control-card active">
+                            <div className="qc-icon"><FiCalendar /></div>
+                            <div className="qc-text">
+                                <h3>Scan Events</h3>
+                                <p>Select event to scan</p>
+                            </div>
+                        </div>
+                        <div className="quick-control-card" onClick={() => window.location.reload()}>
+                            <div className="qc-icon"><FiRefreshCw /></div>
+                            <div className="qc-text">
+                                <h3>Sync Data</h3>
+                                <p>Update event list</p>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Events List */}
