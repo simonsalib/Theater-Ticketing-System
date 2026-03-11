@@ -43,6 +43,7 @@ const Footer: React.FC = () => {
                     <h3>{t('footer.contactUs')}</h3>
                     <div className="contact-info">
                         <a href="mailto:Youthmeeting@gmail.com">Youthmeeting@gmail.com</a>
+                        <a href="https://wa.me/message/3EXT2TKWUGFII1" target="_blank" rel="noopener noreferrer" className="whatsapp-support">WhatsApp Support</a>
                     </div>
                 </div>
             </div>

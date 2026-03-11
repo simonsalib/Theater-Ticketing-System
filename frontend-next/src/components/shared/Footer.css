@@ -110,6 +110,26 @@
   font-size: 0.95rem;
 }
 
+.contact-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.contact-info a {
+  display: block;
+  word-break: break-all;
+}
+
+.whatsapp-support {
+  color: #25D366 !important; /* WhatsApp Green */
+  font-weight: 600;
+}
+
+.whatsapp-support:hover {
+  text-shadow: 0 0 8px rgba(37, 211, 102, 0.4);
+}
+
 @media (max-width: 768px) {
   .footer {
     box-shadow: none !important;
