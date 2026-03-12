@@ -71,6 +71,39 @@ export class BookingsService implements OnModuleInit {
                 await this.bookingModel.findByIdAndDelete(booking._id).exec();
                 this.logger.log(`Expired pending booking ${booking._id} cleaned up`);
             }
+
+            // 3. Robust Orphan Detection: Cleanup any seats in Event.bookedSeats that point to non-existent holds/bookings
+            const eventsWithSeats = await this.eventModel.find({ "bookedSeats.0": { $exists: true } }).exec();
+            for (const event of eventsWithSeats) {
+                const validSeats = [];
+                let removedOrphans = 0;
+
+                for (const seat of event.bookedSeats) {
+                    let isOrphan = false;
+
+                    if (seat.holdId) {
+                        const holdExists = await this.seatHoldModel.exists({ _id: seat.holdId });
+                        if (!holdExists) isOrphan = true;
+                    } else if (seat.bookingId) {
+                        const bookingExists = await this.bookingModel.exists({ _id: seat.bookingId });
+                        if (!bookingExists) isOrphan = true;
+                    }
+
+                    if (isOrphan) {
+                        removedOrphans++;
+                    } else {
+                        validSeats.push(seat);
+                    }
+                }
+
+                if (removedOrphans > 0) {
+                    await this.eventModel.findByIdAndUpdate(event._id, {
+                        $set: { bookedSeats: validSeats },
+                        $inc: { remainingTickets: removedOrphans }
+                    });
+                    this.logger.warn(`Cleaned up ${removedOrphans} orphaned seats in event ${event._id} (${event.title})`);
+                }
+            }
         } catch (err) {
             this.logger.error('Error cleaning up expired bookings/holds', err);
         }
