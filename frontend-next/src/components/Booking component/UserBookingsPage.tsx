@@ -594,10 +594,9 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                             const eventId = typeof booking.eventId === 'object' ? (booking.eventId as any)._id : booking.eventId;
                             const event = eventDetails[eventId];
                             const isCancelled = booking.status === 'canceled';
-
+                            const isRejected = booking.status === 'rejected';
                             const isPending = booking.status === 'pending';
                             const timeLeft = timers[booking._id];
-
                             const isPastCancellationDeadline = event?.cancellationDeadline
                                 ? new Date() > new Date(event.cancellationDeadline)
                                 : false;
@@ -605,7 +604,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                             return (
                                 <motion.div
                                     key={booking._id}
-                                    className={`booking-card ${isCancelled ? 'cancelled' : ''} ${isPending ? 'pending' : ''}`}
+                                    className={`booking-card ${isCancelled ? 'cancelled' : ''} ${isPending ? 'pending' : ''} ${isRejected ? 'rejected' : ''}`}
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: index * 0.05 }}
@@ -620,7 +619,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                                     </span>
                                                 )}
                                             </>
-                                        ) : 'Confirmed'}
+                                        ) : isRejected ? 'Rejected' : 'Confirmed'}
                                     </div>
 
                                     <div className="booking-card-header">
