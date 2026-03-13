@@ -26,7 +26,8 @@ export class AuthService {
     ) { }
 
     async register(registerDto: any) {
-        const { email, password, name, phone } = registerDto;
+        let { email, password, name, phone } = registerDto;
+        email = email.toLowerCase();
 
         // Validate phone: must be 11 digits starting with 01
         if (phone && !/^01\d{9}$/.test(phone)) {
@@ -71,6 +72,7 @@ export class AuthService {
     }
 
     async verifyRegistration(email: string, otp: string) {
+        email = email.toLowerCase();
         // First check pending registrations
         const pending = await this.pendingModel.findOne({ email }).exec();
         if (!pending) {
@@ -144,7 +146,7 @@ export class AuthService {
                 throw new NotFoundException('Username not found');
             }
         } else {
-            user = await this.usersService.findOneByEmail(email);
+            user = await this.usersService.findOneByEmail(email.toLowerCase());
             if (!user) {
                 throw new NotFoundException('Email not found');
             }
@@ -210,7 +212,7 @@ export class AuthService {
     }
 
     async forgetPassword(email: string) {
-        const user = await this.usersService.findOneByEmail(email);
+        const user = await this.usersService.findOneByEmail(email.toLowerCase());
         if (!user) {
             throw new NotFoundException('User not found');
         }
@@ -230,7 +232,7 @@ export class AuthService {
     async resetPassword(resetDto: any) {
         const { email, otp, newPassword } = resetDto;
 
-        const user = await this.usersService.findOneByEmail(email);
+        const user = await this.usersService.findOneByEmail(email.toLowerCase());
         if (!user) {
             throw new NotFoundException('User not found');
         }
@@ -256,7 +258,7 @@ export class AuthService {
     async submitNewPassword(submitDto: any) {
         const { email, newPassword } = submitDto;
 
-        const user = await this.usersService.findOneByEmail(email);
+        const user = await this.usersService.findOneByEmail(email.toLowerCase());
         if (!user) {
             throw new NotFoundException('User not found');
         }
@@ -288,7 +290,7 @@ export class AuthService {
     async verifyAndActivate(verifyDto: any) {
         const { email, otp } = verifyDto;
 
-        const user = await this.usersService.findOneByEmail(email);
+        const user = await this.usersService.findOneByEmail(email.toLowerCase());
         if (!user) {
             throw new NotFoundException('User not found');
         }

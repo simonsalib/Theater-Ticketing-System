@@ -70,7 +70,7 @@ export default function RegisterForm() {
         try {
             await api.post("/auth/register", {
                 name: form.name,
-                email: form.email,
+                email: form.email.toLowerCase(),
                 phone: phone,
                 password: form.password,
             });
@@ -112,13 +112,13 @@ export default function RegisterForm() {
 
         try {
             await api.post("/auth/verify-registration", {
-                email: form.email,
+                email: form.email.toLowerCase(),
                 otp: otpString
             });
 
             // Auto-login after verification
             const loginResult = await login({
-                email: form.email,
+                email: form.email.toLowerCase(),
                 password: form.password
             });
 
@@ -135,6 +135,25 @@ export default function RegisterForm() {
             toast.error(errorMessage);
         } finally {
             setVerifyLoading(false);
+        }
+    };
+
+
+    const handleResendCode = async (e: React.MouseEvent<HTMLAnchorElement>) => {
+        e.preventDefault();
+        try {
+            toast.info("Requesting new verification code...");
+            await api.post("/auth/register", {
+                name: form.name,
+                email: form.email.toLowerCase(),
+                phone: form.phone.trim(),
+                password: form.password,
+            });
+            toast.success("New verification code sent to your email");
+        } catch (error: any) {
+            console.error("Error resending code:", error);
+            const errorMessage = error.response?.data?.message || "Failed to resend verification code";
+            toast.error(errorMessage);
         }
     };
 
@@ -338,6 +357,15 @@ export default function RegisterForm() {
                                 >
                                     {verifyLoading ? t('otp.verifying') : t('otp.verify')}
                                 </button>
+                                <p style={{ textAlign: "center", marginTop: "10px", fontSize: "0.8rem" }}>
+                                    <a
+                                        href="#"
+                                        onClick={handleResendCode}
+                                        style={{ color: "var(--primary)", textDecoration: "underline" }}
+                                    >
+                                        {t('otp.resend')}
+                                    </a>
+                                </p>
                             </div>
                             <svg className="svg" xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" fill="none">
                                 <path className="path" d="M58 29.2C61.3 28.8 63.3 32.5 61.8 35.4C60.4 38.2 56.6 38.4 54.7 35.9C52.8 33.3 54.7 29.6 58 29.2Z" fill="#369eff"></path>

@@ -19,7 +19,7 @@ export class UsersService {
     }
 
     async findOneByEmail(email: string): Promise<UserDocument | null> {
-        return this.userModel.findOne({ email }).exec();
+        return this.userModel.findOne({ email: email.toLowerCase() }).exec();
     }
 
     async findOneByUsername(username: string): Promise<UserDocument | null> {
@@ -69,15 +69,15 @@ export class UsersService {
             throw new NotFoundException('User not found');
         }
 
-        if (email && email !== user.email) {
-            const existingUser = await this.userModel.findOne({ email }).exec();
+        if (email && email.toLowerCase() !== user.email) {
+            const existingUser = await this.userModel.findOne({ email: email.toLowerCase() }).exec();
             if (existingUser) {
                 throw new BadRequestException('Email already in use');
             }
         }
 
         if (name) user.name = name;
-        if (email) user.email = email;
+        if (email) user.email = email.toLowerCase();
         if (phone !== undefined) {
             if (phone && !/^01\d{9}$/.test(phone)) {
                 throw new BadRequestException('Phone number must be 11 digits starting with 01');
@@ -153,7 +153,7 @@ export class UsersService {
 
         const newUserPayload: any = {
             name,
-            email,
+            email: email.toLowerCase(),
             password: hashedPassword,
             role: role,
             isVerified: false, // Requires OTP verification

@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useRef, useEffect, ChangeEvent, FormEvent, KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, ChangeEvent, FormEvent, KeyboardEvent, MouseEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import api from '@/services/api';
 import { FiEye, FiEyeOff } from 'react-icons/fi';
+import { useLanguage } from "@/contexts/LanguageContext";
+import { toast } from "react-toastify";
 import './ForgotPasswordForm.css';
 
 const ForgotPasswordForm = () => {
@@ -46,7 +48,7 @@ const ForgotPasswordForm = () => {
     const handleRequestOtp = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!email) {
-            setError('Email is required');
+            setError(t('forgot.emailRequired'));
             return;
         }
 
@@ -54,29 +56,31 @@ const ForgotPasswordForm = () => {
         setError('');
 
         try {
-            const response = await api.post('/auth/forget-password', { email });
+            const response = await api.post('/auth/forget-password', { 
+                email: email.toLowerCase() 
+            });
 
-            setSuccess(response.data.message || 'Verification code sent to your email');
+            setSuccess(response.data.message || t('forgot.otpSent'));
             setStep(2);
         } catch (err: any) {
             console.error('Error:', err.response?.data || err.message);
-            setError(err.response?.data?.message || 'Failed to send OTP. Please try again.');
+            setError(err.response?.data?.message || t('forgot.failedOTP'));
         } finally {
             setLoading(false);
         }
     };
 
-    const handleResetPassword = async (e: FormEvent<HTMLFormElement>) => {
+    const handleResetPassword = async (e: FormEvent<HTMLFormElement> | MouseEvent<HTMLButtonElement>) => {
         e.preventDefault();
         const otp = otpDigits.join('');
 
         if (!otp || !newPassword || !confirmPassword) {
-            setError('All fields are required');
+            setError(t('forgot.fieldsRequired'));
             return;
         }
 
         if (newPassword !== confirmPassword) {
-            setError('Passwords do not match');
+            setError(t('forgot.passMismatch'));
             return;
         }
 
@@ -84,19 +88,25 @@ const ForgotPasswordForm = () => {
         setError('');
 
         try {
-            const response = await api.post('/auth/verify-otp', { email, otp, newPassword });
+            const response = await api.post('/auth/verify-otp', { 
+                email: email.toLowerCase(), 
+                otp, 
+                newPassword 
+            });
 
-            setSuccess(response.data.message || 'Password reset successfully');
+            setSuccess(response.data.message || t('forgot.success'));
             setTimeout(() => {
                 router.push('/login');
             }, 2000);
         } catch (err: any) {
             console.error('Error:', err.response?.data || err.message);
-            setError(err.response?.data?.message || 'Failed to reset password. Please try again.');
+            setError(err.response?.data?.message || t('forgot.failedReset'));
         } finally {
             setLoading(false);
         }
     };
+
+    const { t } = useLanguage();
 
     // Focus first input when OTP form appears
     useEffect(() => {
@@ -107,17 +117,29 @@ const ForgotPasswordForm = () => {
         }
     }, [step]);
 
+    const handleResendCode = async (e: React.MouseEvent<HTMLAnchorElement>) => {
+        e.preventDefault();
+        try {
+            toast.info(t('gen.processing'));
+            await api.post('/auth/forget-password', { email: email.toLowerCase() });
+            toast.success(t('otp.resendSuccess') || 'New verification code sent to your email');
+        } catch (err: any) {
+            console.error('Error resending code:', err);
+            toast.error(err.response?.data?.message || 'Failed to resend verification code');
+        }
+    };
+
     return (
         <div className="login-container">
             <div className="login-card">
-                <h2 className="login-title">Reset Password</h2>
+                <h2 className="login-title">{t('forgot.title')}</h2>
                 {step === 1 ? (
                     <p className="redirect-link">
-                        Enter your email address to receive a verification code.
+                        {t('forgot.step1Subtitle')}
                     </p>
                 ) : (
                     <p className="redirect-link">
-                        Enter the verification code sent to your email and your new password.
+                        {t('forgot.step2Subtitle')}
                     </p>
                 )}
 
@@ -127,7 +149,7 @@ const ForgotPasswordForm = () => {
                 {step === 1 ? (
                     <form onSubmit={handleRequestOtp}>
                         <div className="form-group">
-                            <label htmlFor="email" className="form-label">Email Address</label>
+                            <label htmlFor="email" className="form-label">{t('forgot.emailLabel')}</label>
                             <input
                                 type="email"
                                 id="email"
@@ -143,7 +165,7 @@ const ForgotPasswordForm = () => {
                             className="btn-primary"
                             disabled={loading}
                         >
-                            {loading ? 'Sending...' : 'Send Reset Code'}
+                            {loading ? t('forgot.sending') : t('forgot.sendCode')}
                         </button>
                     </form>
                 ) : (
@@ -151,7 +173,7 @@ const ForgotPasswordForm = () => {
                         <div className="otp-form-container">
                             <form className="otp-form">
                                 <div className="content">
-                                    <p style={{ textAlign: 'center' }}>OTP Verification</p>
+                                    <p style={{ textAlign: 'center' }}>{t('forgot.otpVerification')}</p>
                                     <div className="inp">
                                         {[0, 1, 2, 3, 4, 5].map((i) => (
                                             <input
@@ -169,13 +191,31 @@ const ForgotPasswordForm = () => {
                                     <svg className="svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
                                         <path fill="#4073ff" d="M56.8,-23.9C61.7,-3.2,45.7,18.8,26.5,31.7C7.2,44.6,-15.2,48.2,-35.5,36.5C-55.8,24.7,-73.9,-2.6,-67.6,-25.2C-61.3,-47.7,-30.6,-65.6,-2.4,-64.8C25.9,-64.1,51.8,-44.7,56.8,-23.9Z" transform="translate(100 100)" className="path"></path>
                                     </svg>
+                                    <button
+                                        type="button"
+                                        className="verify-btn"
+                                        onClick={handleResetPassword}
+                                        disabled={loading || otpDigits.some(digit => !digit)}
+                                        style={{ marginTop: '20px' }}
+                                    >
+                                        {loading ? t('otp.verifying') : t('otp.verify')}
+                                    </button>
+                                    <p style={{ textAlign: "center", marginTop: "10px", fontSize: "0.8rem" }}>
+                                        <a
+                                            href="#"
+                                            onClick={handleResendCode}
+                                            style={{ color: "var(--primary)", textDecoration: "underline" }}
+                                        >
+                                            {t('otp.resend')}
+                                        </a>
+                                    </p>
                                 </div>
                             </form>
                         </div>
 
                         <form onSubmit={handleResetPassword} className="password-reset-form">
                             <div className="form-group">
-                                <label htmlFor="newPassword" className="form-label">New Password</label>
+                                <label htmlFor="newPassword" className="form-label">{t('forgot.newPassword')}</label>
                                 <div style={{ position: 'relative' }}>
                                     <input
                                         type={showPassword ? "text" : "password"}
@@ -193,7 +233,7 @@ const ForgotPasswordForm = () => {
                             </div>
 
                             <div className="form-group">
-                                <label htmlFor="confirmPassword" className="form-label">Confirm New Password</label>
+                                <label htmlFor="confirmPassword" className="form-label">{t('forgot.confirmPassword')}</label>
                                 <div style={{ position: 'relative' }}>
                                     <input
                                         type={showConfirmPassword ? "text" : "password"}
@@ -215,14 +255,14 @@ const ForgotPasswordForm = () => {
                                 className="verify-btn"
                                 disabled={loading}
                             >
-                                {loading ? 'Resetting...' : 'Reset Password'}
+                                {loading ? t('forgot.resetting') : t('forgot.resetButton')}
                             </button>
                         </form>
                     </div>
                 )}
 
                 <div className="redirect-link">
-                    <Link href="/login">Return to Login</Link>
+                    <Link href="/login">{t('forgot.returnLogin')}</Link>
                 </div>
             </div>
         </div>

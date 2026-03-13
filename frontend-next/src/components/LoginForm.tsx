@@ -60,7 +60,10 @@ export default function LoginForm() {
         setError("");
 
         try {
-            const result = await login(formData) as any;
+            const result = await login({
+                ...formData,
+                email: formData.email.toLowerCase(),
+            }) as any;
             console.log("Login result in LoginForm:", result);
 
             if (result.success) {
@@ -100,7 +103,7 @@ export default function LoginForm() {
 
         try {
             await api.post("/auth/verify-registration", {
-                email: formData.email,
+                email: formData.email.toLowerCase(),
                 otp: otpString
             });
 
@@ -108,7 +111,10 @@ export default function LoginForm() {
             setShowOtpForm(false);
 
             // Try logging in again
-            const result = await login(formData);
+            const result = await login({
+                ...formData,
+                email: formData.email.toLowerCase(),
+            });
             if (result.success) {
                 router.push("/events");
             }
@@ -128,7 +134,7 @@ export default function LoginForm() {
 
             try {
                 await api.post("/auth/login", {
-                    email: formData.email,
+                    email: formData.email.toLowerCase(),
                     password: formData.password
                 });
             } catch (err: any) {
