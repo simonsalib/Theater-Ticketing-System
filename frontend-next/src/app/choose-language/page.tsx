@@ -12,7 +12,7 @@ export default function ChooseLanguagePage() {
     const handleContinue = async () => {
         setLoading(true);
         await setLanguage(selected);
-        router.push('/login');
+        router.push('/events');
     };
 
     const cards: { lang: Language; flag: string; nameKey: string; sampleKey: string; gradient: string; borderColor: string }[] = [

@@ -119,7 +119,7 @@ const AdminEventsPage = () => {
                     <div className="header-left"><FiCalendar /><div><h1>{t('admin.eventAdmin')}</h1><p>{t('admin.manageSubmissions')}</p></div></div>
                     <div className="header-actions">
                         <Link href="/admin/events/previous" className="nav-btn" style={{ background: 'rgba(139, 92, 246, 0.15)', color: '#8B5CF6' }}>
-                            <FiClock /> Previous Events
+                            <FiClock /> {t('events.previousEvents')}
                         </Link>
                         <Link href="/admin/users" className="nav-btn"><FiUsers /> {t('admin.users')}</Link>
                         <Link href="/admin/theaters" className="nav-btn"><FiGrid /> {t('admin.theaters')}</Link>

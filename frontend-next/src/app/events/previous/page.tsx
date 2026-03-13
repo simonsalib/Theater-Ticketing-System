@@ -80,9 +80,9 @@ const PreviousEventsPage = () => {
                 <motion.div className="page-header" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
                         <Link href="/events" className="action-btn secondary" style={{ padding: '8px 12px' }}>
-                            <FiArrowLeft /> <span>Back to Active Events</span>
+                            <FiArrowLeft /> <span>{t('events.backToActive')}</span>
                         </Link>
-                        <h1 style={{ margin: 0, fontSize: '1.8rem', color: '#fff' }}>Previous Events</h1>
+                        <h1 style={{ margin: 0, fontSize: '1.8rem', color: '#fff' }}>{t('events.previousTitle')}</h1>
                     </div>
 
                     <div className="actions-bar">
@@ -105,7 +105,7 @@ const PreviousEventsPage = () => {
 
                 {error && (
                     <motion.div className="error-container" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
-                        <span className="error-icon"><FiAlertCircle /></span><p>{error}</p><button onClick={fetchEvents} className="retry-btn">Try Again</button>
+                        <span className="error-icon"><FiAlertCircle /></span><p>{error}</p><button onClick={fetchEvents} className="retry-btn">{t('gen.tryAgain')}</button>
                     </motion.div>
                 )}
 
@@ -120,8 +120,8 @@ const PreviousEventsPage = () => {
                         ) : (
                             <motion.div className="no-events" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                                 <span className="no-events-icon">⏳</span>
-                                <h3>No Previous Events Found</h3>
-                                <p>{searchTerm ? `${t('events.noMatch')} "${searchTerm}"` : 'There are no expired events yet.'}</p>
+                                <h3>{t('events.noPreviousEvents')}</h3>
+                                <p>{searchTerm ? `${t('events.noMatch')} "${searchTerm}"` : t('events.noPreviousEventsDesc')}</p>
                             </motion.div>
                         )}
                     </motion.div>

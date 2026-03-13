@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiX, FiSend, FiCheckSquare, FiSquare } from 'react-icons/fi';
+import { useLanguage } from '@/contexts/LanguageContext';
 import './CancelSeatsModal.css';
 
 interface Seat {
@@ -19,6 +20,7 @@ interface RequestCancellationModalProps {
     onConfirm: (seatKeys: string[], cancelAll: boolean, reason: string) => void;
     seats: Seat[];
     isLoading?: boolean;
+    isRTL?: boolean;
 }
 
 const RequestCancellationModal: React.FC<RequestCancellationModalProps> = ({
@@ -27,7 +29,9 @@ const RequestCancellationModal: React.FC<RequestCancellationModalProps> = ({
     onConfirm,
     seats,
     isLoading = false,
+    isRTL = false,
 }) => {
+    const { t } = useLanguage();
     const [selectedSeatKeys, setSelectedSeatKeys] = useState<Set<string>>(new Set());
     const [selectAll, setSelectAll] = useState(false);
     const [reason, setReason] = useState('');
@@ -76,16 +80,17 @@ const RequestCancellationModal: React.FC<RequestCancellationModalProps> = ({
                     initial={{ opacity: 0, scale: 0.9, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                    style={{ direction: isRTL ? 'rtl' : 'ltr', textAlign: isRTL ? 'right' : 'left' }}
                 >
                     <div className="csm-header">
-                        <h2>Request Ticket Return</h2>
+                        <h2>{t('booking.requestCancellation')}</h2>
                         <button className="csm-close-btn" onClick={onClose}>
                             <FiX size={20} />
                         </button>
                     </div>
 
                     <p className="csm-subtitle">
-                        Select the seats you want to return. The event organizer will review your request and decide whether to approve it.
+                        {t('modal.cancelSeats.descConfirmed')}
                     </p>
 
                     <div className="csm-select-all" onClick={toggleSelectAll}>
@@ -94,7 +99,7 @@ const RequestCancellationModal: React.FC<RequestCancellationModalProps> = ({
                         ) : (
                             <FiSquare size={20} className="csm-check-icon" />
                         )}
-                        <span>Select All ({seats.length} seats)</span>
+                        <span>{t('gen.selectAll').replace('{count}', seats.length.toString())}</span>
                     </div>
 
                     <div className="csm-seats-grid">
@@ -120,7 +125,7 @@ const RequestCancellationModal: React.FC<RequestCancellationModalProps> = ({
                                         <span className="csm-seat-label">
                                             {seat.seatLabel || `${seat.row}${seat.seatNumber}`}
                                         </span>
-                                        <span className="csm-seat-type">{seat.seatType || 'standard'}</span>
+                                        <span className="csm-seat-type">{seat.seatType || t('modal.cancelSeats.standard')}</span>
                                     </div>
                                     <span className="csm-seat-price">
                                         {(seat.price || 0).toFixed(2)} EGP
@@ -131,12 +136,12 @@ const RequestCancellationModal: React.FC<RequestCancellationModalProps> = ({
                     </div>
 
                     <div className="csm-reason-field">
-                        <label htmlFor="cancel-reason">Reason (optional)</label>
+                        <label htmlFor="cancel-reason">{t('modal.requestCancel.reason')}</label>
                         <textarea
                             id="cancel-reason"
                             value={reason}
                             onChange={(e) => setReason(e.target.value)}
-                            placeholder="Tell the organizer why you want to return these tickets..."
+                            placeholder={t('modal.requestCancel.placeholder')}
                             rows={3}
                             maxLength={500}
                         />
@@ -144,14 +149,14 @@ const RequestCancellationModal: React.FC<RequestCancellationModalProps> = ({
 
                     {selectedSeatKeys.size > 0 && (
                         <div className="csm-summary">
-                            <span>{selectedSeatKeys.size} seat(s) selected for return</span>
+                            <span>{t('gen.seatsSelected').replace('{count}', selectedSeatKeys.size.toString())}</span>
                             <span className="csm-refund">{selectedPrice.toFixed(2)} EGP</span>
                         </div>
                     )}
 
                     <div className="csm-actions">
                         <button className="csm-cancel-btn" onClick={onClose} disabled={isLoading}>
-                            Go Back
+                            {t('gen.goBack')}
                         </button>
                         <button
                             className="csm-confirm-btn"
@@ -163,7 +168,7 @@ const RequestCancellationModal: React.FC<RequestCancellationModalProps> = ({
                             }}
                         >
                             <FiSend size={16} />
-                            {isLoading ? 'Submitting...' : 'Submit Request'}
+                            {isLoading ? t('gen.processing') : t('modal.requestCancel.submit')}
                         </button>
                     </div>
                 </motion.div>

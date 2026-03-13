@@ -220,7 +220,7 @@ const EventListPage = () => {
                             )}
                             {user?.role === "Standard User" && <Link href="/bookings" className="action-btn secondary"><FiUser /> <span>{t('nav.bookings')}</span></Link>}
                             <Link href="/events/previous" className="action-btn secondary" style={{ background: 'rgba(255,255,255,0.1)', borderColor: 'rgba(255,255,255,0.2)' }}>
-                                <FiCalendar /> <span>Previous Events</span>
+                                <FiCalendar /> <span>{t('events.previousEvents')}</span>
                             </Link>
                         </div>
                     </div>

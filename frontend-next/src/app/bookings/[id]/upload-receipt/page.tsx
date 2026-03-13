@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FiUploadCloud, FiX, FiCheckCircle, FiAlertCircle, FiImage, FiArrowLeft } from 'react-icons/fi';
 import api from '@/services/api';
 import { toast } from 'react-toastify';
+import { useLanguage } from '@/contexts/LanguageContext';
 import '@/components/RegisterForm.css'; // For the generic auth layout
 import '@/components/Booking component/UploadReceiptModal.css'; // For the upload specific parts
 import './UploadReceiptPage.css';
@@ -13,6 +14,7 @@ import './UploadReceiptPage.css';
 const UploadReceiptPage = () => {
     const router = useRouter();
     const params = useParams();
+    const { t, isRTL } = useLanguage();
     const bookingId = params.id as string;
 
     const [file, setFile] = useState<File | null>(null);
@@ -66,12 +68,12 @@ const UploadReceiptPage = () => {
 
             // Basic validation
             if (!selectedFile.type.startsWith('image/')) {
-                toast.error('Please select an image file');
+                toast.error(t('receipt.error_invalid_type') || 'Please select an image file');
                 return;
             }
 
             if (selectedFile.size > 5 * 1024 * 1024) { // 5MB limit
-                toast.error('Image size should be less than 5MB');
+                toast.error(t('receipt.error_too_large') || 'Image size should be less than 5MB');
                 return;
             }
 
@@ -89,7 +91,7 @@ const UploadReceiptPage = () => {
     const handleUpload = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!file || !previewUrl) {
-            toast.error('Please select a receipt image first');
+            toast.error(t('receipt.error_no_file') || 'Please select a receipt image first');
             return;
         }
 
@@ -104,12 +106,12 @@ const UploadReceiptPage = () => {
             });
 
             if (response.data?.success) {
-                toast.success('Receipt uploaded successfully! Awaiting organizer verification.');
+                toast.success(t('receipt.success'));
                 setTimeout(() => {
                     router.push('/bookings');
                 }, 2000);
             } else {
-                toast.error(response.data?.message || 'Failed to upload receipt');
+                toast.error(t('receipt.error') || response.data?.message || 'Failed to upload receipt');
             }
         } catch (error: any) {
             console.error('Error uploading receipt:', error);
@@ -143,25 +145,24 @@ const UploadReceiptPage = () => {
                     className="back-btn"
                     onClick={() => router.back()}
                     disabled={isUploading}
-                    style={{ background: 'transparent', border: 'none', color: '#a78bfa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', padding: '10px 0', fontSize: '0.95rem', marginBottom: '10px' }}
+                    style={{ background: 'transparent', border: 'none', color: '#a78bfa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', padding: '10px 0', fontSize: '0.95rem', marginBottom: '10px', flexDirection: isRTL ? 'row-reverse' : 'row' }}
                 >
-                    <FiArrowLeft /> Back
+                    <FiArrowLeft style={{ transform: isRTL ? 'rotate(180deg)' : 'none' }} /> {t('gen.back')}
                 </button>
 
                 <div className="upload-header">
                     <div className="upload-icon-wrapper" style={{ margin: '0 auto 1rem', background: 'rgba(54, 158, 255, 0.15)', color: '#369eff' }}>
                         <FiUploadCloud size={32} />
                     </div>
-                    <h1 className="login-title" style={{ fontSize: '1.8rem', marginBottom: '0.5rem' }}>Upload Receipt</h1>
-                    <p className="upload-subtitle" style={{ textAlign: 'center', marginBottom: '1.5rem', color: '#9ca3af' }}>Provide proof of your transaction to confirm your booking.</p>
+                    <h1 className="login-title" style={{ fontSize: '1.8rem', marginBottom: '0.5rem' }}>{t('receipt.title')}</h1>
+                    <p className="upload-subtitle" style={{ textAlign: 'center', marginBottom: '1.5rem', color: '#9ca3af' }}>{t('receipt.subtitle')}</p>
                 </div>
 
-                <div className="warning-box" style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '12px', padding: '1rem', marginBottom: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+                <div className="warning-box" style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '12px', padding: '1rem', marginBottom: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'flex-start', flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                     <FiAlertCircle className="warning-icon" style={{ color: '#f59e0b', fontSize: '1.5rem', marginTop: '0.2rem' }} />
-                    <div className="warning-text">
-                        <strong style={{ color: '#fbbf24', display: 'block', marginBottom: '0.3rem' }}>Important / هام</strong>
-                        <p style={{ color: '#e5e7eb', fontSize: '0.9rem', marginBottom: '0.5rem', lineHeight: '1.4' }}>Please transfer via InstaPay using ONLY ONE account and upload ONLY ONE screenshot.</p>
-                        <p dir="rtl" className="arabic-text" style={{ fontFamily: 'Tajawal, Cairo, sans-serif', fontSize: '0.95rem', color: '#fcd34d', margin: '0' }}>يتم التحويل الانستا باي عن طريق حساب واحد فقط و رفع صورة واحدة فقط.</p>
+                    <div className="warning-text" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        <strong style={{ color: '#fbbf24', display: 'block', marginBottom: '0.3rem' }}>{t('receipt.important')}</strong>
+                        <p style={{ color: '#e5e7eb', fontSize: '0.9rem', marginBottom: '0.5rem', lineHeight: '1.4' }}>{t('receipt.warning')}</p>
                     </div>
                 </div>
 
@@ -181,8 +182,8 @@ const UploadReceiptPage = () => {
                             style={{ border: '2px dashed rgba(54, 158, 255, 0.4)', borderRadius: '12px', padding: '2.5rem 2rem', textAlign: 'center', cursor: 'pointer', background: 'rgba(255, 255, 255, 0.02)', marginBottom: '1.5rem', transition: 'all 0.2s' }}
                         >
                             <FiImage size={48} className="dropzone-icon" style={{ color: '#6b7280', marginBottom: '1rem' }} />
-                            <h3 style={{ color: '#e5e7eb', marginBottom: '0.5rem', fontSize: '1.1rem' }}>Click to browse files</h3>
-                            <p style={{ color: '#9ca3af', margin: 0, fontSize: '0.85rem' }}>PNG, JPG or JPEG (Max 5MB)</p>
+                            <h3 style={{ color: '#e5e7eb', marginBottom: '0.5rem', fontSize: '1.1rem' }}>{t('receipt.browse')}</h3>
+                            <p style={{ color: '#9ca3af', margin: 0, fontSize: '0.85rem' }}>{t('receipt.formats')}</p>
                         </div>
                     ) : (
                         <div className="preview-container" style={{ background: 'rgba(0, 0, 0, 0.2)', borderRadius: '12px', padding: '1rem', marginBottom: '1.5rem' }}>
@@ -192,8 +193,8 @@ const UploadReceiptPage = () => {
                                     className="remove-image-btn"
                                     onClick={resetSelection}
                                     disabled={isUploading}
-                                    title="Remove image"
-                                    style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(239, 68, 68, 0.9)', color: 'white', border: 'none', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                                    title={t('receipt.remove')}
+                                    style={{ position: 'absolute', top: '8px', right: isRTL ? 'auto' : '8px', left: isRTL ? '8px' : 'auto', background: 'rgba(239, 68, 68, 0.9)', color: 'white', border: 'none', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                                 >
                                     <FiX />
                                 </button>
@@ -213,7 +214,7 @@ const UploadReceiptPage = () => {
                             disabled={isUploading}
                             style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: '#9ca3af', flex: 1 }}
                         >
-                            Cancel
+                            {t('gen.cancel')}
                         </button>
                         <button
                             type="submit"
@@ -224,10 +225,10 @@ const UploadReceiptPage = () => {
                             {isUploading ? (
                                 <>
                                     <span className="form-loader"></span>
-                                    Uploading...
+                                    {t('gen.uploading')}
                                 </>
                             ) : (
-                                'Submit Receipt'
+                                t('receipt.submit')
                             )}
                         </button>
                     </div>

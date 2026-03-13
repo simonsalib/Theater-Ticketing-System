@@ -8,6 +8,7 @@ import api from "@/services/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { toast } from "react-toastify";
 import PasswordStrengthIndicator from '@/components/shared/PasswordStrengthIndicator';
+import { useAuth } from "@/auth/AuthContext";
 import "./RegisterForm.css";
 
 interface FormData {
@@ -21,6 +22,7 @@ interface FormData {
 
 export default function RegisterForm() {
     const { t } = useLanguage();
+    const { login } = useAuth();
     const [form, setForm] = useState<FormData>({
         name: "",
         email: "",
@@ -114,7 +116,18 @@ export default function RegisterForm() {
                 otp: otpString
             });
 
-            toast.success("Email verified! Choose your preferred language.");
+            // Auto-login after verification
+            const loginResult = await login({
+                email: form.email,
+                password: form.password
+            });
+
+            if (loginResult.success) {
+                toast.success("Email verified and logged in successfully!");
+            } else {
+                toast.success("Email verified! Choose your preferred language.");
+            }
+            
             setTimeout(() => router.push('/choose-language'), 1200);
         } catch (err: any) {
             const errorMessage = err.response?.data?.message || "Verification failed. Please try again.";
@@ -124,6 +137,7 @@ export default function RegisterForm() {
             setVerifyLoading(false);
         }
     };
+
 
     return (
         <div className="login-container">

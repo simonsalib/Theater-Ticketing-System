@@ -119,7 +119,7 @@ const MyEventsPage = () => {
                     </div>
                     <div className="organizer-buttons">
                         <Link href="/my-events/previous" className="view-events-button" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', borderColor: 'rgba(239, 68, 68, 0.2)' }}>
-                            Previous Events
+                            {t('events.previousEvents')}
                         </Link>
                         <Link href="/events" className="view-events-button">{t('myEvents.viewAll')}</Link>
                         <Link href="/my-events/new" className="create-event-button">{t('myEvents.create')}</Link>

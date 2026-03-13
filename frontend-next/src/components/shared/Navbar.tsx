@@ -180,7 +180,7 @@ const Navbar: React.FC = () => {
                                         className={`lang-option ${language === 'ar' ? 'active' : ''}`}
                                         onClick={() => { setLanguage('ar'); setShowLangMenu(false); }}
                                     >
-                                        <span className="lang-flag">🇸🇦</span>
+                                        <span className="lang-flag">🇪🇬</span>
                                         {t('lang.ar')}
                                         {language === 'ar' && ' ✓'}
                                     </button>

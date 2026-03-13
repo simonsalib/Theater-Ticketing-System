@@ -9,6 +9,7 @@ import {
     FiAlertCircle, FiUser, FiPhone, FiGrid, FiExternalLink
 } from 'react-icons/fi';
 import { toast } from 'react-toastify';
+import { useLanguage } from '@/contexts/LanguageContext';
 import './tickets.css';
 
 interface Ticket {
@@ -35,6 +36,7 @@ const BookingTicketsPage = () => {
     const params = useParams();
     const bookingId = params.id as string;
     const router = useRouter();
+    const { t, isRTL } = useLanguage();
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [loading, setLoading] = useState(true);
     const [eventTitle, setEventTitle] = useState('');
@@ -95,7 +97,7 @@ const BookingTicketsPage = () => {
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 28px Arial, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('🎫  EVENT TICKET', width / 2, 52);
+        ctx.fillText(`🎫  ${t('tickets.title').toUpperCase()}`, width / 2, 52);
 
         // Dashed separator
         ctx.setLineDash([6, 4]);
@@ -180,28 +182,28 @@ const BookingTicketsPage = () => {
             ctx.fillText(value, x, yPos + 22);
         };
 
-        drawInfoRow('Section', ticket.section, leftCol, y);
+        drawInfoRow(t('tickets.section'), ticket.section, leftCol, y);
         drawInfoRow('Seat Type', ticket.seatType, rightCol, y);
         y += 55;
-        drawInfoRow('Row', ticket.seatRow, leftCol, y);
+        drawInfoRow(t('tickets.row'), ticket.seatRow, leftCol, y);
         drawInfoRow('Seat Number', String(ticket.seatNumber), rightCol, y);
         y += 55;
-        drawInfoRow('Price', `${ticket.price.toFixed(2)} EGP`, leftCol, y);
+        drawInfoRow(t('gen.price'), `${ticket.price.toFixed(2)} EGP`, leftCol, y);
 
         const seatDisplay = ticket.seatLabel || `${ticket.seatRow}${ticket.seatNumber}`;
         // Derive side text from the label if present
         const lowerLabel = seatDisplay.toLowerCase();
         const derivedSide = lowerLabel.includes('left')
-            ? 'Left Side'
+            ? t('tickets.leftSide')
             : lowerLabel.includes('right')
-                ? 'Right Side'
+                ? t('tickets.rightSide')
                 : '';
 
-        drawInfoRow('Seat', seatDisplay, rightCol, y);
+        drawInfoRow(t('gen.seat'), seatDisplay, rightCol, y);
         y += 55;
 
         if (derivedSide) {
-            drawInfoRow('Side', derivedSide, leftCol, y);
+            drawInfoRow(t('tickets.side'), derivedSide, leftCol, y);
             y += 55;
         }
 
@@ -211,12 +213,12 @@ const BookingTicketsPage = () => {
 
         if (attendeeFullName) {
             drawInfoRow('Attendee', attendeeFullName, leftCol, y);
-            if (ticket.attendeePhone) drawInfoRow('Phone', ticket.attendeePhone, rightCol, y);
+            if (ticket.attendeePhone) drawInfoRow(t('gen.phone'), ticket.attendeePhone, rightCol, y);
             y += 55;
         }
 
         if (payerEmail) {
-            drawInfoRow('Paid By', payerName || payerEmail, leftCol, y);
+            drawInfoRow(t('tickets.paidBy'), payerName || payerEmail, leftCol, y);
             drawInfoRow('Email', payerEmail, rightCol, y);
             y += 55;
         }
@@ -254,7 +256,7 @@ const BookingTicketsPage = () => {
         }
         ctx.fillStyle = '#9ca3af';
         ctx.font = '12px Arial, sans-serif';
-        ctx.fillText('Scan this QR code at the entrance', width / 2, y);
+        ctx.fillText(t('tickets.scanEntrance'), width / 2, y);
 
         // Footer
         ctx.fillStyle = '#6c3ce0';
@@ -262,7 +264,7 @@ const BookingTicketsPage = () => {
         ctx.fillStyle = '#ffffff';
         ctx.font = '12px Arial, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('Theater Ticketing System — Keep this ticket safe', width / 2, height - 15);
+        ctx.fillText(t('tickets.footer'), width / 2, height - 15);
 
         return canvas.toDataURL('image/png');
     };
@@ -312,8 +314,8 @@ const BookingTicketsPage = () => {
 </head>
 <body>
   <div class="notice">
-    <h2>📸 Save your QR code before arriving</h2>
-    <p>Take a screenshot of this ticket and keep it accessible on your device — our staff will scan your QR code at the theater entrance to verify your seat.</p>
+    <h2>📸 ${t('tickets.saveNotice')}</h2>
+    <p>${t('tickets.saveNoticeDesc')}</p>
   </div>
   <img src="${dataUrl}" alt="Ticket ${ticket.seatRow}${ticket.seatNumber}" />
 </body>
@@ -354,10 +356,10 @@ const BookingTicketsPage = () => {
             <div className="tickets-page">
                 <div className="tickets-empty">
                     <FiAlertCircle size={48} />
-                    <h3>No Tickets Found</h3>
-                    <p>QR tickets are generated after the organizer approves your payment.</p>
+                    <h3>{t('tickets.empty')}</h3>
+                    <p>{t('tickets.emptyDesc')}</p>
                     <button onClick={() => router.push(`/bookings/${bookingId}`)} className="tickets-back-btn">
-                        <FiArrowLeft /> Back to Booking
+                        <FiArrowLeft style={{ transform: isRTL ? 'rotate(180deg)' : 'none' }} /> {t('gen.back')}
                     </button>
                 </div>
             </div>
@@ -380,12 +382,13 @@ const BookingTicketsPage = () => {
                             className="tickets-back-btn"
                             onClick={() => router.push(`/bookings/${bookingId}`)}
                             whileHover={{ x: -3 }}
+                            style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
                         >
-                            <FiArrowLeft size={18} /> Back to Booking
+                            <FiArrowLeft size={18} style={{ transform: isRTL ? 'rotate(180deg)' : 'none' }} /> {t('gen.back')}
                         </motion.button>
 
                         <div className="tickets-event-info">
-                            <h1>🎫 Your Tickets</h1>
+                            <h1>🎫 {t('tickets.title')}</h1>
                             <h2>{eventTitle}</h2>
                             <div className="tickets-meta" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
                                 {eventLocation && <span style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }}>📍 {eventLocation}</span>}
@@ -403,7 +406,7 @@ const BookingTicketsPage = () => {
                                 whileHover={{ scale: 1.03 }}
                                 whileTap={{ scale: 0.97 }}
                             >
-                                <FiDownload /> Download All QR Codes
+                                <FiDownload /> {t('tickets.downloadAll')}
                             </motion.button>
                         )}
                     </div>
@@ -429,7 +432,7 @@ const BookingTicketsPage = () => {
                                         {ticket.isScanned && (
                                             <div className="ticket-scanned-overlay">
                                                 <FiCheckCircle size={32} />
-                                                <span>Scanned</span>
+                                                <span>{t('tickets.scanned')}</span>
                                             </div>
                                         )}
                                     </div>
@@ -443,32 +446,32 @@ const BookingTicketsPage = () => {
                                             <span className={`seat-type-tag ${ticket.seatType}`}>{ticket.seatType}</span>
                                         </div>
 
-                                        <div className="ticket-details">
-                                            <div className="ticket-detail-row">
-                                                <span className="detail-label">Section</span>
+                                        <div className="ticket-details" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                                            <div className="ticket-detail-row" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                                                <span className="detail-label">{t('tickets.section')}</span>
                                                 <span className="detail-value">{ticket.section}</span>
                                             </div>
-                                            <div className="ticket-detail-row">
-                                                <span className="detail-label">Row</span>
+                                            <div className="ticket-detail-row" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                                                <span className="detail-label">{t('tickets.row')}</span>
                                                 <span className="detail-value">{ticket.seatRow}</span>
                                             </div>
-                                            <div className="ticket-detail-row">
-                                                <span className="detail-label">Seat</span>
+                                            <div className="ticket-detail-row" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                                                <span className="detail-label">{t('gen.seat')}</span>
                                                 <span className="detail-value">{ticket.seatNumber}</span>
                                             </div>
-                                            <div className="ticket-detail-row">
-                                                <span className="detail-label">Price</span>
+                                            <div className="ticket-detail-row" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                                                <span className="detail-label">{t('gen.price')}</span>
                                                 <span className="detail-value">{ticket.price} EGP</span>
                                             </div>
                                             {(ticket.attendeeFirstName || ticket.attendeeLastName) && (
-                                                <div className="ticket-detail-row">
-                                                    <span className="detail-label"><FiUser size={12} /> Attendee</span>
+                                                <div className="ticket-detail-row" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                                                    <span className="detail-label"><FiUser size={12} /> {t('gen.name')}</span>
                                                     <span className="detail-value">{ticket.attendeeFirstName} {ticket.attendeeLastName}</span>
                                                 </div>
                                             )}
                                             {ticket.attendeePhone && (
-                                                <div className="ticket-detail-row">
-                                                    <span className="detail-label"><FiPhone size={12} /> Phone</span>
+                                                <div className="ticket-detail-row" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                                                    <span className="detail-label"><FiPhone size={12} /> {t('gen.phone')}</span>
                                                     <span className="detail-value">{ticket.attendeePhone}</span>
                                                 </div>
                                             )}
@@ -483,7 +486,7 @@ const BookingTicketsPage = () => {
                                                 whileTap={{ scale: 0.97 }}
                                                 style={{ flex: 1 }}
                                             >
-                                                <FiExternalLink /> View
+                                                <FiExternalLink /> {t('tickets.view')}
                                             </motion.button>
                                             <motion.button
                                                 className="ticket-download-btn"
@@ -492,7 +495,7 @@ const BookingTicketsPage = () => {
                                                 whileTap={{ scale: 0.97 }}
                                                 style={{ flex: 1 }}
                                             >
-                                                <FiDownload /> Download QR
+                                                <FiDownload /> {t('tickets.download')}
                                             </motion.button>
                                         </div>
                                     </div>

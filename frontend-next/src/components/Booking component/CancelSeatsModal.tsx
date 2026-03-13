@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiX, FiTrash2, FiCheckSquare, FiSquare } from 'react-icons/fi';
+import { useLanguage } from '@/contexts/LanguageContext';
 import './CancelSeatsModal.css';
 
 interface Seat {
@@ -20,6 +21,7 @@ interface CancelSeatsModalProps {
     seats: Seat[];
     isLoading?: boolean;
     bookingType: 'pending' | 'confirmed';
+    isRTL?: boolean;
 }
 
 const CancelSeatsModal: React.FC<CancelSeatsModalProps> = ({
@@ -29,7 +31,9 @@ const CancelSeatsModal: React.FC<CancelSeatsModalProps> = ({
     seats,
     isLoading = false,
     bookingType,
+    isRTL = false,
 }) => {
+    const { t } = useLanguage();
     const [selectedSeatKeys, setSelectedSeatKeys] = useState<Set<string>>(new Set());
     const [selectAll, setSelectAll] = useState(false);
 
@@ -77,12 +81,13 @@ const CancelSeatsModal: React.FC<CancelSeatsModalProps> = ({
                     initial={{ opacity: 0, scale: 0.9, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                    style={{ direction: isRTL ? 'rtl' : 'ltr', textAlign: isRTL ? 'right' : 'left' }}
                 >
                     <div className="csm-header">
                         <h2>
                             {bookingType === 'pending'
-                                ? 'Select Seats to Cancel'
-                                : 'Select Seats to Request Cancellation'}
+                                ? t('modal.cancelSeats.titlePending')
+                                : t('modal.cancelSeats.titleConfirmed')}
                         </h2>
                         <button className="csm-close-btn" onClick={onClose}>
                             <FiX size={20} />
@@ -91,8 +96,8 @@ const CancelSeatsModal: React.FC<CancelSeatsModalProps> = ({
 
                     <p className="csm-subtitle">
                         {bookingType === 'pending'
-                            ? 'Choose which seats you want to cancel from your pending booking, or select all.'
-                            : 'Choose which seats you want to return, or select all. The organizer will review your request.'}
+                            ? t('modal.cancelSeats.descPending')
+                            : t('modal.cancelSeats.descConfirmed')}
                     </p>
 
                     <div className="csm-select-all" onClick={toggleSelectAll}>
@@ -101,7 +106,7 @@ const CancelSeatsModal: React.FC<CancelSeatsModalProps> = ({
                         ) : (
                             <FiSquare size={20} className="csm-check-icon" />
                         )}
-                        <span>Select All ({seats.length} seats)</span>
+                        <span>{t('gen.selectAll').replace('{count}', seats.length.toString())}</span>
                     </div>
 
                     <div className="csm-seats-grid">
@@ -127,7 +132,7 @@ const CancelSeatsModal: React.FC<CancelSeatsModalProps> = ({
                                         <span className="csm-seat-label">
                                             {seat.seatLabel || `${seat.row}${seat.seatNumber}`}
                                         </span>
-                                        <span className="csm-seat-type">{seat.seatType || 'standard'}</span>
+                                        <span className="csm-seat-type">{seat.seatType || t('modal.cancelSeats.standard')}</span>
                                     </div>
                                     <span className="csm-seat-price">
                                         {(seat.price || 0).toFixed(2)} EGP
@@ -139,14 +144,14 @@ const CancelSeatsModal: React.FC<CancelSeatsModalProps> = ({
 
                     {selectedSeatKeys.size > 0 && (
                         <div className="csm-summary">
-                            <span>{selectedSeatKeys.size} seat(s) selected</span>
+                            <span>{t('gen.seatsSelected').replace('{count}', selectedSeatKeys.size.toString())}</span>
                             <span className="csm-refund">{selectedPrice.toFixed(2)} EGP</span>
                         </div>
                     )}
 
                     <div className="csm-actions">
                         <button className="csm-cancel-btn" onClick={onClose} disabled={isLoading}>
-                            Go Back
+                            {t('gen.goBack')}
                         </button>
                         <button
                             className="csm-confirm-btn"
@@ -155,10 +160,10 @@ const CancelSeatsModal: React.FC<CancelSeatsModalProps> = ({
                         >
                             <FiTrash2 size={16} />
                             {isLoading
-                                ? 'Processing...'
+                                ? t('gen.processing')
                                 : bookingType === 'pending'
-                                    ? `Cancel ${selectedSeatKeys.size} Seat(s)`
-                                    : `Request Cancellation`}
+                                    ? t('modal.cancelSeats.cancelN').replace('{count}', selectedSeatKeys.size.toString())
+                                    : t('booking.requestCancellation')}
                         </button>
                     </div>
                 </motion.div>

@@ -27,7 +27,7 @@ interface AttendeeInfo {
 
 const BookTicketPage = () => {
     const params = useParams();
-    const { t } = useLanguage();
+    const { t, isRTL } = useLanguage();
     const eventId = params.eventId as string;
     const router = useRouter();
     const [event, setEvent] = useState<Event | null>(null);
@@ -553,22 +553,35 @@ const BookTicketPage = () => {
                     <motion.div className="success-icon pending-icon" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: "spring" }}>
                         <FiClock size={80} />
                     </motion.div>
-                    <h2>Payment Pending</h2>
-                    <p>Your booking for {ticketCount} {event.hasTheaterSeating ? 'seat' : 'ticket'}{ticketCount > 1 ? 's' : ''} is reserved!</p>
+                    <h2>{t('success.title')}</h2>
+                    <p>
+                        {t('success.subtitle')
+                            .replace('{count}', ticketCount.toString())
+                            .replace('{type}', event.hasTheaterSeating
+                                ? (ticketCount > 1 ? t('gen.seats') : t('gen.seat'))
+                                : (ticketCount > 1 ? t('gen.tickets') : t('gen.ticket'))
+                            )
+                        }
+                    </p>
 
                     {event.hasTheaterSeating && selectedSeats.length > 0 && (
                         <div className="success-seats">
-                            {selectedSeats.map(seat => (
-                                <span key={`${seat.section}-${seat.row}-${seat.seatNumber}`} className="seat-chip">
-                                    {seat.seatLabel || `${seat.row}${seat.seatNumber}`}
-                                </span>
-                            ))}
+                            <p style={{ fontSize: '0.9rem', color: '#9ca3af', marginBottom: '8px' }}>{t('success.seats')}</p>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
+                                {selectedSeats.map(seat => (
+                                    <span key={`${seat.section}-${seat.row}-${seat.seatNumber}`} className="seat-chip">
+                                        {seat.seatLabel || `${seat.row}${seat.seatNumber}`}
+                                    </span>
+                                ))}
+                            </div>
                         </div>
                     )}
 
                     <div className="instapay-section">
-                        <h3>Pay via InstaPay</h3>
-                        <p className="instapay-instruction">Send <strong>{totalToPay.toFixed(2)} EGP</strong> to the organizer&apos;s InstaPay below:</p>
+                        <h3>{t('payment.instapay')}</h3>
+                        <p className="instapay-instruction">
+                            {t('payment.instapay.instruction').replace('{total}', totalToPay.toFixed(2))}
+                        </p>
 
                         {organizerInstapayQR && (
                             <div style={{
@@ -578,7 +591,7 @@ const BookTicketPage = () => {
                                 border: '1px solid rgba(139, 92, 246, 0.2)'
                             }}>
                                 <p style={{ fontSize: '1rem', color: '#a78bfa', margin: 0, fontWeight: 600 }}>
-                                    Scan QR Code to pay via InstaPay
+                                    {t('payment.instapay.qrLabel')}
                                 </p>
                                 <img
                                     src={organizerInstapayQR}
@@ -590,7 +603,7 @@ const BookTicketPage = () => {
                                     }}
                                 />
                                 <p style={{ fontSize: '0.9rem', color: '#9ca3af', margin: 0 }}>
-                                    Open InstaPay app → Scan QR → Send {totalToPay.toFixed(2)} EGP
+                                    {t('payment.instapay.qrInstructions').replace('{total}', totalToPay.toFixed(2))}
                                 </p>
                             </div>
                         )}
@@ -605,16 +618,16 @@ const BookTicketPage = () => {
                                             const ta = document.createElement('textarea'); ta.value = organizerInstapay; ta.style.position = 'fixed'; ta.style.left = '-9999px'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
                                         });
                                         setHasCopied(true);
-                                        toast.success('InstaPay number copied!');
+                                        toast.success(t('gen.copied'));
                                         setTimeout(() => setHasCopied(false), 2000);
                                     }}
                                     style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
                                 >
-                                    <FiCopy size={14} /> {hasCopied ? 'Copied!' : 'Copy'}
+                                    <FiCopy size={14} /> {hasCopied ? t('gen.copied') : t('gen.copy')}
                                 </button>
                             </div>
                         ) : !organizerInstapayQR && !organizerInstapayLink ? (
-                            <p className="instapay-fallback">Contact the event organizer for payment details.</p>
+                            <p className="instapay-fallback">{t('payment.fallback')}</p>
                         ) : null}
 
                         {organizerInstapayLink && (
@@ -650,19 +663,19 @@ const BookTicketPage = () => {
                                         e.currentTarget.style.transform = 'translateY(0)';
                                     }}
                                 >
-                                    <FiExternalLink /> Pay directly via InstaPay Link
+                                    <FiExternalLink /> {t('payment.instapay.link')}
                                 </a>
                             </div>
                         )}
 
-                        <p className="instapay-note">The organizer will confirm your booking once payment is verified.</p>
+                        <p className="instapay-note">{t('payment.note')}</p>
 
                         {/* Receipt Upload Section */}
                         <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(139, 92, 246, 0.08)', borderRadius: '12px', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
                             <h4 style={{ margin: '0 0 8px', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <FiCreditCard /> Upload Payment Receipt
+                                <FiCreditCard /> {t('receipt.title')}
                             </h4>
-                            <p style={{ fontSize: '0.85rem', color: '#9ca3af', margin: '0 0 12px' }}>Upload a screenshot of your InstaPay transfer to speed up verification.</p>
+                            <p style={{ fontSize: '0.85rem', color: '#9ca3af', margin: '0 0 12px' }}>{t('receipt.subtitle')}</p>
 
                             <input
                                 type="file"
@@ -686,7 +699,7 @@ const BookTicketPage = () => {
                                         const compressedBase64 = await compressImage(file);
                                         const response = await api.post(`/booking/${bookingId}/receipt`, { receiptBase64: compressedBase64 });
                                         if (response.data?.success) {
-                                            toast.success('Receipt uploaded! Awaiting organizer verification.');
+                                            toast.success(t('receipt.success'));
                                             setReceiptUploaded(true);
                                         } else {
                                             toast.error(response.data?.message || 'Upload failed');
@@ -705,8 +718,8 @@ const BookTicketPage = () => {
                             />
 
                             {receiptUploaded ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', fontWeight: 600 }}>
-                                    <FiCheckCircle size={20} /> Receipt uploaded successfully!
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', fontWeight: 600, flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                                    <FiCheckCircle size={20} /> {t('receipt.success')}
                                 </div>
                             ) : !receiptPreview ? (
                                 <motion.button
@@ -722,7 +735,7 @@ const BookTicketPage = () => {
                                         fontSize: '0.9rem', fontWeight: 500, width: '100%', justifyContent: 'center'
                                     }}
                                 >
-                                    <FiCreditCard /> Choose Receipt Image
+                                    <FiCreditCard /> {t('receipt.chooseImage')}
                                 </motion.button>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -731,7 +744,7 @@ const BookTicketPage = () => {
                                         {isUploadingReceipt && (
                                             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', color: 'white', fontWeight: 600, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
                                                 <div className="spinner-ring" style={{ width: '30px', height: '30px', border: '3px solid rgba(255,255,255,0.3)', borderTopColor: 'white' }}></div>
-                                                Uploading...
+                                                {t('gen.uploading')}
                                             </div>
                                         )}
                                     </div>
@@ -750,7 +763,14 @@ const BookTicketPage = () => {
                         whileTap={!isUploadingReceipt ? { scale: 0.98 } : {}}
                         style={{ opacity: isUploadingReceipt ? 0.7 : 1, cursor: isUploadingReceipt ? 'not-allowed' : 'pointer' }}
                     >
-                        {isUploadingReceipt ? 'Uploading Receipt...' : 'Done — View My Bookings'}
+                        {isUploadingReceipt ? (
+                            <>
+                                <span className="btn-spinner"></span>
+                                {t('gen.uploading')}
+                            </>
+                        ) : (
+                            t('receipt.viewBookings')
+                        )}
                     </motion.button>
                 </motion.div>
             </motion.div>
@@ -769,21 +789,22 @@ const BookTicketPage = () => {
                 {event.hasTheaterSeating ? (
                     <div className="theater-fullpage-container" dir="ltr">
                         {/* Compact Header Bar */}
-                        <motion.div className="theater-header-bar" initial={{ y: -30, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
+                        <motion.div className="theater-header-bar" initial={{ y: -30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                             <motion.button
                                 className="back-btn-compact"
                                 onClick={() => showAttendeeForm ? handleBackToSeats() : router.back()}
-                                whileHover={{ x: -3 }}
+                                whileHover={{ x: isRTL ? 3 : -3 }}
+                                style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
                             >
-                                <FiArrowLeft size={18} />
-                                <span>{showAttendeeForm ? 'Back to Seats' : 'Back'}</span>
+                                <FiArrowLeft size={18} style={{ transform: isRTL ? 'rotate(180deg)' : 'none' }} />
+                                <span>{showAttendeeForm ? t('booking.backToSeats') : t('gen.back')}</span>
                             </motion.button>
 
-                            <div className="event-info-compact">
+                            <div className="event-info-compact" style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flex: 1, minWidth: 0 }}>
                                 <img src={getImageUrl(event.image)} alt="" className="event-thumb" />
-                                <div>
-                                    <h2>{event.title}</h2>
-                                    <div className="event-meta-compact">
+                                <div style={{ overflow: 'hidden', textAlign: isRTL ? 'right' : 'left' }}>
+                                    <h2 style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{event.title}</h2>
+                                    <div className="event-meta-compact" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                                         <span><FiCalendar /> {formatDate(event.date)}</span>
                                         {event.startTime && <span><FiClock /> {event.startTime} {event.endTime ? `- ${event.endTime}` : ''}</span>}
                                         <span><FiMapPin /> {event.location || 'TBA'}</span>
@@ -791,18 +812,18 @@ const BookTicketPage = () => {
                                 </div>
                             </div>
 
-                            <div className="booking-summary-compact">
+                            <div className="booking-summary-compact" style={{ flexDirection: isRTL ? 'row-reverse' : 'row', marginLeft: isRTL ? '0' : 'auto', marginRight: isRTL ? 'auto' : '0' }}>
                                 {selectedSeats.length > 0 && (
                                     <>
-                                        <div className="header-seats-chips">
+                                        <div className="header-seats-chips" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                                             {selectedSeats.map(seat => (
-                                                <span key={`${seat.section}-${seat.row}-${seat.seatNumber}`} className="header-seat-chip">
+                                                <span key={`${seat.section}-${seat.row}-${seat.seatNumber}`} className="header-seat-chip" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                                                     {seat.seatLabel || `${seat.row}${seat.seatNumber}`}
                                                     <span className="header-chip-price">{seat.price} EGP</span>
                                                 </span>
                                             ))}
                                         </div>
-                                        <span className="seats-count">{selectedSeats.length} seat{selectedSeats.length !== 1 ? 's' : ''}</span>
+                                        <span className="seats-count">{selectedSeats.length} {t('gen.seat')}{selectedSeats.length !== 1 ? (isRTL ? '' : 's') : ''}</span>
                                         <span className="total-amount">{seatTotalPrice.toFixed(2)} EGP</span>
                                     </>
                                 )}
@@ -830,18 +851,20 @@ const BookTicketPage = () => {
                                     exit={{ opacity: 0, x: 20 }}
                                 >
                                     <div className="attendee-form-container">
-                                        <div className="attendee-form-header">
+                                        <div className="attendee-form-header" style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: '15px' }}>
                                             <FiUsers size={24} />
-                                            <div>
-                                                <h3>Attendee Information</h3>
-                                                <p>Enter name and phone for each seat</p>
+                                            <div style={{ flex: 1, minWidth: '150px', textAlign: isRTL ? 'right' : 'left', overflow: 'hidden' }}>
+                                                <h3 style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t('attendee.title')}</h3>
+                                                <p style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t('attendee.subtitle')}</p>
                                             </div>
                                             {holdExpiresAt && holdCountdown > 0 && (
                                                 <div style={{
-                                                    marginLeft: 'auto',
+                                                    marginLeft: isRTL ? '0' : 'auto',
+                                                    marginRight: isRTL ? 'auto' : '0',
                                                     display: 'flex',
                                                     alignItems: 'center',
-                                                    gap: '12px'
+                                                    gap: '12px',
+                                                    flexShrink: 0
                                                 }}>
                                                     <motion.button
                                                         className="cancel-hold-btn"
@@ -858,10 +881,11 @@ const BookTicketPage = () => {
                                                             fontWeight: 600,
                                                             display: 'flex',
                                                             alignItems: 'center',
-                                                            gap: '6px'
+                                                            gap: '6px',
+                                                            flexDirection: isRTL ? 'row-reverse' : 'row'
                                                         }}
                                                     >
-                                                        <FiTrash2 size={14} /> Cancel
+                                                        <FiTrash2 size={14} /> {t('timer.cancel')}
                                                     </motion.button>
 
                                                     <div style={{
@@ -905,34 +929,37 @@ const BookTicketPage = () => {
                                                         <span className="attendee-seat-price">{seat.price} EGP</span>
                                                     </div>
                                                     <div className="attendee-fields">
-                                                        <div className="attendee-field">
-                                                            <FiUser className="field-icon" />
+                                                        <div className="attendee-field" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                                                            <FiUser className="field-icon" style={{ marginLeft: isRTL ? '10px' : '0', marginRight: isRTL ? '0' : '10px' }} />
                                                             <input
                                                                 type="text"
-                                                                placeholder="First Name"
+                                                                placeholder={t('attendee.firstName.placeholder')}
                                                                 value={attendeeInfo[index]?.attendeeFirstName || ''}
                                                                 onChange={(e) => handleAttendeeChange(index, 'attendeeFirstName', e.target.value)}
                                                                 className="attendee-input"
+                                                                style={{ textAlign: isRTL ? 'right' : 'left' }}
                                                             />
                                                         </div>
-                                                        <div className="attendee-field">
-                                                            <FiUser className="field-icon" />
+                                                        <div className="attendee-field" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                                                            <FiUser className="field-icon" style={{ marginLeft: isRTL ? '10px' : '0', marginRight: isRTL ? '0' : '10px' }} />
                                                             <input
                                                                 type="text"
-                                                                placeholder="Last Name"
+                                                                placeholder={t('attendee.lastName.placeholder')}
                                                                 value={attendeeInfo[index]?.attendeeLastName || ''}
                                                                 onChange={(e) => handleAttendeeChange(index, 'attendeeLastName', e.target.value)}
                                                                 className="attendee-input"
+                                                                style={{ textAlign: isRTL ? 'right' : 'left' }}
                                                             />
                                                         </div>
-                                                        <div className="attendee-field">
-                                                            <FiPhone className="field-icon" />
+                                                        <div className="attendee-field" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                                                            <FiPhone className="field-icon" style={{ marginLeft: isRTL ? '10px' : '0', marginRight: isRTL ? '0' : '10px' }} />
                                                             <input
                                                                 type="tel"
-                                                                placeholder="01xxxxxxxxx"
+                                                                placeholder={t('attendee.phone.placeholder')}
                                                                 value={attendeeInfo[index]?.attendeePhone || ''}
                                                                 onChange={(e) => handleAttendeeChange(index, 'attendeePhone', e.target.value)}
                                                                 className="attendee-input"
+                                                                style={{ textAlign: isRTL ? 'right' : 'left' }}
                                                             />
                                                         </div>
                                                     </div>
@@ -946,11 +973,11 @@ const BookTicketPage = () => {
                                             background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(109, 40, 217, 0.08))',
                                             border: '1px solid rgba(139, 92, 246, 0.25)'
                                         }}>
-                                            <h4 style={{ margin: '0 0 10px', fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '10px', color: '#a78bfa' }}>
-                                                <FiCreditCard size={22} /> Payment via InstaPay
+                                            <h4 style={{ margin: '0 0 10px', fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '10px', color: '#a78bfa', flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                                                <FiCreditCard size={22} /> {t('payment.instapay')}
                                             </h4>
-                                            <p style={{ fontSize: '0.95rem', color: '#d1d5db', margin: 0, lineHeight: 1.5 }}>
-                                                After confirming, pay <strong style={{ color: '#fbbf24' }}>{seatTotalPrice.toFixed(2)} EGP</strong> via InstaPay — payment details will be shown after booking.
+                                            <p style={{ fontSize: '0.95rem', color: '#d1d5db', margin: 0, lineHeight: 1.5, textAlign: isRTL ? 'right' : 'left' }}>
+                                                {t('payment.instapay.desc').replace('{total}', seatTotalPrice.toFixed(2))}
                                             </p>
                                         </div>
                                     </div>
@@ -990,13 +1017,13 @@ const BookTicketPage = () => {
                                     whileTap={{ scale: 0.98 }}
                                 >
                                     {isLoading ? (
-                                        <><span className="btn-spinner"></span>Reserving seats...</>
+                                        <><span className="btn-spinner"></span>{t('gen.processing')}</>
                                     ) : (
                                         <>
-                                            <FiArrowRight />
+                                            <FiArrowRight style={{ transform: isRTL ? 'rotate(180deg)' : 'none' }} />
                                             {selectedSeats.length > 0
-                                                ? `Next — ${selectedSeats.length} Seat${selectedSeats.length !== 1 ? 's' : ''} — ${seatTotalPrice.toFixed(2)} EGP`
-                                                : 'Select Seats to Continue'
+                                                ? `${t('gen.next')} — ${selectedSeats.length} ${t('gen.seat')}${selectedSeats.length !== 1 ? (isRTL ? '' : 's') : ''} — ${seatTotalPrice.toFixed(2)} EGP`
+                                                : t('booking.selectSeats')
                                             }
                                         </>
                                     )}
@@ -1011,9 +1038,9 @@ const BookTicketPage = () => {
                                     whileTap={{ scale: 0.98 }}
                                 >
                                     {isLoading ? (
-                                        <><span className="btn-spinner"></span>Processing...</>
+                                        <><span className="btn-spinner"></span>{t('gen.processing')}</>
                                     ) : (
-                                        <><FiCreditCard /> Confirm Booking — {seatTotalPrice.toFixed(2)} EGP</>
+                                        <><FiCreditCard /> {t('gen.confirm')} — {seatTotalPrice.toFixed(2)} EGP</>
                                     )}
                                 </motion.button>
                             )}

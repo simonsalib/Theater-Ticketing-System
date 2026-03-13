@@ -59,7 +59,7 @@ interface UserBookingsPageProps {
 
 const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false }) => {
     const router = useRouter();
-    const { t } = useLanguage();
+    const { t, language, isRTL } = useLanguage();
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [eventDetails, setEventDetails] = useState<Record<string, EventData>>({});
     const [loading, setLoading] = useState(true);
@@ -304,8 +304,15 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
         });
     };
 
-    const formatSeatLabel = (seat: { seatLabel?: string; row: string; seatNumber: number; attendeeFirstName?: string; attendeeLastName?: string }) => {
-        const label = seat.seatLabel || `${seat.row}${seat.seatNumber}`;
+    const formatSeatLabel = (seat: { section: string; seatLabel?: string; row: string; seatNumber: number; attendeeFirstName?: string; attendeeLastName?: string }) => {
+        let side = '';
+        if (seat.section === 'Left' || seat.section?.includes('Left')) {
+            side = language === 'ar' ? ` (${t('tickets.leftSide')})` : ' (Left Side)';
+        } else if (seat.section === 'Right' || seat.section?.includes('Right')) {
+            side = language === 'ar' ? ` (${t('tickets.rightSide')})` : ' (Right Side)';
+        }
+        
+        const label = seat.seatLabel || `${seat.row}${side} ${seat.seatNumber}`;
         const attendee = (seat.attendeeFirstName || seat.attendeeLastName) 
             ? ` (${seat.attendeeFirstName || ''} ${seat.attendeeLastName || ''}`.trim() + ')'
             : '';
@@ -330,8 +337,8 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
     return (
         <div className="user-bookings-container">
             <div className="bookings-hero">
-                <h1>{isPrevious ? 'Previous Bookings' : 'My Bookings'}</h1>
-                <p>{isPrevious ? 'Review your past event reservations' : 'Manage your event reservations and tickets'}</p>
+                <h1>{isPrevious ? t('bookings.previousTitle') : t('bookings.currentTitle')}</h1>
+                <p>{isPrevious ? t('bookings.previousSubtitle') : t('bookings.currentSubtitle')}</p>
                 <div style={{ marginTop: '20px', display: 'flex', gap: '12px' }}>
                     <Link
                         href="/bookings"
@@ -346,7 +353,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                             letterSpacing: '0.5px'
                         }}
                     >
-                        Active Bookings
+                        {t('bookings.activeBookings')}
                     </Link>
                     <Link
                         href="/bookings/previous"
@@ -361,7 +368,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                             letterSpacing: '0.5px'
                         }}
                     >
-                        Previous Bookings
+                        {t('bookings.previousBookings')}
                     </Link>
                 </div>
                 {!isPrevious && (
@@ -395,7 +402,10 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                     >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px', color: '#fbbf24', fontWeight: 700, fontSize: '1.3rem' }}>
                             <FiAlertCircle size={26} />
-                            Action Required — {pendingBookings.length} Pending Booking{pendingBookings.length > 1 ? 's' : ''}
+                            {t('pending.header')
+                                .replace('{count}', pendingBookings.length.toString())
+                                .replace('{plural}', pendingBookings.length > 1 ? (language === 'ar' ? 'ات' : 's') : '')
+                            }
                         </div>
 
                         {pendingBookings.map(booking => {
@@ -413,14 +423,22 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                 }}>
                                     {/* Event info + timer */}
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-                                        <div>
-                                            <strong style={{ fontSize: '1.2rem', display: 'block', marginBottom: '4px' }}>{event?.title || 'Event'}</strong>
+                                        <div style={{ flex: 1, minWidth: '200px' }}>
+                                            <strong style={{ 
+                                                fontSize: '1.2rem', 
+                                                display: 'block', 
+                                                marginBottom: '4px',
+                                                whiteSpace: 'nowrap',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                maxWidth: '100%'
+                                            }} title={event?.title}>{event?.title || t('home.featured.event')}</strong>
                                             <span style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '1rem', color: '#d1d5db', flexWrap: 'wrap' }}>
                                                 <span style={{ fontWeight: 700, color: '#fbbf24', fontSize: '1.1rem' }}>{booking.totalPrice.toFixed(2)} EGP</span>
-                                                <span>{booking.numberOfTickets} ticket{booking.numberOfTickets > 1 ? 's' : ''}</span>
+                                                <span>{booking.numberOfTickets} {booking.numberOfTickets > 1 ? t('gen.tickets') : t('gen.ticket')}</span>
                                                 {booking.selectedSeats && booking.selectedSeats.length > 0 && (
                                                     <span style={{ color: '#a78bfa' }}>
-                                                        Seats:{' '}
+                                                        {t('pending.seats')}{' '}
                                                         {booking.selectedSeats.map(formatSeatLabel).join(', ')}
                                                     </span>
                                                 )}
@@ -437,13 +455,13 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                             </span>
                                         )}
                                         {timeLeft === 'Expired' && (
-                                            <span style={{ padding: '6px 16px', borderRadius: '24px', background: 'rgba(239, 68, 68, 0.25)', color: '#ef4444', fontSize: '1rem', fontWeight: 700 }}>Expired</span>
+                                            <span style={{ padding: '6px 16px', borderRadius: '24px', background: 'rgba(239, 68, 68, 0.25)', color: '#ef4444', fontSize: '1rem', fontWeight: 700 }}>{t('pending.expired')}</span>
                                         )}
                                     </div>
 
                                     {/* Payment info text */}
                                     <p style={{ fontSize: '0.95rem', color: '#e5e7eb', margin: '0 0 16px', lineHeight: 1.5 }}>
-                                        Pay <strong style={{ color: '#fbbf24' }}>{booking.totalPrice.toFixed(2)} EGP</strong> via InstaPay and upload your receipt before time runs out.
+                                        {t('pending.instruction').replace('{total}', booking.totalPrice.toFixed(2))}
                                     </p>
 
                                     {/* InstaPay QR image + number */}
@@ -467,7 +485,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                             <div style={{ width: '100%' }}>
                                                 {instapayNumber && (
                                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                                        <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>InstaPay Number:</span>
+                                                        <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>{t('payment.instapay.number')}</span>
                                                         <span style={{ fontWeight: 700, fontSize: '0.95rem', letterSpacing: '0.4px' }}>{instapayNumber}</span>
                                                         <button
                                                             type="button"
@@ -476,7 +494,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                                                     const ta = document.createElement('textarea'); ta.value = instapayNumber; ta.style.position = 'fixed'; ta.style.left = '-9999px'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
                                                                 });
                                                                 setCopiedNumber(booking._id);
-                                                                toast.success('InstaPay number copied!');
+                                                                toast.success(t('gen.copied'));
                                                                 setTimeout(() => setCopiedNumber(null), 2000);
                                                             }}
                                                             style={{
@@ -488,13 +506,13 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                                                 transition: 'all 0.2s'
                                                             }}
                                                         >
-                                                            <FiCopy size={13} /> {copiedNumber === booking._id ? 'Copied!' : 'Copy'}
+                                                            <FiCopy size={13} /> {copiedNumber === booking._id ? t('gen.copied') : t('gen.copy')}
                                                         </button>
                                                     </div>
                                                 )}
                                                 {instapayQR && (
                                                     <p style={{ fontSize: '0.78rem', color: '#9ca3af', margin: '6px 0 0', textAlign: 'center' }}>
-                                                        Scan QR → Send {booking.totalPrice.toFixed(2)} EGP
+                                                        {t('payment.instapay.qrInstructions').replace('{total}', booking.totalPrice.toFixed(2))}
                                                     </p>
                                                 )}
                                             </div>
@@ -534,7 +552,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                                     e.currentTarget.style.transform = 'translateY(0)';
                                                 }}
                                             >
-                                                <FiExternalLink /> Pay directly via InstaPay Link
+                                                <FiExternalLink /> {t('payment.instapay.link')}
                                             </a>
                                         </div>
                                     )}
@@ -553,7 +571,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                                 transition: 'all 0.2s'
                                             }}
                                         >
-                                            <FiTrash2 size={20} /> Cancel Booking
+                                            <FiTrash2 size={20} /> {t('pending.cancel')}
                                         </motion.button>
 
                                         <motion.button
@@ -570,7 +588,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                                 letterSpacing: '0.3px'
                                             }}
                                         >
-                                            <FiUploadCloud size={20} /> Upload Receipt Now
+                                            <FiUploadCloud size={20} /> {t('pending.uploadNow')}
                                         </motion.button>
                                     </div>
                                 </div>
@@ -610,20 +628,25 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                     transition={{ delay: index * 0.05 }}
                                 >
                                     <div className="booking-status-badge">
-                                        {isCancelled ? 'Cancelled' : isPending ? (
+                                        {isCancelled ? t('status.canceled') : isPending ? (
                                             <>
-                                                Pending
+                                                {t('status.pending')}
                                                 {timeLeft && timeLeft !== 'Expired' && !booking.isReceiptUploaded && (
                                                     <span className="booking-timer">
                                                         <FiClock size={12} /> {timeLeft}
                                                     </span>
                                                 )}
                                             </>
-                                        ) : isRejected ? 'Rejected' : 'Confirmed'}
+                                        ) : isRejected ? t('status.rejected') : t('status.confirmed')}
                                     </div>
 
                                     <div className="booking-card-header">
-                                        <h3>{event?.title || 'Loading Event...'}</h3>
+                                        <h3 style={{
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            maxWidth: '100%'
+                                        }} title={event?.title}>{event?.title || (loading ? t('gen.loading') : t('booking.eventNotFound'))}</h3>
                                     </div>
 
                                     <div className="booking-card-body">
@@ -643,12 +666,12 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                         </div>
                                         <div className="info-item">
                                             <FiClock />
-                                            <span>Booked on {formatDate(booking.createdAt)}</span>
+                                            <span>{t('booking.bookedOn')} {formatDate(booking.createdAt)}</span>
                                         </div>
                                         {event?.cancellationDeadline && (
                                             <div className="info-item" style={{ color: isPastCancellationDeadline ? '#ef4444' : '#f59e0b' }}>
                                                 <FiAlertCircle />
-                                                <span>Cancel Before: {new Date(event.cancellationDeadline).toLocaleString('en-US', { timeZone: 'Africa/Cairo', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                                <span>{t('booking.cancelBefore')} {new Date(event.cancellationDeadline).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US', { timeZone: 'Africa/Cairo', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                                             </div>
                                         )}
 
@@ -658,25 +681,25 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                                 background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)',
                                                 display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', fontSize: '0.85rem', fontWeight: 600
                                             }}>
-                                                <FiCheckCircle size={16} /> Receipt uploaded — awaiting verification
+                                                <FiCheckCircle size={16} /> {t('booking.receiptUploaded')}
                                             </div>
                                         )}
 
                                         <div className="booking-summary">
                                             <div className="summary-row">
-                                                <span>Tickets</span>
+                                                <span>{t('booking.tickets')}</span>
                                                 <strong>{booking.numberOfTickets}</strong>
                                             </div>
                                             {booking.selectedSeats && booking.selectedSeats.length > 0 && (
                                                 <div className="summary-row seats">
-                                                    <span>Seats</span>
+                                                    <span>{t('gen.seats')}</span>
                                                     <div className="seats-list">
                                                         {booking.selectedSeats.map(formatSeatLabel).join(', ')}
                                                     </div>
                                                 </div>
                                             )}
                                             <div className="summary-row total">
-                                                <span>Total Price</span>
+                                                <span>{t('booking.totalPrice')}</span>
                                                 <strong>{booking.totalPrice.toFixed(2)} EGP</strong>
                                             </div>
                                         </div>
@@ -684,7 +707,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
 
                                     <div className="booking-card-footer">
                                         <Link href={`/bookings/${booking._id}`} className="view-details-btn">
-                                            <FiEye /> Details
+                                            <FiEye /> {t('booking.details')}
                                         </Link>
                                         {/* Direct cancel for confirmed bookings has been removed; users should use the request cancellation flow instead */}
                                         {!isCancelled && isPending && booking.isReceiptUploaded && booking.hasTheaterSeating && (
@@ -697,7 +720,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                                         border: '1px solid rgba(245, 158, 11, 0.3)',
                                                         fontSize: '0.85rem', fontWeight: 600,
                                                     }}>
-                                                        <FiClock size={14} /> Cancellation Pending
+                                                        <FiClock size={14} /> {t('booking.cancellationPending')}
                                                     </span>
                                                 )}
                                                 {(() => {
@@ -711,7 +734,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                                     if (!showButton) return null;
 
                                                     if (isPastCancellationDeadline) {
-                                                        return <span style={{ fontSize: '0.85rem', color: '#ef4444', fontStyle: 'italic', padding: '0.5rem 0' }}>Cancellation deadline passed</span>;
+                                                        return <span style={{ fontSize: '0.85rem', color: '#ef4444', fontStyle: 'italic', padding: '0.5rem 0' }}>{t('booking.deadlinePassed')}</span>;
                                                     }
 
                                                     return (
@@ -725,7 +748,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                                                 fontSize: '0.85rem', fontWeight: 500, transition: 'all 0.2s'
                                                             }}
                                                         >
-                                                            <FiRotateCcw size={14} /> {booking.cancellationRequest?.status === 'pending' ? 'Cancel More Seats' : 'Request Cancellation'}
+                                                            <FiRotateCcw size={14} /> {booking.cancellationRequest?.status === 'pending' ? t('booking.cancelMore') : t('booking.requestCancellation')}
                                                         </button>
                                                     );
                                                 })()}
@@ -744,7 +767,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                                         flex: 1, justifyContent: 'center'
                                                     }}
                                                 >
-                                                    <FiTrash2 size={14} /> Cancel
+                                                    <FiTrash2 size={14} /> {t('gen.cancel')}
                                                 </button>
                                                 <button
                                                     onClick={() => handleUploadClick(booking._id)}
@@ -758,7 +781,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                                         flex: 2, justifyContent: 'center'
                                                     }}
                                                 >
-                                                    <FiUploadCloud /> Upload Receipt
+                                                    <FiUploadCloud /> {t('pending.uploadNow')}
                                                 </button>
                                             </div>
                                         )}
@@ -775,7 +798,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                                     boxShadow: '0 2px 10px rgba(139, 92, 246, 0.3)'
                                                 }}
                                             >
-                                                <FiGrid /> QR Tickets
+                                                <FiGrid /> {t('booking.viewTickets')}
                                             </Link>
                                         )}
                                         {booking.status === 'confirmed' && booking.hasTheaterSeating && (
@@ -802,7 +825,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                                             fontSize: '0.85rem', fontWeight: 500, transition: 'all 0.2s'
                                                         }}
                                                     >
-                                                        <FiRotateCcw size={14} /> Re-request Return
+                                                        <FiRotateCcw size={14} /> {t('booking.requestCancellation')}
                                                     </button>
                                                 )}
                                                 {(() => {
@@ -813,7 +836,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                                     const unrequestedSeats = (booking.selectedSeats || []).filter(s => !pendingKeys.has(`${s.section}-${s.row}-${s.seatNumber}`));
 
                                                     if (isPastCancellationDeadline && booking.cancellationRequest?.status !== 'rejected') {
-                                                        return <span style={{ fontSize: '0.85rem', color: '#ef4444', fontStyle: 'italic', padding: '0.5rem 0' }}>Cancellation deadline passed</span>;
+                                                        return <span style={{ fontSize: '0.85rem', color: '#ef4444', fontStyle: 'italic', padding: '0.5rem 0' }}>{t('booking.deadlinePassed')}</span>;
                                                     }
 
                                                     if (booking.cancellationRequest?.status === 'pending' && unrequestedSeats.length > 0) {
@@ -828,7 +851,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                                                     fontSize: '0.85rem', fontWeight: 500, transition: 'all 0.2s'
                                                                 }}
                                                             >
-                                                                <FiRotateCcw size={14} /> Cancel More Seats
+                                                                <FiRotateCcw size={14} /> {t('booking.cancelMore')}
                                                             </button>
                                                         );
                                                     }
@@ -844,7 +867,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                                                                     fontSize: '0.85rem', fontWeight: 500, transition: 'all 0.2s'
                                                                 }}
                                                             >
-                                                                <FiRotateCcw size={14} /> Request Return
+                                                                <FiRotateCcw size={14} /> {t('booking.requestCancellation')}
                                                             </button>
                                                         );
                                                     }
@@ -862,15 +885,15 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
 
             <ConfirmationDialog
                 isOpen={showDeleteConfirm}
-                title="Cancel Booking"
-                message="Are you sure you want to cancel this booking? Your seats will be released."
+                title={t('pending.cancel')}
+                message={t('pending.cancelConfirm')}
                 itemName={(() => {
                     const booking = bookings.find(b => b._id === deleteBookingId);
                     const bEventId = typeof booking?.eventId === 'object' ? (booking?.eventId as any)._id : booking?.eventId;
                     return eventDetails[bEventId || '']?.title;
                 })()}
-                confirmText={cancellationLoading ? "Cancelling..." : "Yes, Cancel Booking"}
-                cancelText="Keep Booking"
+                confirmText={cancellationLoading ? t('gen.processing') : t('gen.confirm')}
+                cancelText={t('gen.cancel')}
                 variant="danger"
                 onConfirm={confirmCancel}
                 onCancel={() => setShowDeleteConfirm(false)}
@@ -889,6 +912,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                         seats={booking?.selectedSeats || []}
                         isLoading={cancelSeatsLoading}
                         bookingType="pending"
+                        isRTL={isRTL}
                     />
                 );
             })()}
@@ -913,6 +937,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                         onConfirm={handleRequestCancellationConfirm}
                         seats={availableSeats}
                         isLoading={requestCancelLoading}
+                        isRTL={isRTL}
                     />
                 );
             })()}

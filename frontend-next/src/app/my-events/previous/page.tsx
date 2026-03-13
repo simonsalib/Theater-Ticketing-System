@@ -82,9 +82,9 @@ const OrganizerPreviousEventsPage = () => {
                     <motion.div className="page-header" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
                             <Link href="/my-events" className="action-btn secondary" style={{ padding: '8px 12px' }}>
-                                <FiArrowLeft /> <span>Back to Event Dashboard</span>
+                                <FiArrowLeft /> <span>{t('myEvents.backToDashboard')}</span>
                             </Link>
-                            <h1 style={{ margin: 0, fontSize: '1.8rem', color: '#fff' }}>My Previous Events</h1>
+                            <h1 style={{ margin: 0, fontSize: '1.8rem', color: '#fff' }}>{t('myEvents.previousTitle')}</h1>
                         </div>
 
                         <div className="actions-bar">
@@ -107,7 +107,7 @@ const OrganizerPreviousEventsPage = () => {
 
                     {error && (
                         <motion.div className="error-container" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
-                            <span className="error-icon"><FiAlertCircle /></span><p>{error}</p><button onClick={fetchEvents} className="retry-btn">Try Again</button>
+                            <span className="error-icon"><FiAlertCircle /></span><p>{error}</p><button onClick={fetchEvents} className="retry-btn">{t('gen.tryAgain')}</button>
                         </motion.div>
                     )}
 
@@ -120,7 +120,7 @@ const OrganizerPreviousEventsPage = () => {
                                             <EventCard event={event} index={index} />
                                             <div className="event-actions" style={{ marginTop: 'auto', padding: '10px 15px', background: 'rgba(255,255,255,0.02)', borderTop: '1px solid rgba(255,255,255,0.05)', borderRadius: '0 0 16px 16px' }}>
                                                 <Link href={`/my-events/${event._id}/bookings`} className="view-bookings-btn-card" style={{ width: '100%', textAlign: 'center', justifyContent: 'center' }}>
-                                                    View Bookings (Read-Only)
+                                                    {t('myEvents.viewBookingsReadOnly')}
                                                 </Link>
                                             </div>
                                         </div>
@@ -129,8 +129,8 @@ const OrganizerPreviousEventsPage = () => {
                             ) : (
                                 <motion.div className="no-events" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                                     <span className="no-events-icon">⏳</span>
-                                    <h3>No Previous Events Found</h3>
-                                    <p>{searchTerm ? `${t('events.noMatch')} "${searchTerm}"` : 'You have no expired events yet.'}</p>
+                                    <h3>{t('myEvents.noPreviousEvents')}</h3>
+                                    <p>{searchTerm ? `${t('events.noMatch')} "${searchTerm}"` : t('myEvents.noPreviousEventsDesc')}</p>
                                 </motion.div>
                             )}
                         </motion.div>
