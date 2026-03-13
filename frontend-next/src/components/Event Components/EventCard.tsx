@@ -3,12 +3,14 @@ import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiCalendar, FiMapPin, FiTag, FiX, FiMaximize2, FiShoppingCart, FiInfo, FiAlertCircle, FiClock, FiShieldOff } from 'react-icons/fi';
+import { FiCalendar, FiMapPin, FiTag, FiX, FiMaximize2, FiShoppingCart, FiInfo, FiAlertCircle, FiClock, FiShieldOff, FiLoader } from 'react-icons/fi';
 import './EventCard.css';
 import { getImageUrl } from '@/utils/imageHelper';
 import { Event } from '@/types/event';
 import { useAuth } from '@/auth/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useInView } from 'react-intersection-observer';
+import api from '@/services/api';
 
 interface EventCardProps {
     event: Event;
@@ -22,8 +24,62 @@ const EventCard: React.FC<EventCardProps> = ({ event, index = 0 }) => {
     const { user } = useAuth();
     const { t } = useLanguage();
 
+    // Intersection observer for lazy loading seat data
+    const { ref, inView } = useInView({
+        triggerOnce: true,
+        threshold: 0.1,
+    });
+
+    const [seatData, setSeatData] = useState<any>(null);
+    const [seatLoading, setSeatLoading] = useState(false);
+
     // Support both _id (MongoDB) and id (Standard)
     const eventId = event._id || (event as any).id;
+
+    // Fetch seat data when theater event comes into view
+    React.useEffect(() => {
+        if (inView && event.hasTheaterSeating && !seatData && !seatLoading) {
+            const fetchSeatData = async () => {
+                try {
+                    setSeatLoading(true);
+                    const response = await api.get<any>(`/booking/event/${eventId}/seats`);
+                    const data = response.data.success ? response.data.data : response.data;
+                    if (data) {
+                        setSeatData(data);
+                    }
+                } catch (err) {
+                    console.error('Error fetching card seat data:', err);
+                } finally {
+                    setSeatLoading(false);
+                }
+            };
+            fetchSeatData();
+        }
+    }, [inView, event.hasTheaterSeating, eventId, seatData, seatLoading]);
+
+    const seatCounts = React.useMemo(() => {
+        if (!seatData || !seatData.seats) return null;
+
+        const activeSeats = seatData.seats.filter((s: any) => s.isActive);
+        const hasBalcony = activeSeats.some((s: any) => (s.section || 'main') === 'balcony');
+
+        const getStats = (section?: string) => {
+            const sectionSeats = section
+                ? activeSeats.filter((s: any) => (s.section || 'main') === section)
+                : activeSeats;
+            return {
+                available: sectionSeats.filter((s: any) => !s.isBooked).length,
+                count: sectionSeats.length
+            };
+        };
+
+        return {
+            total: getStats(),
+            main: getStats('main'),
+            balcony: getStats('balcony'),
+            hasBalcony
+        };
+    }, [seatData]);
 
     const formatDate = (dateString?: string) => {
         if (!dateString) return 'TBA';
@@ -81,6 +137,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, index = 0 }) => {
     return (
         <>
             <motion.div
+                ref={ref}
                 className="event-card-modern"
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -110,7 +167,40 @@ const EventCard: React.FC<EventCardProps> = ({ event, index = 0 }) => {
                             onLoad={() => setImageLoaded(true)}
                         />
                         <div className="image-gradient-overlay"></div>
-                        {!isExpired && <div className={`ticket-badge ${ticketStatus.class}`}>{ticketStatus.text}</div>}
+                        
+                        {!isExpired && (
+                            event.hasTheaterSeating ? (
+                                <div className="availability-mini-grid">
+                                    {seatLoading ? (
+                                        <div className="mini-stat-loading">
+                                            <FiLoader className="spin" size={14} />
+                                        </div>
+                                    ) : seatCounts ? (
+                                        <>
+                                            <div className="mini-stat total" title="إجمالي المتاح">
+                                                <span className="mini-value">{seatCounts.total.available}</span>
+                                                <span className="mini-label">إجمالي</span>
+                                            </div>
+                                            <div className="mini-stat main" title="متاح بالصالة">
+                                                <span className="mini-value">{seatCounts.main.available}</span>
+                                                <span className="mini-label">صالة</span>
+                                            </div>
+                                            {seatCounts.hasBalcony && (
+                                                <div className="mini-stat balcony" title="متاح بالبلكونة">
+                                                    <span className="mini-value">{seatCounts.balcony.available}</span>
+                                                    <span className="mini-label">بلكون</span>
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <div className={`ticket-badge ${ticketStatus.class}`}>{ticketStatus.text}</div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className={`ticket-badge ${ticketStatus.class}`}>{ticketStatus.text}</div>
+                            )
+                        )}
+
                         <motion.div className="expand-icon" initial={{ opacity: 0 }} whileHover={{ opacity: 1, scale: 1.1 }}>
                             <FiMaximize2 size={20} />
                         </motion.div>

@@ -512,3 +512,106 @@
         gap: 6px;
     }
 }
+
+/* ===== Availability Mini Grid (On Cards) ===== */
+.availability-mini-grid {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    gap: 6px;
+    z-index: 10;
+}
+
+.mini-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 10px;
+    background: rgba(15, 15, 22, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    min-width: 48px;
+    transition: all 0.3s ease;
+}
+
+.mini-stat:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.mini-value {
+    font-size: 0.9rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.mini-label {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.6;
+    margin-top: 1px;
+}
+
+/* Color Theming for Mini Stats */
+.mini-stat.total {
+    border-color: rgba(139, 92, 246, 0.3);
+}
+.mini-stat.total .mini-value { color: #A78BFA; }
+
+.mini-stat.main {
+    border-color: rgba(59, 130, 246, 0.3);
+}
+.mini-stat.main .mini-value { color: #60A5FA; }
+
+.mini-stat.balcony {
+    border-color: rgba(245, 158, 11, 0.3);
+}
+.mini-stat.balcony .mini-value { color: #FBBF24; }
+
+/* Loading State for Mini Stats */
+.mini-stat-loading {
+    padding: 8px;
+    background: rgba(15, 15, 22, 0.6);
+    backdrop-filter: blur(12px);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent-purple);
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Mobile Tweaks */
+@media (max-width: 480px) {
+    .availability-mini-grid {
+        top: 8px;
+        right: 8px;
+        gap: 4px;
+    }
+    .mini-stat {
+        padding: 3px 8px;
+        min-width: 42px;
+    }
+    .mini-value {
+        font-size: 0.8rem;
+    }
+    .mini-label {
+        font-size: 0.55rem;
+    }
+}

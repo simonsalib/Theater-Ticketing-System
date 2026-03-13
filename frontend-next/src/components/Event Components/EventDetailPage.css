@@ -1109,3 +1109,122 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* ===== Availability Stats Grid ===== */
+.availability-stats-grid {
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+    margin-right: 15px;
+}
+
+.stat-pill {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    min-width: 100px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.stat-pill::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 3px;
+    height: 100%;
+    opacity: 0.7;
+}
+
+.stat-pill:hover {
+    background: rgba(255, 255, 255, 0.06);
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.stat-content {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+.stat-value {
+    font-size: 1.25rem;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.5px;
+}
+
+.stat-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    opacity: 0.6;
+}
+
+.stat-total {
+    font-size: 0.65rem;
+    opacity: 0.4;
+    margin-top: 2px;
+    font-weight: 500;
+}
+
+/* Color Themes */
+.stat-pill.total {
+    border-color: rgba(139, 92, 246, 0.2);
+}
+.stat-pill.total::before { background: #8B5CF6; }
+.stat-pill.total .stat-value { color: #A78BFA; }
+
+.stat-pill.main {
+    border-color: rgba(59, 130, 246, 0.2);
+}
+.stat-pill.main::before { background: #3B82F6; }
+.stat-pill.main .stat-value { color: #60A5FA; }
+
+.stat-pill.balcony {
+    border-color: rgba(245, 158, 11, 0.2);
+}
+.stat-pill.balcony::before { background: #F59E0B; }
+.stat-pill.balcony .stat-value { color: #FBBF24; }
+
+/* Mobile Adjustments */
+@media (max-width: 1200px) {
+    .availability-stats-grid {
+        margin-right: 0;
+        margin-bottom: 10px;
+        width: 100%;
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 768px) {
+    .availability-stats-grid {
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 5px;
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+    .availability-stats-grid::-webkit-scrollbar {
+        display: none;
+    }
+    .stat-pill {
+        padding: 6px 12px;
+        min-width: 90px;
+        flex-shrink: 0;
+    }
+    .stat-value {
+        font-size: 1.1rem;
+    }
+}

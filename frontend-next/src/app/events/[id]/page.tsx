@@ -121,12 +121,34 @@ const EventDetailsPage = () => {
     const deadlineStr = event?.cancellationDeadline ? formatDeadline(event.cancellationDeadline) : null;
     const isPastDeadline = event?.cancellationDeadline ? new Date() > new Date(event.cancellationDeadline) : false;
 
-    const totalSeatCounts = React.useMemo(() => {
-        if (!seatData || !seatData.seats) return { available: 0, booked: 0, total: 0 };
+    const seatCounts = React.useMemo(() => {
+        if (!seatData || !seatData.seats) return {
+            total: { available: 0, booked: 0, count: 0 },
+            main: { available: 0, booked: 0, count: 0 },
+            balcony: { available: 0, booked: 0, count: 0 },
+            hasBalcony: false
+        };
+
         const activeSeats = seatData.seats.filter((s: any) => s.isActive);
-        const available = activeSeats.filter((s: any) => !s.isBooked).length;
-        const booked = activeSeats.filter((s: any) => s.isBooked).length;
-        return { available, booked, total: activeSeats.length };
+        const hasBalcony = activeSeats.some((s: any) => (s.section || 'main') === 'balcony');
+
+        const getStats = (section?: string) => {
+            const sectionSeats = section
+                ? activeSeats.filter((s: any) => (s.section || 'main') === section)
+                : activeSeats;
+            return {
+                available: sectionSeats.filter((s: any) => !s.isBooked).length,
+                booked: sectionSeats.filter((s: any) => s.isBooked).length,
+                count: sectionSeats.length
+            };
+        };
+
+        return {
+            total: getStats(),
+            main: getStats('main'),
+            balcony: getStats('balcony'),
+            hasBalcony
+        };
     }, [seatData]);
 
     if (loading) {
@@ -167,10 +189,31 @@ const EventDetailsPage = () => {
                         </div>
                         <div className="booking-summary-compact">
                             {seatData && (
-                                <>
-                                    <span className="seats-count">{totalSeatCounts.available} available of {totalSeatCounts.total}</span>
-                                    <span className="seats-count" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}>{totalSeatCounts.booked} booked</span>
-                                </>
+                                <div className="availability-stats-grid">
+                                    <div className="stat-pill total" title="إجمالي المقاعد المتاحة">
+                                        <div className="stat-content">
+                                            <span className="stat-value">{seatCounts.total.available}</span>
+                                            <span className="stat-label">متاح</span>
+                                        </div>
+                                        <div className="stat-total">من {seatCounts.total.count} إجمالي</div>
+                                    </div>
+                                    <div className="stat-pill main" title="توافر الصالة">
+                                        <div className="stat-content">
+                                            <span className="stat-value">{seatCounts.main.available}</span>
+                                            <span className="stat-label">الصالة</span>
+                                        </div>
+                                        <div className="stat-total">{seatCounts.main.count} مقعد</div>
+                                    </div>
+                                    {seatCounts.hasBalcony && (
+                                        <div className="stat-pill balcony" title="توافر البلكونة">
+                                            <div className="stat-content">
+                                                <span className="stat-value">{seatCounts.balcony.available}</span>
+                                                <span className="stat-label">البلكونة</span>
+                                            </div>
+                                            <div className="stat-total">{seatCounts.balcony.count} مقعد</div>
+                                        </div>
+                                    )}
+                                </div>
                             )}
                             {user?.role === "Standard User" && (
                                 <motion.button
