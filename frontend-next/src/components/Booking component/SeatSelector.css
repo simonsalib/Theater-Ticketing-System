@@ -354,6 +354,9 @@
     color: white;
     font-size: 0.65rem;
     font-weight: 600;
+    /* Ensure minimum touch target size for UX */
+    min-width: 32px;
+    min-height: 32px;
 }
 
 .seat-btn:hover:not(.booked):not(.disabled) {
@@ -586,8 +589,21 @@
     border: 1px solid rgba(139, 92, 246, 0.3);
     border-radius: 16px;
     padding: 20px;
-    z-index: 100;
+    z-index: 1000;
     box-shadow: 0 -10px 50px rgba(0, 0, 0, 0.5);
+    /* Mobile optimization: make it stick to bottom */
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (max-width: 768px) {
+    .selection-summary {
+        bottom: 0px;
+        width: 100%;
+        max-width: none;
+        border-radius: 20px 20px 0 0;
+        padding: 15px 20px 25px; /* Extra bottom padding for safe area */
+        box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.8);
+    }
 }
 
 .summary-header {

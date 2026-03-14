@@ -189,10 +189,10 @@ export class BookingsService implements OnModuleInit {
             );
             const conflicting = normalizedSeats
                 .filter(s => bookedSet.has(`${s.section}-${s.row}-${s.seatNumber}`))
-                .map(s => `${s.row}${s.seatNumber}`);
+                .map(s => (s as any).seatLabel || `${s.row}${s.seatNumber}`);
 
             throw new BadRequestException(
-                `Seats no longer available: ${conflicting.join(', ')}`,
+                `One or more seats are no longer available: ${conflicting.join(', ')}. Please refresh the page to see current availability.`,
             );
         }
 

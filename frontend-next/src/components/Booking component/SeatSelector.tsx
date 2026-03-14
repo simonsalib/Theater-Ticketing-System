@@ -48,34 +48,43 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
 
     // Fetch seat availability
     useEffect(() => {
-        if (initialSeatsData) return;
+        if (initialSeatsData && !loading) return; // For initial load only if provided
 
-        const fetchSeats = async () => {
+        const fetchSeats = async (isPoll = false) => {
             try {
-                setLoading(true);
-                setError(null);
+                if (!isPoll) setLoading(true);
                 const response = await api.get<any>(`/booking/event/${eventId}/seats`);
 
                 if (response.data.success) {
                     const data = response.data.data;
                     setTheaterData(data.theater);
-                    setSeats(data.seats);
+                    
+                    // Atomic update to prevent jerky UI
+                    setSeats(prevSeats => {
+                        // If it's a poll, only update if data changed (optional optimization)
+                        return data.seats;
+                    });
                     setSeatPricing(data.seatPricing);
-
-                    // DEBUG: Log booked seats
-                    const bookedSeats = data.seats.filter((s: any) => s.isBooked);
-                    console.log('[SeatSelector] Total seats:', data.seats.length);
-                    console.log('[SeatSelector] Booked seats:', bookedSeats.length, bookedSeats.map((s: any) => `${s.section}-${s.row}-${s.seatNumber}`));
                 }
             } catch (err: any) {
                 console.error('Error fetching seats:', err);
-                setError(err.response?.data?.message || 'Failed to load seats');
+                if (!isPoll) setError(err.response?.data?.message || 'Failed to load seats');
             } finally {
-                setLoading(false);
+                if (!isPoll) setLoading(false);
             }
         };
+
         fetchSeats();
-    }, [eventId]);
+
+        // Implement Polling to prevent "Ghost" seats
+        const pollInterval = setInterval(() => {
+            if (!readOnly) {
+                fetchSeats(true);
+            }
+        }, 10000); // 10 seconds
+
+        return () => clearInterval(pollInterval);
+    }, [eventId, readOnly]);
 
     // Group seats by SECTION and ROW for easy lookup
     const seatMap = useMemo(() => {
