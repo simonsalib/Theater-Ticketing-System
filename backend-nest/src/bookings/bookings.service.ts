@@ -72,36 +72,25 @@ export class BookingsService implements OnModuleInit {
                 this.logger.log(`Expired pending booking ${booking._id} cleaned up`);
             }
 
-            // 3. Robust Orphan Detection: Cleanup any seats in Event.bookedSeats that point to non-existent holds/bookings
-            const eventsWithSeats = await this.eventModel.find({ "bookedSeats.0": { $exists: true } }).exec();
-            for (const event of eventsWithSeats) {
-                const validSeats = [];
-                let removedOrphans = 0;
-
+            // 3. Safe Cleanup: Cleanup any seats in Event.bookedSeats that point to expired SeatHolds
+            const eventsWithHolds = await this.eventModel.find({ "bookedSeats.holdId": { $exists: true } }).exec();
+            for (const event of eventsWithHolds) {
+                const expiredHoldIds = [];
                 for (const seat of event.bookedSeats) {
-                    let isOrphan = false;
-
                     if (seat.holdId) {
-                        const holdExists = await this.seatHoldModel.exists({ _id: seat.holdId });
-                        if (!holdExists) isOrphan = true;
-                    } else if (seat.bookingId) {
-                        const bookingExists = await this.bookingModel.exists({ _id: seat.bookingId });
-                        if (!bookingExists) isOrphan = true;
-                    }
-
-                    if (isOrphan) {
-                        removedOrphans++;
-                    } else {
-                        validSeats.push(seat);
+                        const hold = await this.seatHoldModel.findById(seat.holdId);
+                        if (!hold || hold.expiresAt <= new Date()) {
+                            expiredHoldIds.push(seat.holdId);
+                        }
                     }
                 }
 
-                if (removedOrphans > 0) {
+                if (expiredHoldIds.length > 0) {
                     await this.eventModel.findByIdAndUpdate(event._id, {
-                        $set: { bookedSeats: validSeats },
-                        $inc: { remainingTickets: removedOrphans }
+                        $pull: { bookedSeats: { holdId: { $in: expiredHoldIds } } },
+                        $inc: { remainingTickets: expiredHoldIds.length }
                     });
-                    this.logger.warn(`Cleaned up ${removedOrphans} orphaned seats in event ${event._id} (${event.title})`);
+                    this.logger.log(`Cleaned up ${expiredHoldIds.length} expired hold seats in event ${event._id}`);
                 }
             }
         } catch (err) {
@@ -633,6 +622,39 @@ export class BookingsService implements OnModuleInit {
         }
 
         booking.status = status;
+
+        if (status === 'confirmed') {
+            const seats = booking.selectedSeats;
+            const eventId = booking.eventId;
+
+            // Atomic repair: Add missing seats to event.bookedSeats if they aren't there
+            const seatUpdates = seats.map(s => ({
+                row: s.row,
+                seatNumber: s.seatNumber,
+                section: s.section || 'main',
+                seatLabel: s.seatLabel || `${s.row}${s.seatNumber}`,
+                bookingId: booking._id
+            }));
+
+            for (const seat of seatUpdates) {
+                await this.eventModel.updateOne(
+                    {
+                        _id: eventId,
+                        "bookedSeats": {
+                            $not: {
+                                $elemMatch: {
+                                    row: { $regex: new RegExp(`^${seat.row}$`, 'i') },
+                                    seatNumber: seat.seatNumber,
+                                    section: seat.section
+                                }
+                            }
+                        }
+                    },
+                    { $push: { bookedSeats: seat } }
+                );
+            }
+        }
+
         const savedBooking = await booking.save();
 
         // Generate QR code tickets when booking is confirmed
