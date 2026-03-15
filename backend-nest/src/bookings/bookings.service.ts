@@ -72,25 +72,54 @@ export class BookingsService implements OnModuleInit {
                 this.logger.log(`Expired pending booking ${booking._id} cleaned up`);
             }
 
-            // 3. Safe Cleanup: Cleanup any seats in Event.bookedSeats that point to expired SeatHolds
-            const eventsWithHolds = await this.eventModel.find({ "bookedSeats.holdId": { $exists: true } }).exec();
-            for (const event of eventsWithHolds) {
-                const expiredHoldIds = [];
-                for (const seat of event.bookedSeats) {
-                    if (seat.holdId) {
-                        const hold = await this.seatHoldModel.findById(seat.holdId);
-                        if (!hold || hold.expiresAt <= new Date()) {
-                            expiredHoldIds.push(seat.holdId);
-                        }
-                    }
-                }
+            // 3. Deep Sync / Ghost Removal: Cleanup any seats in Event.bookedSeats that point to non-existent bookings or expired holds
+            const eventsWithSeats = await this.eventModel.find({ "bookedSeats.0": { $exists: true } }).exec();
+            for (const event of eventsWithSeats) {
+                const bookingIds = [...new Set(event.bookedSeats.filter(s => s.bookingId).map(s => s.bookingId.toString()))];
+                const holdIds = [...new Set(event.bookedSeats.filter(s => s.holdId).map(s => s.holdId.toString()))];
 
-                if (expiredHoldIds.length > 0) {
-                    await this.eventModel.findByIdAndUpdate(event._id, {
-                        $pull: { bookedSeats: { holdId: { $in: expiredHoldIds } } },
-                        $inc: { remainingTickets: expiredHoldIds.length }
-                    });
-                    this.logger.log(`Cleaned up ${expiredHoldIds.length} expired hold seats in event ${event._id}`);
+                const [validBookings, validHolds] = await Promise.all([
+                    this.bookingModel.find({ _id: { $in: bookingIds } }).select('_id').lean().exec(),
+                    this.seatHoldModel.find({ _id: { $in: holdIds }, expiresAt: { $gt: new Date() } }).select('_id').lean().exec()
+                ]);
+
+                const validBookingSet = new Set(validBookings.map(b => b._id.toString()));
+                const validHoldSet = new Set(validHolds.map(h => h._id.toString()));
+
+                const orphanedBookingIds = bookingIds.filter(id => !validBookingSet.has(id));
+                const orphanedHoldIds = holdIds.filter(id => !validHoldSet.has(id));
+
+                if (orphanedBookingIds.length > 0 || orphanedHoldIds.length > 0) {
+                    const pullQuery: any = {};
+                    if (orphanedBookingIds.length > 0 && orphanedHoldIds.length > 0) {
+                        pullQuery.$or = [
+                            { bookingId: { $in: orphanedBookingIds.map(id => new Types.ObjectId(id)) } },
+                            { holdId: { $in: orphanedHoldIds.map(id => new Types.ObjectId(id)) } }
+                        ];
+                    } else if (orphanedBookingIds.length > 0) {
+                        pullQuery.bookingId = { $in: orphanedBookingIds.map(id => new Types.ObjectId(id)) };
+                    } else {
+                        pullQuery.holdId = { $in: orphanedHoldIds.map(id => new Types.ObjectId(id)) };
+                    }
+
+                    const updatedEvent = await this.eventModel.findByIdAndUpdate(
+                        event._id,
+                        { $pull: { bookedSeats: pullQuery } },
+                        { new: true }
+                    ).exec();
+
+                    if (updatedEvent) {
+                        // Recalculate remainingTickets to ensure sync for theater seating events
+                        if (updatedEvent.hasTheaterSeating) {
+                            const totalTickets = updatedEvent.totalTickets || event.totalTickets || 0;
+                            const correctRemaining = totalTickets - updatedEvent.bookedSeats.length;
+                            if (updatedEvent.remainingTickets !== correctRemaining) {
+                                await this.eventModel.findByIdAndUpdate(event._id, { remainingTickets: correctRemaining }).exec();
+                                this.logger.log(`Repaired remainingTickets for event ${event._id}: ${updatedEvent.remainingTickets} -> ${correctRemaining}`);
+                            }
+                        }
+                        this.logger.log(`Cleaned up ${orphanedBookingIds.length} ghost bookings and ${orphanedHoldIds.length} ghost holds in event ${event._id}`);
+                    }
                 }
             }
         } catch (err) {
