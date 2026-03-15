@@ -1014,8 +1014,22 @@ export class BookingsService implements OnModuleInit {
                 section: s.section || 'main',
             }))
             : seatKeys.map((key) => {
-                const [section, row, seatNum] = key.split('-');
-                return { section, row, seatNumber: parseInt(seatNum, 10) };
+                const matchingSeat = (booking.selectedSeats as any[]).find(
+                    (s: any) => `${s.section || 'main'}-${s.row}-${s.seatNumber}` === key,
+                );
+                if (matchingSeat) {
+                    return {
+                        section: matchingSeat.section || 'main',
+                        row: matchingSeat.row,
+                        seatNumber: matchingSeat.seatNumber,
+                    };
+                }
+                // Fallback: split from right to handle potential hyphens in section/row
+                const parts = key.split('-');
+                const seatNumber = parseInt(parts.pop() || '0', 10);
+                const rowLabel = parts.pop() || '';
+                const sectionName = parts.join('-') || 'main';
+                return { section: sectionName, row: rowLabel, seatNumber };
             })
         ).filter((s: any) => !scannedKeys.has(`${s.section}-${s.row}-${s.seatNumber}`));
 
