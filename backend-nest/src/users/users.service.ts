@@ -19,7 +19,11 @@ export class UsersService {
     }
 
     async findOneByEmail(email: string): Promise<UserDocument | null> {
-        return this.userModel.findOne({ email: email.toLowerCase() }).exec();
+        if (!email) return null;
+        const lowerEmail = email.toLowerCase();
+        return this.userModel.findOne({ 
+            email: { $regex: new RegExp(`^${lowerEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } 
+        }).exec();
     }
 
     async findOneByUsername(username: string): Promise<UserDocument | null> {
