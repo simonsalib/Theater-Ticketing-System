@@ -1110,7 +1110,10 @@ export class BookingsService implements OnModuleInit {
         return this.bookingModel
             .find({
                 eventId,
-                'cancellationRequest.status': 'pending',
+                $or: [
+                    { 'cancellationRequest.status': 'pending' },
+                    { 'cancellationHistory.0': { $exists: true } }
+                ],
             } as any)
             .populate('StandardId', 'name email phone')
             .sort({ 'cancellationRequest.requestedAt': -1 })
@@ -1165,13 +1168,15 @@ export class BookingsService implements OnModuleInit {
             }
 
             booking.status = 'canceled';
-            booking.cancellationRequest = {
+            const approvedRequest = {
                 status: 'approved',
                 requestedAt: booking.cancellationRequest.requestedAt,
                 reason: booking.cancellationRequest.reason,
                 seatsToCancel: seatsToCancel as any,
                 cancelAll: true,
             } as any;
+            booking.cancellationHistory.push(approvedRequest);
+            booking.cancellationRequest = approvedRequest;
 
             return booking.save();
         }
@@ -1221,6 +1226,15 @@ export class BookingsService implements OnModuleInit {
         booking.numberOfTickets = remainingSeats.length;
         booking.totalPrice = booking.totalPrice - removedPrice;
 
+        const approvedPartial = {
+            status: 'approved',
+            requestedAt: booking.cancellationRequest.requestedAt,
+            reason: booking.cancellationRequest.reason,
+            seatsToCancel: seatsToCancel as any,
+            cancelAll: false,
+        } as any;
+        booking.cancellationHistory.push(approvedPartial);
+
         // Reset to 'none' so the user can request cancellation for remaining seats
         booking.cancellationRequest = {
             status: 'none',
@@ -1257,12 +1271,22 @@ export class BookingsService implements OnModuleInit {
             throw new BadRequestException('No pending cancellation request found');
         }
 
-        booking.cancellationRequest = {
+        const rejectedRequest = {
             status: 'rejected',
             requestedAt: booking.cancellationRequest.requestedAt,
             reason: booking.cancellationRequest.reason,
             seatsToCancel: booking.cancellationRequest.seatsToCancel as any,
             cancelAll: booking.cancellationRequest.cancelAll,
+        } as any;
+        booking.cancellationHistory.push(rejectedRequest);
+
+        // Reset to 'none' so the user can request cancellation for remaining seats
+        booking.cancellationRequest = {
+            status: 'none',
+            requestedAt: null,
+            reason: '',
+            seatsToCancel: [],
+            cancelAll: false,
         } as any;
 
         return booking.save();

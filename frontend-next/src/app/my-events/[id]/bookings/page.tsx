@@ -49,6 +49,13 @@ interface Booking {
         seatsToCancel?: { row: string; seatNumber: number; section: string; seatLabel?: string }[];
         cancelAll?: boolean;
     };
+    cancellationHistory?: {
+        status: 'none' | 'pending' | 'approved' | 'rejected';
+        requestedAt?: string;
+        reason?: string;
+        seatsToCancel?: { row: string; seatNumber: number; section: string; seatLabel?: string }[];
+        cancelAll?: boolean;
+    }[];
 }
 
 const EventBookingsPage = () => {
@@ -592,168 +599,191 @@ const EventBookingsPage = () => {
                             ) : (
                                 <div className="eb-list">
                                     <AnimatePresence>
-                                        {cancellationRequests.map((booking, index) => (
-                                            <motion.div
-                                                key={booking._id}
-                                                className="eb-card"
-                                                initial={{ opacity: 0, y: 20 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                transition={{ delay: index * 0.05 }}
-                                                style={{ borderLeft: '3px solid #f59e0b' }}
-                                            >
-                                                <div className="eb-card-top">
-                                                    <div className="eb-user-info">
-                                                        <div className="eb-user-avatar" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
-                                                            {booking.StandardId?.name?.charAt(0)?.toUpperCase() || '?'}
-                                                        </div>
-                                                        <div>
-                                                            <h3>{booking.StandardId?.name || 'Unknown User'}</h3>
-                                                            <div className="eb-user-meta">
-                                                                <span><FiMail size={13} /> {booking.StandardId?.email || 'N/A'}</span>
-                                                                {booking.StandardId?.phone && (
-                                                                    <span><FiPhone size={13} /> {booking.StandardId.phone}</span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="eb-card-right">
-                                                        <span className="status-badge" style={{
-                                                            background: 'rgba(245, 158, 11, 0.15)',
-                                                            color: '#fbbf24',
-                                                            border: '1px solid rgba(245, 158, 11, 0.3)',
-                                                            padding: '4px 12px', borderRadius: '20px',
-                                                            fontSize: '0.8rem', fontWeight: 600,
-                                                            display: 'flex', alignItems: 'center', gap: '4px'
-                                                        }}>
-                                                            <FiRotateCcw size={12} /> Return Request
-                                                        </span>
-                                                        <span className="eb-price">{booking.totalPrice?.toFixed(2)} EGP</span>
-                                                    </div>
-                                                </div>
+                                        {cancellationRequests.flatMap((booking) => {
+                                            const allRequests = [
+                                                ...(booking.cancellationRequest?.status === 'pending' ? [{ ...booking.cancellationRequest, id: 'pending' }] : []),
+                                                ...(booking.cancellationHistory || []).map((h, i) => ({ ...h, id: `hist-${i}` }))
+                                            ];
+                                            
+                                            allRequests.sort((a, b) => new Date(b.requestedAt || 0).getTime() - new Date(a.requestedAt || 0).getTime());
 
-                                                {/* Seats to cancel */}
-                                                <div style={{
-                                                    margin: '12px 0', padding: '14px',
-                                                    background: 'rgba(245, 158, 11, 0.06)',
-                                                    border: '1px solid rgba(245, 158, 11, 0.15)',
-                                                    borderRadius: '12px',
-                                                }}>
-                                                    <h4 style={{ margin: '0 0 10px', color: '#fbbf24', fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                        <FiGrid size={14} />
-                                                        {booking.cancellationRequest?.cancelAll
-                                                            ? `Requesting to return ALL ${booking.selectedSeats?.length || 0} seats`
-                                                            : `Requesting to return ${booking.cancellationRequest?.seatsToCancel?.length || 0} seat(s)`
-                                                        }
-                                                    </h4>
-                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                                        {(booking.cancellationRequest?.cancelAll
-                                                            ? booking.selectedSeats
-                                                            : booking.cancellationRequest?.seatsToCancel || []
-                                                        ).map((seat, sIdx) => (
-                                                            <span key={sIdx} style={{
-                                                                padding: '4px 12px', borderRadius: '8px',
-                                                                background: 'rgba(239, 68, 68, 0.12)',
-                                                                border: '1px solid rgba(239, 68, 68, 0.25)',
-                                                                color: '#fca5a5', fontSize: '0.85rem', fontWeight: 600,
-                                                            }}>
-                                                                {seat.seatLabel || `${seat.row}${seat.seatNumber}`}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                    {booking.cancellationRequest?.reason && (
-                                                        <div style={{
-                                                            marginTop: '10px', padding: '10px 14px',
-                                                            background: 'rgba(255,255,255,0.03)',
-                                                            borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)',
-                                                        }}>
-                                                            <span style={{ color: '#9ca3af', fontSize: '0.8rem', fontWeight: 600 }}>Reason:</span>
-                                                            <p style={{ color: '#e2e8f0', fontSize: '0.85rem', margin: '4px 0 0', lineHeight: 1.5 }}>
-                                                                {booking.cancellationRequest.reason}
-                                                            </p>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                            return allRequests.map((req, rIdx) => {
+                                                const isPending = req.status === 'pending';
+                                                const isApproved = req.status === 'approved';
+                                                const isRejected = req.status === 'rejected';
 
-                                                {/* All booking seats for reference */}
-                                                {booking.hasTheaterSeating && booking.selectedSeats?.length > 0 && (
-                                                    <div className="eb-seats-section">
-                                                        <h4><FiGrid size={14} /> All Booked Seats ({booking.selectedSeats.length})</h4>
-                                                        <div className="eb-seats-grid">
-                                                            {booking.selectedSeats.map((seat, sIdx) => {
-                                                                const isRequestedForCancel = booking.cancellationRequest?.seatsToCancel?.some(
-                                                                    (cs) => cs.row === seat.row && cs.seatNumber === seat.seatNumber && cs.section === seat.section
-                                                                ) || booking.cancellationRequest?.cancelAll;
-                                                                return (
-                                                                    <div 
-                                                                        key={sIdx} 
-                                                                        className="eb-seat-item" 
-                                                                        onClick={() => {
-                                                                            setSelectedSeatInfo(seat);
-                                                                            setIsSeatModalOpen(true);
-                                                                        }}
-                                                                        style={{
-                                                                            borderColor: isRequestedForCancel ? 'rgba(239, 68, 68, 0.4)' : undefined,
-                                                                            background: isRequestedForCancel ? 'rgba(239, 68, 68, 0.08)' : undefined,
-                                                                            cursor: 'pointer'
-                                                                        }}
-                                                                    >
-                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                                            <span className="eb-seat-label">
-                                                                                {formatSeatLabel(seat)}
-                                                                            </span>
-                                                                            <FiEye size={14} style={{ color: '#8b5cf6', opacity: 0.7 }} title="View attendee details" />
-                                                                        </div>
-                                                                        <span className="eb-seat-type">{seat.seatType}</span>
-                                                                        <span className="eb-seat-price">{seat.price} EGP</span>
-                                                                        {isRequestedForCancel && (
-                                                                            <span style={{ color: '#ef4444', fontSize: '0.75rem', fontWeight: 700 }}>RETURN</span>
-                                                                        )}
-                                                                        {(seat.attendeeFirstName || seat.attendeeLastName) && (
-                                                                            <div className="eb-seat-attendee">
-                                                                                <FiUser size={12} /> {seat.attendeeFirstName} {seat.attendeeLastName}
-                                                                                {seat.attendeePhone && (
-                                                                                    <span className="eb-att-phone"><FiPhone size={11} /> {seat.attendeePhone}</span>
-                                                                                )}
-                                                                            </div>
+                                                const statusBadgeStyle = isPending 
+                                                    ? { background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.3)' }
+                                                    : isApproved
+                                                        ? { background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)' }
+                                                        : { background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)' };
+
+                                                const statusText = isPending ? 'Return Request' : isApproved ? 'Return Approved' : 'Return Rejected';
+                                                const statusIcon = isPending ? <FiRotateCcw size={12} /> : isApproved ? <FiCheckCircle size={12} /> : <FiXCircle size={12} />;
+                                                const borderColor = isPending ? '#f59e0b' : isApproved ? '#10b981' : '#ef4444';
+
+                                                return (
+                                                    <motion.div
+                                                        key={`${booking._id}-${req.id}`}
+                                                        className="eb-card"
+                                                        initial={{ opacity: 0, y: 20 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        transition={{ delay: rIdx * 0.05 }}
+                                                        style={{ borderLeft: `3px solid ${borderColor}` }}
+                                                    >
+                                                        <div className="eb-card-top">
+                                                            <div className="eb-user-info">
+                                                                <div className="eb-user-avatar" style={{ background: `linear-gradient(135deg, ${borderColor}, #000)` }}>
+                                                                    {booking.StandardId?.name?.charAt(0)?.toUpperCase() || '?'}
+                                                                </div>
+                                                                <div>
+                                                                    <h3>{booking.StandardId?.name || 'Unknown User'}</h3>
+                                                                    <div className="eb-user-meta">
+                                                                        <span><FiMail size={13} /> {booking.StandardId?.email || 'N/A'}</span>
+                                                                        {booking.StandardId?.phone && (
+                                                                            <span><FiPhone size={13} /> {booking.StandardId.phone}</span>
                                                                         )}
                                                                     </div>
-                                                                );
-                                                            })}
+                                                                </div>
+                                                            </div>
+                                                            <div className="eb-card-right">
+                                                                <span className="status-badge" style={{
+                                                                    ...statusBadgeStyle,
+                                                                    padding: '4px 12px', borderRadius: '20px',
+                                                                    fontSize: '0.8rem', fontWeight: 600,
+                                                                    display: 'flex', alignItems: 'center', gap: '4px'
+                                                                }}>
+                                                                    {statusIcon} {statusText}
+                                                                </span>
+                                                                <span className="eb-price">{booking.totalPrice?.toFixed(2)} EGP</span>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                )}
 
-                                                <div className="eb-card-bottom">
-                                                    <span className="eb-date">
-                                                        Requested: {booking.cancellationRequest?.requestedAt
-                                                            ? formatDate(booking.cancellationRequest.requestedAt)
-                                                            : 'N/A'}
-                                                    </span>
-                                                    {!isExpired && (
-                                                        <div className="eb-actions">
-                                                            <motion.button
-                                                                className="eb-approve-btn"
-                                                                onClick={() => handleCancellationAction(booking._id, 'approve')}
-                                                                disabled={cancellationLoading}
-                                                                whileHover={{ scale: 1.03 }}
-                                                                whileTap={{ scale: 0.97 }}
-                                                            >
-                                                                <FiCheckCircle /> Approve Return
-                                                            </motion.button>
-                                                            <motion.button
-                                                                className="eb-reject-btn"
-                                                                onClick={() => handleCancellationAction(booking._id, 'reject')}
-                                                                disabled={cancellationLoading}
-                                                                whileHover={{ scale: 1.03 }}
-                                                                whileTap={{ scale: 0.97 }}
-                                                            >
-                                                                <FiXCircle /> Reject
-                                                            </motion.button>
+                                                        {/* Seats to cancel */}
+                                                        <div style={{
+                                                            margin: '12px 0', padding: '14px',
+                                                            background: 'rgba(245, 158, 11, 0.06)',
+                                                            border: `1px solid ${borderColor}55`,
+                                                            borderRadius: '12px',
+                                                        }}>
+                                                            <h4 style={{ margin: '0 0 10px', color: borderColor, fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                <FiGrid size={14} />
+                                                                {req.cancelAll
+                                                                    ? `Requested to return ALL ${booking.selectedSeats?.length || 0} seats`
+                                                                    : `Requested to return ${req.seatsToCancel?.length || 0} seat(s)`
+                                                                }
+                                                            </h4>
+                                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                                                {(req.cancelAll
+                                                                    ? booking.selectedSeats
+                                                                    : req.seatsToCancel || []
+                                                                ).map((seat, sIdx) => (
+                                                                    <span key={sIdx} style={{
+                                                                        padding: '4px 12px', borderRadius: '8px',
+                                                                        background: 'rgba(239, 68, 68, 0.12)',
+                                                                        border: '1px solid rgba(239, 68, 68, 0.25)',
+                                                                        color: '#fca5a5', fontSize: '0.85rem', fontWeight: 600,
+                                                                    }}>
+                                                                        {seat.seatLabel || `${seat.row}${seat.seatNumber}`}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                            {req.reason && (
+                                                                <div style={{
+                                                                    marginTop: '10px', padding: '10px 14px',
+                                                                    background: 'rgba(255,255,255,0.03)',
+                                                                    borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)',
+                                                                }}>
+                                                                    <span style={{ color: '#9ca3af', fontSize: '0.8rem', fontWeight: 600 }}>Reason:</span>
+                                                                    <p style={{ color: '#e2e8f0', fontSize: '0.85rem', margin: '4px 0 0', lineHeight: 1.5 }}>
+                                                                        {req.reason}
+                                                                    </p>
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                    )}
-                                                </div>
-                                            </motion.div>
-                                        ))}
+
+                                                        {/* All booking seats for reference */}
+                                                        {booking.hasTheaterSeating && booking.selectedSeats?.length > 0 && (
+                                                            <div className="eb-seats-section">
+                                                                <h4><FiGrid size={14} /> All Booked Seats ({booking.selectedSeats.length})</h4>
+                                                                <div className="eb-seats-grid">
+                                                                    {booking.selectedSeats.map((seat, sIdx) => {
+                                                                        const isRequestedForCancel = req.seatsToCancel?.some(
+                                                                            (cs: any) => cs.row === seat.row && cs.seatNumber === seat.seatNumber && cs.section === seat.section
+                                                                        ) || req.cancelAll;
+                                                                        return (
+                                                                            <div 
+                                                                                key={sIdx} 
+                                                                                className="eb-seat-item" 
+                                                                                onClick={() => {
+                                                                                    setSelectedSeatInfo(seat as any);
+                                                                                    setIsSeatModalOpen(true);
+                                                                                }}
+                                                                                style={{
+                                                                                    borderColor: isRequestedForCancel ? 'rgba(239, 68, 68, 0.4)' : undefined,
+                                                                                    background: isRequestedForCancel ? 'rgba(239, 68, 68, 0.08)' : undefined,
+                                                                                    cursor: 'pointer'
+                                                                                }}
+                                                                            >
+                                                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                                    <span className="eb-seat-label">
+                                                                                        {formatSeatLabel(seat as any)}
+                                                                                    </span>
+                                                                                    <FiEye size={14} style={{ color: '#8b5cf6', opacity: 0.7 }} title="View attendee details" />
+                                                                                </div>
+                                                                                <span className="eb-seat-type">{seat.seatType}</span>
+                                                                                <span className="eb-seat-price">{seat.price} EGP</span>
+                                                                                {isRequestedForCancel && (
+                                                                                    <span style={{ color: '#ef4444', fontSize: '0.75rem', fontWeight: 700 }}>RETURN</span>
+                                                                                )}
+                                                                                {(seat.attendeeFirstName || seat.attendeeLastName) && (
+                                                                                    <div className="eb-seat-attendee">
+                                                                                        <FiUser size={12} /> {seat.attendeeFirstName} {seat.attendeeLastName}
+                                                                                        {seat.attendeePhone && (
+                                                                                            <span className="eb-att-phone"><FiPhone size={11} /> {seat.attendeePhone}</span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        <div className="eb-card-bottom">
+                                                            <span className="eb-date">
+                                                                Requested: {req.requestedAt
+                                                                    ? formatDate(req.requestedAt)
+                                                                    : 'N/A'}
+                                                            </span>
+                                                            {!isExpired && isPending && (
+                                                                <div className="eb-actions">
+                                                                    <motion.button
+                                                                        className="eb-approve-btn"
+                                                                        onClick={() => handleCancellationAction(booking._id, 'approve')}
+                                                                        disabled={cancellationLoading}
+                                                                        whileHover={{ scale: 1.03 }}
+                                                                        whileTap={{ scale: 0.97 }}
+                                                                    >
+                                                                        <FiCheckCircle /> Approve Return
+                                                                    </motion.button>
+                                                                    <motion.button
+                                                                        className="eb-reject-btn"
+                                                                        onClick={() => handleCancellationAction(booking._id, 'reject')}
+                                                                        disabled={cancellationLoading}
+                                                                        whileHover={{ scale: 1.03 }}
+                                                                        whileTap={{ scale: 0.97 }}
+                                                                    >
+                                                                        <FiXCircle /> Reject
+                                                                    </motion.button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </motion.div>
+                                                );
+                                            });
+                                        })}
                                     </AnimatePresence>
                                 </div>
                             )}

@@ -111,6 +111,9 @@ export class Booking {
 
     @Prop({ type: CancellationRequest, default: () => ({ status: 'none' }) })
     cancellationRequest: CancellationRequest;
+
+    @Prop({ type: [CancellationRequest], default: [] })
+    cancellationHistory: CancellationRequest[];
 }
 
 export const BookingSchema = SchemaFactory.createForClass(Booking);
