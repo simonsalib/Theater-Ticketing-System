@@ -19,7 +19,19 @@ export class UsersService {
     }
 
     async findOneByEmail(email: string): Promise<UserDocument | null> {
-        return this.userModel.findOne({ email }).exec();
+        if (!email) return null;
+        const lowerEmail = email.toLowerCase();
+        return this.userModel.findOne({ 
+            email: { $regex: new RegExp(`^${lowerEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } 
+        }).exec();
+    }
+
+    async findOneByUsername(username: string): Promise<UserDocument | null> {
+        if (!username) return null;
+        const escapedUsername = username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return this.userModel.findOne({
+            username: { $regex: new RegExp(`^${escapedUsername}$`, 'i') },
+        }).exec();
     }
 
     async findById(id: string): Promise<UserDocument> {
@@ -53,25 +65,32 @@ export class UsersService {
     }
 
     async updateProfile(id: string, updateDto: any): Promise<UserDocument> {
-        const { name, email, phone, profilePicture, instapayNumber, instapayQR } = updateDto;
+        console.log('Update Profile DTO received:', JSON.stringify(updateDto, null, 2));
+        const { name, email, phone, profilePicture, instapayNumber, instapayLink, instapayQR } = updateDto;
 
         const user = await this.userModel.findById(id).exec();
         if (!user) {
             throw new NotFoundException('User not found');
         }
 
-        if (email && email !== user.email) {
-            const existingUser = await this.userModel.findOne({ email }).exec();
+        if (email && email.toLowerCase() !== user.email) {
+            const existingUser = await this.userModel.findOne({ email: email.toLowerCase() }).exec();
             if (existingUser) {
                 throw new BadRequestException('Email already in use');
             }
         }
 
         if (name) user.name = name;
-        if (email) user.email = email;
-        if (phone !== undefined) user.set('phone', phone);
+        if (email) user.email = email.toLowerCase();
+        if (phone !== undefined) {
+            if (phone && !/^01\d{9}$/.test(phone)) {
+                throw new BadRequestException('Phone number must be 11 digits starting with 01');
+            }
+            user.set('phone', phone);
+        }
         if (profilePicture !== undefined) user.set('profilePicture', profilePicture);
         if (instapayNumber !== undefined) user.set('instapayNumber', instapayNumber);
+        if (instapayLink !== undefined) user.set('instapayLink', instapayLink);
         if (instapayQR !== undefined) {
             user.set('instapayQR', instapayQR);
             user.markModified('instapayQR');
@@ -80,15 +99,55 @@ export class UsersService {
         return await user.save();
     }
 
-    // Admin-only: Create user with Admin or Organizer role (requires password change on first login)
-    async createUserByAdmin(createDto: any): Promise<UserDocument> {
-        const { email, password, name, role, phone, instapayNumber, instapayQR } = createDto;
+    async updateLanguage(id: string, language: 'en' | 'ar'): Promise<UserDocument> {
+        if (!['en', 'ar'].includes(language)) {
+            throw new BadRequestException('Invalid language. Allowed values: en, ar');
+        }
+        const user = await this.userModel
+            .findByIdAndUpdate(id, { language }, { new: true })
+            .select('-password')
+            .exec();
+        if (!user) throw new NotFoundException('User not found');
+        return user;
+    }
 
-        // Only allow Admin or Organizer roles
-        if (role !== UserRole.ADMIN && role !== UserRole.ORGANIZER) {
-            throw new BadRequestException('Admin can only create Admin or Organizer accounts');
+    async createUserByAdmin(createDto: any): Promise<UserDocument> {
+        const { email, password, name, role, phone, instapayNumber, instapayLink, instapayQR, username } = createDto;
+
+        // Allow Admin, Organizer, or Scanner roles
+        if (role !== UserRole.ADMIN && role !== UserRole.ORGANIZER && role !== UserRole.SCANNER) {
+            throw new BadRequestException('Admin can only create Admin, Organizer, or Scanner accounts');
         }
 
+        // Scanner uses username, others use email
+        if (role === UserRole.SCANNER) {
+            if (!username) {
+                throw new BadRequestException('Scanner accounts require a username');
+            }
+            const sanitizedUsername = username.startsWith('$') ? username.substring(1) : username;
+            const existingScanner = await this.findOneByUsername(sanitizedUsername);
+            if (existingScanner) {
+                throw new ConflictException('Scanner with this username already exists');
+            }
+
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+            // Generate a dummy email to prevent MongoDB E11000 duplicate key error on null emails
+            const dummyEmail = `scanner_${sanitizedUsername}_${Date.now()}@system.local`;
+
+            const newScanner = new this.userModel({
+                name,
+                username: sanitizedUsername,
+                email: dummyEmail,
+                password: hashedPassword,
+                role: UserRole.SCANNER,
+                isVerified: true,
+                requiresPasswordChange: false,
+            });
+            return newScanner.save();
+        }
+
+        // Regular admin/organizer creation (email-based)
         const existingUser = await this.findOneByEmail(email);
         if (existingUser) {
             throw new ConflictException('User with this email already exists');
@@ -98,18 +157,35 @@ export class UsersService {
 
         const newUserPayload: any = {
             name,
-            email,
+            email: email.toLowerCase(),
             password: hashedPassword,
             role: role,
             isVerified: false, // Requires OTP verification
             requiresPasswordChange: true, // Must set own password on first login
         };
-        if (phone) newUserPayload.phone = phone;
+        if (phone) {
+            if (!/^01\d{9}$/.test(phone)) {
+                throw new BadRequestException('Phone number must be 11 digits starting with 01');
+            }
+            newUserPayload.phone = phone;
+        }
         if (instapayNumber) newUserPayload.instapayNumber = instapayNumber;
+        if (instapayLink) newUserPayload.instapayLink = instapayLink;
         if (instapayQR) newUserPayload.instapayQR = instapayQR;
 
         const newUser = new this.userModel(newUserPayload);
 
         return newUser.save();
+    }
+
+    async blockUser(id: string, isBlocked: boolean): Promise<UserDocument> {
+        const user = await this.userModel
+            .findByIdAndUpdate(id, { isBlocked }, { new: true })
+            .select('-password')
+            .exec();
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+        return user;
     }
 }

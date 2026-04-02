@@ -22,7 +22,7 @@ export class TicketsService {
     private bookingModel: Model<BookingDocument>,
     @InjectModel(Event.name)
     private eventModel: Model<EventDocument>,
-  ) {}
+  ) { }
 
   /**
    * Generate tickets with QR codes for a confirmed booking.
@@ -38,8 +38,10 @@ export class TicketsService {
       section: string;
       seatType: string;
       price: number;
-      attendeeName?: string;
+      attendeeFirstName?: string;
+      attendeeLastName?: string;
       attendeePhone?: string;
+      seatLabel?: string;
     }>,
   ): Promise<TicketDocument[]> {
     // Check if tickets already exist for this booking
@@ -76,8 +78,10 @@ export class TicketsService {
         section: seat.section,
         seatType: seat.seatType,
         price: seat.price,
-        attendeeName: seat.attendeeName || '',
+        attendeeFirstName: seat.attendeeFirstName || '',
+        attendeeLastName: seat.attendeeLastName || '',
         attendeePhone: seat.attendeePhone || '',
+        seatLabel: seat.seatLabel || '',
         qrData,
         qrCodeImage,
         isScanned: false,
@@ -126,8 +130,10 @@ export class TicketsService {
             section: s.section || 'main',
             seatType: s.seatType || 'standard',
             price: s.price || 0,
-            attendeeName: s.attendeeName || '',
+            attendeeFirstName: s.attendeeFirstName || '',
+            attendeeLastName: s.attendeeLastName || '',
             attendeePhone: s.attendeePhone || '',
+            seatLabel: s.seatLabel || '',
           })),
         );
 
@@ -171,15 +177,23 @@ export class TicketsService {
     seatNumber: number;
     section: string;
     seatType: string;
-    attendeeName: string;
+    seatLabel: string;
+    attendeeFirstName: string;
+    attendeeLastName: string;
     attendeePhone: string;
     isFree: boolean;
     message: string;
+    eventId: string;
+    eventTitle: string;
+    eventDate: string;
+    eventLocation: string;
+    startTime: string;
+    endTime: string;
   }> {
     const ticket = await this.ticketModel
       .findOne({ qrData })
       .populate('userId', 'name email phone')
-      .populate('eventId', 'title date location')
+      .populate('eventId', 'title date location startTime endTime')
       .populate('bookingId', 'status')
       .exec();
 
@@ -187,14 +201,26 @@ export class TicketsService {
       throw new NotFoundException('Invalid QR code - no ticket found');
     }
 
+    const eventData = ticket.eventId as any;
+
     // Check that the ticket belongs to the expected event
     if (expectedEventId) {
-      const ticketEventId = (ticket.eventId as any)?._id?.toString() || ticket.eventId?.toString();
+      const ticketEventId = eventData?._id?.toString() || ticket.eventId?.toString();
       if (ticketEventId !== expectedEventId) {
-        const eventTitle = (ticket.eventId as any)?.title || 'another event';
+        const eventTitle = eventData?.title || 'another event';
         throw new BadRequestException(
           `This ticket belongs to "${eventTitle}", not this event.`,
         );
+      }
+    }
+
+    // Check if event is expired
+    if (eventData && eventData.date) {
+      const eventDate = new Date(eventData.date);
+      const expirationDate = new Date(eventDate.getTime() + 24 * 60 * 60 * 1000); // 1 day after event date
+      const now = new Date();
+      if (now >= expirationDate) {
+        throw new BadRequestException('This event has already expired. Tickets cannot be scanned anymore.');
       }
     }
 
@@ -208,21 +234,33 @@ export class TicketsService {
 
     const user = ticket.userId as any;
 
+    const baseResponse = {
+      ticket,
+      userEmail: user?.email || '',
+      userPhone: user?.phone || '',
+      userName: user?.name || '',
+      seatRow: ticket.seatRow,
+      seatNumber: ticket.seatNumber,
+      section: ticket.section,
+      seatType: ticket.seatType,
+      seatLabel: ticket.seatLabel || '',
+      attendeeFirstName: ticket.attendeeFirstName,
+      attendeeLastName: ticket.attendeeLastName,
+      attendeePhone: ticket.attendeePhone,
+      eventId: eventData?._id?.toString() || '',
+      eventTitle: eventData?.title || '',
+      eventDate: eventData?.date || '',
+      eventLocation: eventData?.location || '',
+      startTime: eventData?.startTime || '',
+      endTime: eventData?.endTime || '',
+    };
+
     if (ticket.isScanned) {
       // Already scanned - not free
       return {
-        ticket,
-        userEmail: user?.email || '',
-        userPhone: user?.phone || '',
-        userName: user?.name || '',
-        seatRow: ticket.seatRow,
-        seatNumber: ticket.seatNumber,
-        section: ticket.section,
-        seatType: ticket.seatType,
-        attendeeName: ticket.attendeeName,
-        attendeePhone: ticket.attendeePhone,
+        ...baseResponse,
         isFree: false,
-        message: `⚠️ This ticket was already scanned on ${ticket.scannedAt?.toLocaleString()}. This seat is NOT free.`,
+        message: `⚠️ This ticket was already scanned on ${ticket.scannedAt?.toLocaleString('en-US', { timeZone: 'Africa/Cairo' })}. This seat is NOT free.`,
       };
     }
 
@@ -232,20 +270,84 @@ export class TicketsService {
     ticket.scannedBy = new Types.ObjectId(scannedByUserId);
     await ticket.save();
 
+    // Remove this seat from any pending cancellation request on the booking
+    try {
+      const fullBooking = await this.bookingModel.findById(ticket.bookingId).exec();
+      if (fullBooking?.cancellationRequest?.status === 'pending') {
+        const seatKey = `${ticket.section}-${ticket.seatRow}-${ticket.seatNumber}`;
+        const remaining = (fullBooking.cancellationRequest.seatsToCancel || []).filter(
+          (s: any) => `${s.section}-${s.row}-${s.seatNumber}` !== seatKey,
+        );
+        if (remaining.length === 0) {
+          // No seats left in the request — reset it
+          fullBooking.cancellationRequest = {
+            status: 'none',
+            requestedAt: null,
+            reason: '',
+            seatsToCancel: [],
+            cancelAll: false,
+          } as any;
+        } else {
+          fullBooking.cancellationRequest.seatsToCancel = remaining as any;
+          fullBooking.cancellationRequest.cancelAll = false;
+        }
+        await fullBooking.save();
+      }
+    } catch (err) {
+      this.logger.error(`Error updating cancellation request after scan:`, err);
+    }
+
     return {
-      ticket,
-      userEmail: user?.email || '',
-      userPhone: user?.phone || '',
-      userName: user?.name || '',
-      seatRow: ticket.seatRow,
-      seatNumber: ticket.seatNumber,
-      section: ticket.section,
-      seatType: ticket.seatType,
-      attendeeName: ticket.attendeeName,
-      attendeePhone: ticket.attendeePhone,
+      ...baseResponse,
       isFree: true,
       message: '✅ Valid ticket! This is the first scan. Seat is free to enter.',
     };
+  }
+
+  /**
+   * Get all scanned tickets for a booking (used to exclude from cancellation).
+   */
+  async getScannedSeatsForBooking(bookingId: string): Promise<TicketDocument[]> {
+    return this.ticketModel
+      .find({
+        bookingId: new Types.ObjectId(bookingId),
+        isScanned: true,
+      })
+      .exec();
+  }
+
+  /**
+   * Delete all tickets for a booking (used when cancellation is approved).
+   */
+  async deleteTicketsForBooking(bookingId: string): Promise<number> {
+    const result = await this.ticketModel
+      .deleteMany({ bookingId: new Types.ObjectId(bookingId) })
+      .exec();
+    this.logger.log(`Deleted ${result.deletedCount} tickets for booking ${bookingId}`);
+    return result.deletedCount;
+  }
+
+  /**
+   * Delete tickets for specific seats of a booking (partial cancellation).
+   */
+  async deleteTicketsForSeats(
+    bookingId: string,
+    seats: Array<{ row: string; seatNumber: number; section: string }>,
+  ): Promise<number> {
+    let deletedCount = 0;
+    for (const seat of seats) {
+      const result = await this.ticketModel
+        .deleteMany({
+          bookingId: new Types.ObjectId(bookingId),
+          seatRow: seat.row,
+          seatNumber: seat.seatNumber,
+          section: seat.section,
+        })
+        .exec();
+      deletedCount += result.deletedCount;
+    }
+    this.logger.log(`Deleted ${deletedCount} tickets for partial cancellation of booking ${bookingId}`);
+    return deletedCount;
   }
 
   /**
@@ -263,6 +365,18 @@ export class TicketsService {
     }
 
     return ticket;
+  }
+
+  /**
+   * Get all tickets scanned by a specific user (Scanner).
+   */
+  async getTicketsScannedBy(scannerId: string): Promise<TicketDocument[]> {
+    return this.ticketModel
+      .find({ scannedBy: new Types.ObjectId(scannerId) })
+      .populate('eventId', 'title date location')
+      .populate('userId', 'name email phone')
+      .sort({ scannedAt: -1 })
+      .exec();
   }
 
   /**

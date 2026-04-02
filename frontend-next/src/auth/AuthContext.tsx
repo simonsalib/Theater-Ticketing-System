@@ -3,7 +3,15 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { toast } from "react-toastify";
 import api from "../services/api";
 import { User, ApiResponse, AuthResponse } from "../types/auth";
-import { useRouter } from "next/navigation";
+
+interface LoginResult {
+    success: boolean;
+    user?: User;
+    error?: string;
+    requiresVerification?: boolean;
+    requiresPasswordChange?: boolean;
+    email?: string;
+}
 
 interface AuthContextType {
     user: User | null;
@@ -11,7 +19,8 @@ interface AuthContextType {
     isAuthenticated: boolean;
     isAdmin: boolean;
     isOrganizer: boolean;
-    login: (credentials: any) => Promise<{ success: boolean; user?: User; error?: string; requiresVerification?: boolean }>;
+    isScanner: boolean;
+    login: (credentials: { email: string; password: string }) => Promise<LoginResult>;
     logout: () => Promise<{ success: boolean; error?: string }>;
     updateUser: (userData: Partial<User>) => void;
     loading: boolean;
@@ -23,7 +32,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [authenticated, setAuthenticated] = useState(false);
     const [loading, setLoading] = useState(true);
-    const router = useRouter();
 
     useEffect(() => {
         const fetchUser = async () => {
@@ -52,7 +60,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     }, []);
 
-    const login = async (credentials: any) => {
+    const login = async (credentials: { email: string; password: string }): Promise<LoginResult> => {
         try {
             const response = await api.post<AuthResponse>("/auth/login", credentials);
 
@@ -125,6 +133,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             isAuthenticated: authenticated,
             isAdmin: user?.role === 'System Admin',
             isOrganizer: user?.role === 'Organizer',
+            isScanner: user?.role === 'Scanner',
             login,
             logout,
             updateUser,

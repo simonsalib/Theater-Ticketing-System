@@ -3,9 +3,12 @@
 import { useState, ChangeEvent, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { FiEye, FiEyeOff } from "react-icons/fi";
 import api from "@/services/api";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { toast } from "react-toastify";
 import PasswordStrengthIndicator from '@/components/shared/PasswordStrengthIndicator';
+import { useAuth } from "@/auth/AuthContext";
 import "./RegisterForm.css";
 
 interface FormData {
@@ -18,6 +21,8 @@ interface FormData {
 }
 
 export default function RegisterForm() {
+    const { t } = useLanguage();
+    const { login } = useAuth();
     const [form, setForm] = useState<FormData>({
         name: "",
         email: "",
@@ -28,6 +33,8 @@ export default function RegisterForm() {
     });
     const [error, setError] = useState<string>("");
     const [loading, setLoading] = useState<boolean>(false);
+    const [showPassword, setShowPassword] = useState<boolean>(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
     const router = useRouter();
 
     // States for OTP verification
@@ -53,9 +60,9 @@ export default function RegisterForm() {
         }
 
         const phone = form.phone.trim();
-        if (!/^\d{11}$/.test(phone)) {
-            setError("Phone number must be exactly 11 digits");
-            toast.error("Phone number must be exactly 11 digits");
+        if (!/^01\d{9}$/.test(phone)) {
+            setError("Phone number must be 11 digits starting with 01");
+            toast.error("Phone number must be 11 digits starting with 01");
             setLoading(false);
             return;
         }
@@ -63,7 +70,7 @@ export default function RegisterForm() {
         try {
             await api.post("/auth/register", {
                 name: form.name,
-                email: form.email,
+                email: form.email.toLowerCase(),
                 phone: phone,
                 password: form.password,
             });
@@ -105,12 +112,23 @@ export default function RegisterForm() {
 
         try {
             await api.post("/auth/verify-registration", {
-                email: form.email,
+                email: form.email.toLowerCase(),
                 otp: otpString
             });
 
-            toast.success("Registration successful! Redirecting to login...");
-            setTimeout(() => router.push('/login'), 2000);
+            // Auto-login after verification
+            const loginResult = await login({
+                email: form.email.toLowerCase(),
+                password: form.password
+            });
+
+            if (loginResult.success) {
+                toast.success("Email verified and logged in successfully!");
+            } else {
+                toast.success("Email verified! Choose your preferred language.");
+            }
+            
+            setTimeout(() => router.push('/choose-language'), 1200);
         } catch (err: any) {
             const errorMessage = err.response?.data?.message || "Verification failed. Please try again.";
             setError(errorMessage);
@@ -119,6 +137,26 @@ export default function RegisterForm() {
             setVerifyLoading(false);
         }
     };
+
+
+    const handleResendCode = async (e: React.MouseEvent<HTMLAnchorElement>) => {
+        e.preventDefault();
+        try {
+            toast.info("Requesting new verification code...");
+            await api.post("/auth/register", {
+                name: form.name,
+                email: form.email.toLowerCase(),
+                phone: form.phone.trim(),
+                password: form.password,
+            });
+            toast.success("New verification code sent to your email");
+        } catch (error: any) {
+            console.error("Error resending code:", error);
+            const errorMessage = error.response?.data?.message || "Failed to resend verification code";
+            toast.error(errorMessage);
+        }
+    };
+
 
     return (
         <div className="login-container">
@@ -129,7 +167,7 @@ export default function RegisterForm() {
             </div>
             <div className="login-card">
                 <div className="card-decoration"></div>
-                <h1 className="login-title">{showOtpForm ? "Verify Your Email" : "Join the Theater"}</h1>
+                <h1 className="login-title">{showOtpForm ? t('otp.title') : t('register.title')}</h1>
 
                 {error && <div className="error-message">{error}</div>}
 
@@ -137,13 +175,13 @@ export default function RegisterForm() {
                     <form onSubmit={handleSubmit}>
                         <div className="form-group">
                             <label className="form-label">
-                                <span className="label-text">Full Name</span>
+                                <span className="label-text">{t('register.name')}</span>
                             </label>
                             <div className="input-container">
                                 <input
                                     type="text"
                                     name="name"
-                                    placeholder="Enter your full name"
+                                    placeholder={t('register.name.placeholder')}
                                     className="form-input"
                                     value={form.name}
                                     onChange={handleChange}
@@ -155,13 +193,13 @@ export default function RegisterForm() {
 
                         <div className="form-group">
                             <label className="form-label">
-                                <span className="label-text">Email Address</span>
+                                <span className="label-text">{t('login.email')}</span>
                             </label>
                             <div className="input-container">
                                 <input
                                     type="email"
                                     name="email"
-                                    placeholder="Enter your email"
+                                    placeholder={t('login.email.placeholder')}
                                     className="form-input"
                                     value={form.email}
                                     onChange={handleChange}
@@ -173,13 +211,13 @@ export default function RegisterForm() {
 
                         <div className="form-group">
                             <label className="form-label">
-                                <span className="label-text">Phone Number</span>
+                                <span className="label-text">{t('register.phone')}</span>
                             </label>
                             <div className="input-container">
                                 <input
                                     type="tel"
                                     name="phone"
-                                    placeholder="Enter your phone number"
+                                    placeholder="01xxxxxxxxx"
                                     className="form-input"
                                     value={form.phone}
                                     onChange={handleChange}
@@ -193,41 +231,85 @@ export default function RegisterForm() {
 
                         <div className="form-group">
                             <label className="form-label">
-                                <span className="label-text">Password</span>
+                                <span className="label-text">{t('login.password')}</span>
                             </label>
                             <div className="input-container">
                                 <input
-                                    type="password"
+                                    type={showPassword ? "text" : "password"}
                                     name="password"
-                                    placeholder="Create a secure password"
+                                    placeholder={t('login.password.placeholder')}
                                     className="form-input"
                                     value={form.password}
                                     onChange={handleChange}
                                     required
+                                    style={{ paddingRight: '2.5rem' }}
                                 />
                                 <i className="input-icon fas fa-lock"></i>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="password-toggle-btn"
+                                    style={{
+                                        position: 'absolute',
+                                        right: '1.2rem',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'var(--text-muted)',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        padding: '0',
+                                    }}
+                                >
+                                    {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                                </button>
                             </div>
                             <PasswordStrengthIndicator password={form.password} />
                         </div>
 
                         <div className="form-group">
                             <label className="form-label">
-                                <span className="label-text">Confirm Password</span>
+                                <span className="label-text">{t('register.confirmPassword')}</span>
                             </label>
                             <div className="input-container">
                                 <input
-                                    type="password"
+                                    type={showConfirmPassword ? "text" : "password"}
                                     name="confirmPassword"
-                                    placeholder="Repeat your password"
+                                    placeholder={t('register.confirmPassword.placeholder')}
                                     className="form-input"
                                     value={form.confirmPassword}
                                     onChange={handleChange}
                                     required
+                                    style={{ paddingRight: '2.5rem' }}
                                 />
                                 <i className="input-icon fas fa-lock"></i>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    className="password-toggle-btn"
+                                    style={{
+                                        position: 'absolute',
+                                        right: '1.2rem',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'var(--text-muted)',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        padding: '0',
+                                    }}
+                                >
+                                    {showConfirmPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                                </button>
                             </div>
                             {form.confirmPassword && form.password !== form.confirmPassword && (
-                                <div className="password-mismatch">Passwords do not match</div>
+                                <div className="password-mismatch">{t('register.passwordMismatch')}</div>
                             )}
                         </div>
 
@@ -239,10 +321,10 @@ export default function RegisterForm() {
                             {loading ? (
                                 <>
                                     <span className="form-loader"></span>
-                                    Creating Account...
+                                    {t('register.submit.loading')}
                                 </>
                             ) : (
-                                <>Join Now</>
+                                <>{t('register.submit')}</>
                             )}
                         </button>
                     </form>
@@ -250,7 +332,7 @@ export default function RegisterForm() {
                     <div className="otp-form-container">
                         <form className="otp-form" onSubmit={handleVerifyOtp}>
                             <div className="content">
-                                <p style={{ textAlign: "center" }}>Enter verification code</p>
+                                <p style={{ textAlign: "center" }}>{t('otp.enter')}</p>
                                 <div className="inp">
                                     {otp.map((digit, index) => (
                                         <input
@@ -273,8 +355,17 @@ export default function RegisterForm() {
                                     className="verify-btn"
                                     disabled={verifyLoading || otp.some(digit => !digit)}
                                 >
-                                    {verifyLoading ? 'Verifying...' : 'Verify'}
+                                    {verifyLoading ? t('otp.verifying') : t('otp.verify')}
                                 </button>
+                                <p style={{ textAlign: "center", marginTop: "10px", fontSize: "0.8rem" }}>
+                                    <a
+                                        href="#"
+                                        onClick={handleResendCode}
+                                        style={{ color: "var(--primary)", textDecoration: "underline" }}
+                                    >
+                                        {t('otp.resend')}
+                                    </a>
+                                </p>
                             </div>
                             <svg className="svg" xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" fill="none">
                                 <path className="path" d="M58 29.2C61.3 28.8 63.3 32.5 61.8 35.4C60.4 38.2 56.6 38.4 54.7 35.9C52.8 33.3 54.7 29.6 58 29.2Z" fill="#369eff"></path>
@@ -284,7 +375,7 @@ export default function RegisterForm() {
                 )}
 
                 <div className="redirect-link">
-                    <div>Already part of our community? <Link href="/login">Sign In</Link></div>
+                    <div>{t('register.haveAccount')} <Link href="/login">{t('register.signIn')}</Link></div>
                 </div>
             </div>
         </div>

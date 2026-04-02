@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
     FiArrowLeft, FiUserPlus, FiMail, FiLock, FiUser,
-    FiShield, FiStar, FiCheck, FiAlertCircle, FiUpload, FiX
+    FiShield, FiStar, FiCheck, FiAlertCircle, FiUpload, FiX, FiCamera,
+    FiEye, FiEyeOff
 } from 'react-icons/fi';
 import api from '@/services/api';
 import { toast } from 'react-toastify';
@@ -14,6 +15,7 @@ import '@/components/AdminComponent/AdminUsersPage.css';
 const ROLES = [
     { value: 'Organizer', label: 'Organizer', icon: FiStar, color: '#f59e0b' },
     { value: 'System Admin', label: 'System Admin', icon: FiShield, color: '#ef4444' },
+    { value: 'Scanner', label: 'Scanner', icon: FiCamera, color: '#10b981' },
 ];
 
 const CreateUserPage = () => {
@@ -21,16 +23,20 @@ const CreateUserPage = () => {
     const [formData, setFormData] = useState({
         name: '',
         email: '',
+        username: '',
         password: '',
         confirmPassword: '',
         role: 'Organizer',
         phone: '',
         instapayNumber: '',
+        instapayLink: '',
         instapayQR: ''
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [qrPreview, setQrPreview] = useState<string | null>(null);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const qrInputRef = useRef<HTMLInputElement>(null);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -45,6 +51,7 @@ const CreateUserPage = () => {
             ...prev,
             role,
             instapayNumber: prev.role !== role ? '' : prev.instapayNumber,
+            instapayLink: prev.role !== role ? '' : prev.instapayLink,
             instapayQR: prev.role !== role ? '' : prev.instapayQR,
         }));
         if (formData.role !== role) setQrPreview(null);
@@ -85,10 +92,6 @@ const CreateUserPage = () => {
             setError('Name is required');
             return;
         }
-        if (!formData.email.trim()) {
-            setError('Email is required');
-            return;
-        }
         if (!formData.password) {
             setError('Password is required');
             return;
@@ -101,16 +104,29 @@ const CreateUserPage = () => {
             setError('Passwords do not match');
             return;
         }
+        // Scanner-specific validation
+        if (formData.role === 'Scanner') {
+            if (!formData.username.trim()) {
+                setError('Username is required for scanners');
+                return;
+            }
+        } else {
+            // Email and phone required for non-Scanner roles
+            if (!formData.email.trim()) {
+                setError('Email is required');
+                return;
+            }
 
-        // Validate phone
-        if (!formData.phone.trim()) {
-            setError('Phone is required');
-            return;
-        }
-        const phone = formData.phone.trim();
-        if (!/^\d{11}$/.test(phone)) {
-            setError('Phone number must be exactly 11 digits');
-            return;
+            // Validate phone
+            if (!formData.phone.trim()) {
+                setError('Phone is required');
+                return;
+            }
+            const phone = formData.phone.trim();
+            if (!/^01\d{9}$/.test(phone)) {
+                setError('Phone number must be 11 digits starting with 01');
+                return;
+            }
         }
 
         // Validate InstaPay
@@ -131,14 +147,20 @@ const CreateUserPage = () => {
             setLoading(true);
             const payload: any = {
                 name: formData.name.trim(),
-                email: formData.email.trim(),
                 password: formData.password,
                 role: formData.role,
-                phone: phone
             };
-            if (formData.role === 'Organizer') {
-                payload.instapayNumber = instapayNumber;
-                if (formData.instapayQR) payload.instapayQR = formData.instapayQR;
+
+            if (formData.role === 'Scanner') {
+                payload.username = formData.username.trim();
+            } else {
+                payload.email = formData.email.trim();
+                payload.phone = formData.phone.trim();
+                if (formData.role === 'Organizer') {
+                    payload.instapayNumber = instapayNumber;
+                    if (formData.instapayLink.trim()) payload.instapayLink = formData.instapayLink.trim();
+                    if (formData.instapayQR) payload.instapayQR = formData.instapayQR;
+                }
             }
 
             const response = await api.post('/user/create', payload);
@@ -209,7 +231,7 @@ const CreateUserPage = () => {
                         <label style={{ display: 'block', marginBottom: '0.75rem', color: 'var(--text-secondary)' }}>
                             Select Role *
                         </label>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
                             {ROLES.map(role => {
                                 const RoleIcon = role.icon;
                                 const isSelected = formData.role === role.value;
@@ -269,53 +291,83 @@ const CreateUserPage = () => {
                         />
                     </div>
 
-                    {/* Email Field */}
-                    <div style={{ marginBottom: '1.5rem' }}>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
-                            <FiMail style={{ marginRight: '0.5rem' }} />
-                            Email Address *
-                        </label>
-                        <input
-                            type="email"
-                            name="email"
-                            value={formData.email}
-                            onChange={handleChange}
-                            placeholder="Enter email address"
-                            style={{
-                                width: '100%',
-                                padding: '0.75rem 1rem',
-                                borderRadius: '8px',
-                                border: '1px solid rgba(255, 255, 255, 0.1)',
-                                background: 'rgba(255, 255, 255, 0.05)',
-                                color: 'white',
-                                fontSize: '1rem'
-                            }}
-                        />
-                    </div>
+                    {/* Username Field (Scanner Only) */}
+                    {formData.role === 'Scanner' && (
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
+                                <FiUser style={{ marginRight: '0.5rem' }} />
+                                Username *
+                            </label>
+                            <input
+                                type="text"
+                                name="username"
+                                value={formData.username}
+                                onChange={handleChange}
+                                placeholder="Enter scanner username"
+                                style={{
+                                    width: '100%',
+                                    padding: '0.75rem 1rem',
+                                    borderRadius: '8px',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    background: 'rgba(255, 255, 255, 0.05)',
+                                    color: 'white',
+                                    fontSize: '1rem'
+                                }}
+                            />
+                        </div>
+                    )}
 
-                    {/* Phone Field */}
-                    <div style={{ marginBottom: '1.5rem' }}>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
-                            <span style={{ marginRight: '0.5rem' }}>📞</span>
-                            Phone Number *
-                        </label>
-                        <input
-                            type="text"
-                            name="phone"
-                            value={formData.phone}
-                            onChange={handleChange}
-                            placeholder="Enter 11-digit phone number"
-                            style={{
-                                width: '100%',
-                                padding: '0.75rem 1rem',
-                                borderRadius: '8px',
-                                border: '1px solid rgba(255, 255, 255, 0.1)',
-                                background: 'rgba(255, 255, 255, 0.05)',
-                                color: 'white',
-                                fontSize: '1rem'
-                            }}
-                        />
-                    </div>
+                    {/* Email Field (Not for Scanner) */}
+                    {formData.role !== 'Scanner' && (
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
+                                <FiMail style={{ marginRight: '0.5rem' }} />
+                                Email Address *
+                            </label>
+                            <input
+                                type="email"
+                                name="email"
+                                value={formData.email}
+                                onChange={handleChange}
+                                placeholder="Enter email address"
+                                style={{
+                                    width: '100%',
+                                    padding: '0.75rem 1rem',
+                                    borderRadius: '8px',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    background: 'rgba(255, 255, 255, 0.05)',
+                                    color: 'white',
+                                    fontSize: '1rem'
+                                }}
+                            />
+                        </div>
+                    )}
+
+                    {/* Phone Field (Not for Scanner) */}
+                    {formData.role !== 'Scanner' && (
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
+                                <span style={{ marginRight: '0.5rem' }}>📞</span>
+                                Phone Number *
+                            </label>
+                            <input
+                                type="text"
+                                name="phone"
+                                value={formData.phone}
+                                onChange={handleChange}
+                                placeholder="01xxxxxxxxx"
+                                style={{
+                                    width: '100%',
+                                    padding: '0.75rem 1rem',
+                                    borderRadius: '8px',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    background: 'rgba(255, 255, 255, 0.05)',
+                                    color: 'white',
+                                    fontSize: '1rem'
+                                }}
+                            />
+                        </div>
+                    )}
 
                     {/* InstaPay Fields (Organizer Only) */}
                     {formData.role === 'Organizer' && (
@@ -331,6 +383,29 @@ const CreateUserPage = () => {
                                     value={formData.instapayNumber}
                                     onChange={handleChange}
                                     placeholder="Enter 11-digit InstaPay number"
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem 1rem',
+                                        borderRadius: '8px',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                        background: 'rgba(255, 255, 255, 0.05)',
+                                        color: 'white',
+                                        fontSize: '1rem'
+                                    }}
+                                />
+                            </div>
+
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
+                                    <span style={{ marginRight: '0.5rem' }}>🔗</span>
+                                    InstaPay Link / Reference (Optional)
+                                </label>
+                                <input
+                                    type="url"
+                                    name="instapayLink"
+                                    value={formData.instapayLink}
+                                    onChange={handleChange}
+                                    placeholder="Enter InstaPay payment link"
                                     style={{
                                         width: '100%',
                                         padding: '0.75rem 1rem',
@@ -418,20 +493,20 @@ const CreateUserPage = () => {
                     )}
 
                     {/* Password Field */}
-                    <div style={{ marginBottom: '1.5rem' }}>
+                    <div style={{ marginBottom: '1.5rem', position: 'relative' }}>
                         <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
                             <FiLock style={{ marginRight: '0.5rem' }} />
                             Password *
                         </label>
                         <input
-                            type="password"
+                            type={showPassword ? "text" : "password"}
                             name="password"
                             value={formData.password}
                             onChange={handleChange}
                             placeholder="Enter password (min 6 characters)"
                             style={{
                                 width: '100%',
-                                padding: '0.75rem 1rem',
+                                padding: '0.75rem 2.5rem 0.75rem 1rem',
                                 borderRadius: '8px',
                                 border: '1px solid rgba(255, 255, 255, 0.1)',
                                 background: 'rgba(255, 255, 255, 0.05)',
@@ -439,23 +514,42 @@ const CreateUserPage = () => {
                                 fontSize: '1rem'
                             }}
                         />
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            style={{
+                                position: 'absolute',
+                                right: '1rem',
+                                bottom: '0.75rem',
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                cursor: 'pointer',
+                                padding: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}
+                        >
+                            {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                        </button>
                     </div>
 
                     {/* Confirm Password Field */}
-                    <div style={{ marginBottom: '1.5rem' }}>
+                    <div style={{ marginBottom: '1.5rem', position: 'relative' }}>
                         <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
                             <FiLock style={{ marginRight: '0.5rem' }} />
                             Confirm Password *
                         </label>
                         <input
-                            type="password"
+                            type={showConfirmPassword ? "text" : "password"}
                             name="confirmPassword"
                             value={formData.confirmPassword}
                             onChange={handleChange}
-                            placeholder="Confirm password"
+                            placeholder="Confirm your password"
                             style={{
                                 width: '100%',
-                                padding: '0.75rem 1rem',
+                                padding: '0.75rem 2.5rem 0.75rem 1rem',
                                 borderRadius: '8px',
                                 border: '1px solid rgba(255, 255, 255, 0.1)',
                                 background: 'rgba(255, 255, 255, 0.05)',
@@ -463,6 +557,25 @@ const CreateUserPage = () => {
                                 fontSize: '1rem'
                             }}
                         />
+                        <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            style={{
+                                position: 'absolute',
+                                right: '1rem',
+                                bottom: '0.75rem',
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                cursor: 'pointer',
+                                padding: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}
+                        >
+                            {showConfirmPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                        </button>
                     </div>
 
                     {/* Role Selection moved to top */}
@@ -471,13 +584,17 @@ const CreateUserPage = () => {
                     <div style={{
                         padding: '1rem',
                         borderRadius: '8px',
-                        background: 'rgba(102, 126, 234, 0.1)',
-                        border: '1px solid rgba(102, 126, 234, 0.2)',
+                        background: formData.role === 'Scanner' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(102, 126, 234, 0.1)',
+                        border: formData.role === 'Scanner' ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(102, 126, 234, 0.2)',
                         marginBottom: '1.5rem',
                         fontSize: '0.9rem',
                         color: 'var(--text-secondary)'
                     }}>
-                        <strong style={{ color: '#667eea' }}>Note:</strong> The password you enter is temporary. When the user logs in, they will be prompted to set their own password and verify via OTP.
+                        {formData.role === 'Scanner' ? (
+                            <><strong style={{ color: '#10b981' }}>Scanner Note:</strong> Scanners log in with <code>$username</code> and their password. <br /><strong>Important:</strong> Do NOT type the <code>$</code> prefix in the username field above; it is added automatically during login.</>
+                        ) : (
+                            <><strong style={{ color: '#667eea' }}>Note:</strong> The password you enter is temporary. When the user logs in, they will be prompted to set their own password and verify via OTP.</>
+                        )}
                     </div>
 
                     {/* Submit Button */}

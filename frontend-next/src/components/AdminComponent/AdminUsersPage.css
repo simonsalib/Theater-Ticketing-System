@@ -105,18 +105,18 @@
 /* ===== Stats Grid ===== */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 15px;
-    margin-bottom: 25px;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
 }
 
 .stat-card {
     display: flex;
     align-items: center;
-    gap: 15px;
-    padding: 20px;
+    gap: 12px;
+    padding: 14px 16px;
     background: rgba(30, 30, 50, 0.5);
-    border-radius: 14px;
+    border-radius: 12px;
     border: 1px solid rgba(139, 92, 246, 0.15);
     transition: all 0.3s ease;
 }
@@ -127,9 +127,9 @@
 }
 
 .stat-card .stat-icon {
-    font-size: 1.5rem;
-    padding: 12px;
-    border-radius: 10px;
+    font-size: 1.2rem;
+    padding: 10px;
+    border-radius: 8px;
 }
 
 .stat-card.total .stat-icon {
@@ -152,19 +152,24 @@
     color: #22d3ee;
 }
 
+.stat-card.scanners .stat-icon {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+}
+
 .stat-info {
     display: flex;
     flex-direction: column;
 }
 
 .stat-value {
-    font-size: 1.5rem;
+    font-size: 1.2rem;
     font-weight: 700;
     color: #f8fafc;
 }
 
 .stat-label {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: #94a3b8;
 }
 
@@ -279,6 +284,12 @@
     color: #22d3ee;
 }
 
+.tab-btn.scanners.active {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.5);
+    color: #10b981;
+}
+
 /* ===== Error Banner ===== */
 .error-banner {
     display: flex;
@@ -327,18 +338,20 @@
 /* ===== Users Grid ===== */
 .users-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 16px;
 }
 
 .user-card {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 15px;
-    padding: 20px;
+    text-align: center;
+    gap: 12px;
+    padding: 20px 16px;
     background: rgba(30, 30, 50, 0.5);
     border: 1px solid rgba(139, 92, 246, 0.15);
-    border-radius: 14px;
+    border-radius: 12px;
     transition: all 0.3s ease;
 }
 
@@ -347,19 +360,46 @@
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
 }
 
+.user-card.blocked {
+    border-color: rgba(239, 68, 68, 0.3);
+    background: rgba(239, 68, 68, 0.05);
+    opacity: 0.85;
+}
+
+.user-card.blocked:hover {
+    border-color: rgba(239, 68, 68, 0.5);
+}
+
+.blocked-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 5px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: #f87171;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
 .user-avatar {
-    width: 50px;
-    height: 50px;
-    border-radius: 12px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
     background: linear-gradient(135deg, #8b5cf6, #6366f1);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.2rem;
+    font-size: 1.5rem;
     font-weight: 600;
     color: white;
     flex-shrink: 0;
     overflow: hidden;
+    margin-bottom: 5px;
 }
 
 .user-avatar img {
@@ -369,24 +409,23 @@
 }
 
 .user-info {
-    flex: 1;
-    min-width: 0;
+    width: 100%;
 }
 
 .user-name {
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 600;
     color: #f8fafc;
-    margin: 0 0 3px;
+    margin: 0 0 2px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .user-email {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: #94a3b8;
-    margin: 0 0 8px;
+    margin: 0 0 6px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -395,17 +434,22 @@
 .role-badge {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 5px;
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
     border: 1px solid;
+    margin-top: 5px;
 }
 
 .user-actions {
     display: flex;
+    width: 100%;
+    justify-content: center;
     gap: 8px;
+    margin-top: 10px;
 }
 
 .action-btn {
@@ -426,6 +470,18 @@
     background: rgba(34, 211, 238, 0.2);
     border-color: rgba(34, 211, 238, 0.4);
     color: #22d3ee;
+}
+
+.action-btn.block:hover {
+    background: rgba(245, 158, 11, 0.2);
+    border-color: rgba(245, 158, 11, 0.4);
+    color: #f59e0b;
+}
+
+.action-btn.unblock:hover {
+    background: rgba(34, 197, 94, 0.2);
+    border-color: rgba(34, 197, 94, 0.4);
+    color: #4ade80;
 }
 
 .action-btn.delete:hover {

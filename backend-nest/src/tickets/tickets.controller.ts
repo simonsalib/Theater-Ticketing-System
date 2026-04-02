@@ -15,7 +15,7 @@ import { TicketsService } from './tickets.service';
 
 @Controller('api/v1/tickets')
 export class TicketsController {
-  constructor(private readonly ticketsService: TicketsService) {}
+  constructor(private readonly ticketsService: TicketsService) { }
 
   /**
    * GET /api/v1/tickets/booking/:bookingId
@@ -36,7 +36,7 @@ export class TicketsController {
    * Get all tickets for an event - for organizer.
    */
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ORGANIZER)
+  @Roles(UserRole.ORGANIZER, UserRole.SCANNER)
   @Get('event/:eventId')
   async getTicketsByEvent(@Param('eventId') eventId: string) {
     const tickets = await this.ticketsService.getTicketsByEvent(eventId);
@@ -49,11 +49,23 @@ export class TicketsController {
    * Body: { qrData: string }
    */
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ORGANIZER)
+  @Roles(UserRole.ORGANIZER, UserRole.SCANNER)
   @Post('scan')
   async scanTicket(@Body() body: { qrData: string; eventId?: string }, @Req() req: any) {
-    const result = await this.ticketsService.scanTicket(body.qrData, req.user.userId, body.eventId);
+    const result = await this.ticketsService.scanTicket(body.qrData, req.user._id, body.eventId);
     return result;
+  }
+
+  /**
+   * GET /api/v1/tickets/scanner/:scannerId
+   * Get all tickets scanned by a specific scanner (Admin only).
+   */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Get('scanner/:scannerId')
+  async getTicketsScannedBy(@Param('scannerId') scannerId: string) {
+    const tickets = await this.ticketsService.getTicketsScannedBy(scannerId);
+    return { tickets };
   }
 
   /**
@@ -61,7 +73,7 @@ export class TicketsController {
    * Get scan statistics for an event.
    */
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ORGANIZER)
+  @Roles(UserRole.ORGANIZER, UserRole.SCANNER)
   @Get('event/:eventId/stats')
   async getEventScanStats(@Param('eventId') eventId: string) {
     return this.ticketsService.getEventScanStats(eventId);

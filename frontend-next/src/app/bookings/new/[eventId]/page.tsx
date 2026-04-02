@@ -1,28 +1,33 @@
 "use client";
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import api from '@/services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     FiCalendar, FiMapPin, FiTag, FiMinus, FiPlus,
     FiShoppingCart, FiArrowLeft, FiCheckCircle, FiAlertCircle,
-    FiCreditCard, FiUsers, FiGrid, FiUser, FiPhone, FiArrowRight, FiClock, FiCopy
+    FiCreditCard, FiUsers, FiGrid, FiUser, FiPhone, FiArrowRight, FiClock, FiCopy, FiExternalLink, FiTrash2
 } from 'react-icons/fi';
 import { getImageUrl } from '@/utils/imageHelper';
 import SeatSelector from '@/components/Booking component/SeatSelector';
 import { ProtectedRoute } from '@/auth/ProtectedRoute';
 import { Event } from '@/types/event';
 import { Seat } from '@/types/booking';
+import CancelSeatsModal from '@/components/Booking component/CancelSeatsModal';
 import { toast } from 'react-toastify';
+import { API_BASE_URL } from '../../../../config';
+import { useLanguage } from '@/contexts/LanguageContext';
 import '@/components/Booking component/BookingTicketForm.css';
 
 interface AttendeeInfo {
-    attendeeName: string;
+    attendeeFirstName: string;
+    attendeeLastName: string;
     attendeePhone: string;
 }
 
 const BookTicketPage = () => {
     const params = useParams();
+    const { t, isRTL } = useLanguage();
     const eventId = params.eventId as string;
     const router = useRouter();
     const [event, setEvent] = useState<Event | null>(null);
@@ -35,14 +40,16 @@ const BookTicketPage = () => {
     // Seat selection state
     const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
     const [seatTotalPrice, setSeatTotalPrice] = useState(0);
+    const [existingSeats, setExistingSeats] = useState<{ row: string; seatNumber: number; section: string }[]>([]);
+    const [initialSeatsData, setInitialSeatsData] = useState<any>(null);
 
     // Attendee form state
     const [showAttendeeForm, setShowAttendeeForm] = useState(false);
     const [attendeeInfo, setAttendeeInfo] = useState<AttendeeInfo[]>([]);
 
-    // Organizer InstaPay
     const [organizerInstapay, setOrganizerInstapay] = useState<string>('');
     const [organizerInstapayQR, setOrganizerInstapayQR] = useState<string>('');
+    const [organizerInstapayLink, setOrganizerInstapayLink] = useState<string>('');
     const [hasCopied, setHasCopied] = useState(false);
     const [bookingId, setBookingId] = useState<string>('');
 
@@ -53,32 +60,204 @@ const BookTicketPage = () => {
     const [receiptUploaded, setReceiptUploaded] = useState(false);
     const receiptInputRef = React.useRef<HTMLInputElement>(null);
 
+    // Seat hold state
+    const [holdId, setHoldId] = useState<string | null>(null);
+    const [holdExpiresAt, setHoldExpiresAt] = useState<Date | null>(null);
+    const [holdCountdown, setHoldCountdown] = useState<number>(0);
+    const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+    const holdIdRef = useRef<string | null>(null); // for cleanup in useEffect
+
+    // Compress image to reduce payload size (same as UploadReceiptPage)
+    const compressImage = (file: File, maxDimension = 1200, quality = 0.7): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let { width, height } = img;
+                    if (width > maxDimension || height > maxDimension) {
+                        if (width > height) {
+                            height = Math.round((height * maxDimension) / width);
+                            width = maxDimension;
+                        } else {
+                            width = Math.round((width * maxDimension) / height);
+                            height = maxDimension;
+                        }
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d')!;
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                };
+                img.onerror = () => reject(new Error('Failed to load image'));
+                img.src = e.target?.result as string;
+            };
+            reader.onerror = () => reject(new Error('Failed to read file'));
+            reader.readAsDataURL(file);
+        });
+    };
+
     useEffect(() => {
         if (!eventId) return;
-        const fetchEvent = async () => {
+        const fetchAllData = async () => {
+            setIsEventLoading(true);
             try {
-                setIsEventLoading(true);
-                const response = await api.get<any>(`/event/${eventId}`);
-                const data = response.data.success ? response.data.data : response.data;
-                setEvent(data);
-                // Read organizer InstaPay number from populated event data
-                if (data.organizerId && typeof data.organizerId === 'object') {
-                    setOrganizerInstapay(data.organizerId.instapayNumber || '');
-                    setOrganizerInstapayQR(data.organizerId.instapayQR || '');
+                // Fetch event details
+                const eventPromise = api.get<any>(`/event/${eventId}`);
+
+                // Fetch user bookings (optional)
+                const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+                const bookingsPromise = token ? api.get('/user/bookings').catch(e => null) : Promise.resolve(null);
+
+                // Fetch theater seats eagerly
+                const seatsPromise = api.get<any>(`/booking/event/${eventId}/seats`).catch(e => null);
+
+                // Fetch active hold if logged in
+                const holdPromise = token ? api.get(`/booking/active-hold/${eventId}`).catch(e => null) : Promise.resolve(null);
+
+                // Wait for all
+                const [eventResponse, bookingsResponse, seatsResponse, holdResponse] = await Promise.all([
+                    eventPromise, bookingsPromise, seatsPromise, holdPromise
+                ]);
+
+                // Process event
+                const eventData = eventResponse.data.success ? eventResponse.data.data : eventResponse.data;
+                setEvent(eventData);
+                if (eventData.organizerId && typeof eventData.organizerId === 'object') {
+                    setOrganizerInstapay(eventData.organizerId.instapayNumber || '');
+                    setOrganizerInstapayQR(eventData.organizerId.instapayQR || '');
+                    setOrganizerInstapayLink(eventData.organizerId.instapayLink || '');
                 }
+
+                // Process bookings (if logged in and successful)
+                if (bookingsResponse && bookingsResponse.data) {
+                    let bookingsData: any[] = [];
+                    if (bookingsResponse.data.success !== undefined) {
+                        bookingsData = bookingsResponse.data.data;
+                    } else if (Array.isArray(bookingsResponse.data)) {
+                        bookingsData = bookingsResponse.data;
+                    }
+
+                    const bookedSeats: { row: string; seatNumber: number; section: string }[] = [];
+                    bookingsData.forEach(booking => {
+                        const bEventId = typeof booking.eventId === 'object' ? booking.eventId._id : booking.eventId;
+                        if (bEventId === eventId && booking.status !== 'canceled' && booking.status !== 'rejected') {
+                            if (booking.selectedSeats && Array.isArray(booking.selectedSeats)) {
+                                bookedSeats.push(...booking.selectedSeats);
+                            }
+                        }
+                    });
+                    setExistingSeats(bookedSeats);
+                }
+
+                // Process eager seats data
+                if (seatsResponse?.data?.success) {
+                    setInitialSeatsData(seatsResponse.data.data);
+                }
+
+                // Check for active hold to recover session
+                if (holdResponse && holdResponse.data && holdResponse.data.data) {
+                    const activeHold = holdResponse.data.data;
+                    if (activeHold.seats && activeHold.seats.length > 0) {
+                        setHoldId(activeHold._id);
+                        holdIdRef.current = activeHold._id;
+                        setHoldExpiresAt(new Date(activeHold.expiresAt));
+
+                        // Transform held seats to the format expected by the attendee form
+                        const recoveredSeats = activeHold.seats.map((s: any) => ({
+                            row: s.row,
+                            seatNumber: s.seatNumber,
+                            section: s.section,
+                            seatLabel: s.seatLabel || `${s.row}${s.seatNumber}`,
+                            seatType: s.seatType || 'standard',
+                            price: s.price || 0
+                        }));
+
+                        setSelectedSeats(recoveredSeats);
+                        setShowAttendeeForm(true);
+                        setNumberOfTickets(recoveredSeats.length);
+                    }
+                }
+
             } catch (err: any) {
-                console.error("Error fetching event details:", err);
+                console.error("Error fetching event data:", err);
                 setError(err.response?.data?.message || "Failed to load event details");
             } finally {
                 setIsEventLoading(false);
             }
         };
-        fetchEvent();
+
+        fetchAllData();
     }, [eventId]);
+
+    // Hold countdown timer
+    useEffect(() => {
+        if (!holdExpiresAt || !showAttendeeForm) return;
+
+        const tick = async () => {
+            const remaining = Math.max(0, Math.floor((holdExpiresAt.getTime() - Date.now()) / 1000));
+            setHoldCountdown(remaining);
+
+            if (remaining <= 0) {
+                // Hold expired — release explicitly and go back to seat selection
+                if (holdIdRef.current) {
+                    api.delete(`/booking/hold-seats/${holdIdRef.current}`).catch(() => { });
+                }
+                toast.warning('Your seat hold has expired. Please select seats again.');
+                setShowAttendeeForm(false);
+                setHoldId(null);
+                holdIdRef.current = null;
+                setHoldExpiresAt(null);
+            }
+        };
+
+        tick(); // run immediately
+        const interval = setInterval(tick, 1000);
+        return () => clearInterval(interval);
+    }, [holdExpiresAt, showAttendeeForm]);
+
+    // Release hold on page unload/navigation
+    useEffect(() => {
+        holdIdRef.current = holdId;
+    }, [holdId]);
+
+    useEffect(() => {
+        const releaseHoldReliably = () => {
+            if (holdIdRef.current) {
+                const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+                const url = `${API_BASE_URL}/booking/hold-seats/${holdIdRef.current}`;
+
+                // Use fetch with keepalive for maximum reliability on page close/refresh
+                fetch(url, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                    },
+                    keepalive: true
+                }).catch(() => { });
+            }
+        };
+
+        const handleBeforeUnload = () => {
+            releaseHoldReliably();
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            // Also cleanup when component unmounts (navigating away within app)
+            if (holdIdRef.current) {
+                api.delete(`/booking/hold-seats/${holdIdRef.current}`).catch(() => { });
+            }
+        };
+    }, []);
 
     const handleTicketChange = (delta: number) => {
         if (!event) return;
-        const max = event.remainingTickets || event.totalTickets || 0;
+        const max = event.remainingTickets ?? event.totalTickets ?? 0;
         const newVal = numberOfTickets + delta;
         if (newVal >= 1 && newVal <= Math.min(max, 10)) {
             setNumberOfTickets(newVal);
@@ -90,24 +269,130 @@ const BookTicketPage = () => {
         setSeatTotalPrice(totalPrice);
     }, []);
 
-    // Step 1 → Step 2: Click "Next" to go to attendee form
-    const handleNext = () => {
+    // Step 1 → Step 2: Click "Next" to hold seats and go to attendee form
+    const handleNext = async () => {
         if (selectedSeats.length === 0) {
             toast.error("Please select at least one seat");
             return;
         }
         setError(null);
+        setIsLoading(true);
 
-        // Initialize attendee info for each seat (preserve existing data)
-        const newAttendeeInfo = selectedSeats.map((_seat, index) => {
-            const existing = attendeeInfo[index];
-            return existing || { attendeeName: '', attendeePhone: '+20' };
-        });
-        setAttendeeInfo(newAttendeeInfo);
-        setShowAttendeeForm(true);
+        try {
+            // Call hold-seats API for atomic seat reservation
+            const response = await api.post('/booking/hold-seats', {
+                eventId: event?._id,
+                seats: selectedSeats.map(s => ({
+                    row: s.row,
+                    seatNumber: s.seatNumber,
+                    section: s.section || 'main',
+                })),
+            });
+
+            if (response.data.success) {
+                const { holdId: newHoldId, expiresAt } = response.data.data;
+                setHoldId(newHoldId);
+                holdIdRef.current = newHoldId;
+                setHoldExpiresAt(new Date(expiresAt));
+
+                // Initialize attendee info for each seat (preserve existing data)
+                const newAttendeeInfo = selectedSeats.map((_seat, index) => {
+                    const existing = attendeeInfo[index];
+                    return existing || { attendeeFirstName: '', attendeeLastName: '', attendeePhone: '' };
+                });
+                setAttendeeInfo(newAttendeeInfo);
+                setShowAttendeeForm(true);
+            }
+        } catch (err: any) {
+            const msg = err.response?.data?.message || 'Failed to hold seats. Please try again.';
+            setError(msg);
+            toast.error(msg);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const handleBackToSeats = () => {
+    const handleCancelSeatsConfirm = async (seatKeys: string[], cancelAll: boolean) => {
+        setIsLoading(true);
+        try {
+            // 1. Release the current hold
+            if (holdId) {
+                await api.delete(`/booking/hold-seats/${holdId}`);
+            }
+
+            if (cancelAll) {
+                // If canceling all, just go back to seat selection
+                setHoldId(null);
+                holdIdRef.current = null;
+                setHoldExpiresAt(null);
+                setShowAttendeeForm(false);
+                setSelectedSeats([]);
+                setSeatTotalPrice(0);
+                setIsCancelModalOpen(false);
+                toast.info('All seats released.');
+                return;
+            }
+
+            // 2. Filter remaining seats
+            const remainingSeats = selectedSeats.filter(seat => {
+                const key = `${seat.section}-${seat.row}-${seat.seatNumber}`;
+                return !seatKeys.includes(key);
+            });
+
+            // Update attendee info as well (by index)
+            const remainingIndices = selectedSeats
+                .map((seat, index) => ({ seat, index }))
+                .filter(item => {
+                    const key = `${item.seat.section}-${item.seat.row}-${item.seat.seatNumber}`;
+                    return !seatKeys.includes(key);
+                })
+                .map(item => item.index);
+
+            const newAttendeeInfo = remainingIndices.map(idx => attendeeInfo[idx]);
+            setAttendeeInfo(newAttendeeInfo);
+
+            // 3. Re-hold the remaining seats
+            const response = await api.post('/booking/hold-seats', {
+                eventId: event?._id,
+                seats: remainingSeats.map(s => ({
+                    row: s.row,
+                    seatNumber: s.seatNumber,
+                    section: s.section || 'main',
+                })),
+            });
+
+            if (response.data.success) {
+                const { holdId: newHoldId, expiresAt } = response.data.data;
+                setHoldId(newHoldId);
+                holdIdRef.current = newHoldId;
+                setHoldExpiresAt(new Date(expiresAt));
+                setSelectedSeats(remainingSeats);
+
+                // Recalculate total price
+                const newTotal = remainingSeats.reduce((sum, s) => sum + (s.price || 0), 0);
+                setSeatTotalPrice(newTotal);
+
+                toast.success(`${seatKeys.length} seat(s) released.`);
+            }
+        } catch (err: any) {
+            console.error("Cancellation error:", err);
+            toast.error(err.response?.data?.message || "Failed to cancel seats. Please try again.");
+        } finally {
+            setIsLoading(false);
+            setIsCancelModalOpen(false);
+        }
+    };
+
+    const handleBackToSeats = async () => {
+        // Release hold when going back to seat selection
+        if (holdId) {
+            try {
+                await api.delete(`/booking/hold-seats/${holdId}`);
+            } catch { /* ignore — hold may have already expired */ }
+            setHoldId(null);
+            holdIdRef.current = null;
+            setHoldExpiresAt(null);
+        }
         setShowAttendeeForm(false);
     };
 
@@ -135,23 +420,42 @@ const BookTicketPage = () => {
 
         // Validate attendee info for theater events
         if (event.hasTheaterSeating) {
+            const seenNames = new Set<string>();
+
             for (let i = 0; i < attendeeInfo.length; i++) {
-                if (!attendeeInfo[i]?.attendeeName?.trim()) {
-                    toast.error(`Please enter name for seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber}`);
+                const fName = attendeeInfo[i]?.attendeeFirstName?.trim() || '';
+                const lName = attendeeInfo[i]?.attendeeLastName?.trim() || '';
+
+                if (!fName) {
+                    toast.error(`Please enter first name for ${selectedSeats[i].seatLabel || `seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber}`}`);
                     return;
                 }
+                if (!lName) {
+                    toast.error(`Please enter last name for ${selectedSeats[i].seatLabel || `seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber}`}`);
+                    return;
+                }
+
+                // Check for duplicate names within the same booking
+                const fullName = `${fName.toLowerCase()} ${lName.toLowerCase()}`;
+                if (seenNames.has(fullName)) {
+                    toast.error(`Duplicate name detected: "${fName} ${lName}". Each seat must have a unique attendee.`);
+                    return;
+                }
+                seenNames.add(fullName);
 
                 const phoneField = attendeeInfo[i]?.attendeePhone?.trim() || '';
                 if (!phoneField) {
-                    toast.error(`Please enter phone for seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber}`);
+                    toast.error(`Please enter phone for ${selectedSeats[i].seatLabel || `seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber}`}`);
                     return;
                 }
 
-                if (!/^\d{11}$/.test(phoneField)) {
-                    toast.error(`Phone number for seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber} must be exactly 11 digits`);
+                if (!/^01\d{9}$/.test(phoneField)) {
+                    toast.error(`Phone for ${selectedSeats[i].seatLabel || `seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber}`} must be 11 digits starting with 01`);
                     return;
                 }
 
+                attendeeInfo[i].attendeeFirstName = fName;
+                attendeeInfo[i].attendeeLastName = lName;
                 attendeeInfo[i].attendeePhone = phoneField;
             }
         }
@@ -162,7 +466,8 @@ const BookTicketPage = () => {
         try {
             const payload: any = {
                 eventId: event._id,
-                status: 'confirmed'
+                status: 'confirmed',
+                holdId: holdId || undefined,
             };
 
             if (event.hasTheaterSeating) {
@@ -170,7 +475,9 @@ const BookTicketPage = () => {
                     row: seat.row,
                     seatNumber: seat.seatNumber,
                     section: seat.section,
-                    attendeeName: attendeeInfo[index]?.attendeeName || '',
+                    seatLabel: seat.seatLabel,
+                    attendeeFirstName: attendeeInfo[index]?.attendeeFirstName || '',
+                    attendeeLastName: attendeeInfo[index]?.attendeeLastName || '',
                     attendeePhone: attendeeInfo[index]?.attendeePhone || '',
                 }));
             } else {
@@ -182,6 +489,9 @@ const BookTicketPage = () => {
 
             if (response.data.success) {
                 setBookingId(response.data.data?._id || '');
+                setHoldId(null);
+                holdIdRef.current = null;
+                setHoldExpiresAt(null);
                 setSuccess(true);
             }
         } catch (err: any) {
@@ -197,6 +507,7 @@ const BookTicketPage = () => {
     const formatDate = (dateString?: string) => {
         if (!dateString) return 'TBA';
         return new Date(dateString).toLocaleDateString('en-US', {
+            timeZone: 'Africa/Cairo',
             weekday: 'short',
             month: 'short',
             day: 'numeric',
@@ -211,7 +522,7 @@ const BookTicketPage = () => {
                     <div className="loading-spinner-booking">
                         <div className="spinner-ring"></div>
                     </div>
-                    <p>Loading event details...</p>
+                    <p>{t('booking.loadingEvent')}</p>
                 </div>
             </div>
         );
@@ -222,10 +533,10 @@ const BookTicketPage = () => {
             <motion.div className="booking-page" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 <div className="booking-error-state">
                     <FiAlertCircle size={60} />
-                    <h2>Event Not Found</h2>
-                    <p>The event you&apos;re looking for doesn&apos;t exist or has been removed.</p>
+                    <h2>{t('booking.eventNotFound')}</h2>
+                    <p>{t('booking.eventNotFoundDesc')}</p>
                     <motion.button onClick={() => router.push('/events')} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                        <FiArrowLeft /> Browse Events
+                        <FiArrowLeft /> {t('booking.browseEvents')}
                     </motion.button>
                 </div>
             </motion.div>
@@ -242,22 +553,35 @@ const BookTicketPage = () => {
                     <motion.div className="success-icon pending-icon" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: "spring" }}>
                         <FiClock size={80} />
                     </motion.div>
-                    <h2>Payment Pending</h2>
-                    <p>Your booking for {ticketCount} {event.hasTheaterSeating ? 'seat' : 'ticket'}{ticketCount > 1 ? 's' : ''} is reserved!</p>
+                    <h2>{t('success.title')}</h2>
+                    <p>
+                        {t('success.subtitle')
+                            .replace('{count}', ticketCount.toString())
+                            .replace('{type}', event.hasTheaterSeating
+                                ? (ticketCount > 1 ? t('gen.seats') : t('gen.seat'))
+                                : (ticketCount > 1 ? t('gen.tickets') : t('gen.ticket'))
+                            )
+                        }
+                    </p>
 
                     {event.hasTheaterSeating && selectedSeats.length > 0 && (
                         <div className="success-seats">
-                            {selectedSeats.map(seat => (
-                                <span key={`${seat.section}-${seat.row}-${seat.seatNumber}`} className="seat-chip">
-                                    {seat.row}{seat.seatNumber}
-                                </span>
-                            ))}
+                            <p style={{ fontSize: '0.9rem', color: '#9ca3af', marginBottom: '8px' }}>{t('success.seats')}</p>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
+                                {selectedSeats.map(seat => (
+                                    <span key={`${seat.section}-${seat.row}-${seat.seatNumber}`} className="seat-chip">
+                                        {seat.seatLabel || `${seat.row}${seat.seatNumber}`}
+                                    </span>
+                                ))}
+                            </div>
                         </div>
                     )}
 
                     <div className="instapay-section">
-                        <h3>Pay via InstaPay</h3>
-                        <p className="instapay-instruction">Send <strong>{totalToPay.toFixed(2)} EGP</strong> to the organizer&apos;s InstaPay below:</p>
+                        <h3>{t('payment.instapay')}</h3>
+                        <p className="instapay-instruction">
+                            {t('payment.instapay.instruction').replace('{total}', totalToPay.toFixed(2))}
+                        </p>
 
                         {organizerInstapayQR && (
                             <div style={{
@@ -267,7 +591,7 @@ const BookTicketPage = () => {
                                 border: '1px solid rgba(139, 92, 246, 0.2)'
                             }}>
                                 <p style={{ fontSize: '1rem', color: '#a78bfa', margin: 0, fontWeight: 600 }}>
-                                    Scan QR Code to pay via InstaPay
+                                    {t('payment.instapay.qrLabel')}
                                 </p>
                                 <img
                                     src={organizerInstapayQR}
@@ -279,7 +603,7 @@ const BookTicketPage = () => {
                                     }}
                                 />
                                 <p style={{ fontSize: '0.9rem', color: '#9ca3af', margin: 0 }}>
-                                    Open InstaPay app → Scan QR → Send {totalToPay.toFixed(2)} EGP
+                                    {t('payment.instapay.qrInstructions').replace('{total}', totalToPay.toFixed(2))}
                                 </p>
                             </div>
                         )}
@@ -294,47 +618,108 @@ const BookTicketPage = () => {
                                             const ta = document.createElement('textarea'); ta.value = organizerInstapay; ta.style.position = 'fixed'; ta.style.left = '-9999px'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
                                         });
                                         setHasCopied(true);
-                                        toast.success('InstaPay number copied!');
+                                        toast.success(t('gen.copied'));
                                         setTimeout(() => setHasCopied(false), 2000);
                                     }}
                                     style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
                                 >
-                                    <FiCopy size={14} /> {hasCopied ? 'Copied!' : 'Copy'}
+                                    <FiCopy size={14} /> {hasCopied ? t('gen.copied') : t('gen.copy')}
                                 </button>
                             </div>
-                        ) : !organizerInstapayQR ? (
-                            <p className="instapay-fallback">Contact the event organizer for payment details.</p>
+                        ) : !organizerInstapayQR && !organizerInstapayLink ? (
+                            <p className="instapay-fallback">{t('payment.fallback')}</p>
                         ) : null}
 
-                        <p className="instapay-note">The organizer will confirm your booking once payment is verified.</p>
+                        {organizerInstapayLink && (
+                            <div style={{
+                                marginTop: '16px',
+                                display: 'flex',
+                                justifyContent: 'center'
+                            }}>
+                                <a
+                                    href={organizerInstapayLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        padding: '12px 24px',
+                                        background: 'rgba(16, 185, 129, 0.15)',
+                                        color: '#10b981',
+                                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                                        borderRadius: '12px',
+                                        textDecoration: 'none',
+                                        fontWeight: 600,
+                                        transition: 'all 0.2s',
+                                        boxShadow: '0 4px 15px rgba(16, 185, 129, 0.1)'
+                                    }}
+                                    onMouseOver={(e) => {
+                                        e.currentTarget.style.background = 'rgba(16, 185, 129, 0.25)';
+                                        e.currentTarget.style.transform = 'translateY(-2px)';
+                                    }}
+                                    onMouseOut={(e) => {
+                                        e.currentTarget.style.background = 'rgba(16, 185, 129, 0.15)';
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                    }}
+                                >
+                                    <FiExternalLink /> {t('payment.instapay.link')}
+                                </a>
+                            </div>
+                        )}
+
+                        <p className="instapay-note">{t('payment.note')}</p>
 
                         {/* Receipt Upload Section */}
                         <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(139, 92, 246, 0.08)', borderRadius: '12px', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
                             <h4 style={{ margin: '0 0 8px', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <FiCreditCard /> Upload Payment Receipt
+                                <FiCreditCard /> {t('receipt.title')}
                             </h4>
-                            <p style={{ fontSize: '0.85rem', color: '#9ca3af', margin: '0 0 12px' }}>Upload a screenshot of your InstaPay transfer to speed up verification.</p>
+                            <p style={{ fontSize: '0.85rem', color: '#9ca3af', margin: '0 0 12px' }}>{t('receipt.subtitle')}</p>
 
                             <input
                                 type="file"
                                 accept="image/*"
                                 ref={receiptInputRef}
                                 style={{ display: 'none' }}
-                                onChange={(e) => {
+                                onChange={async (e) => {
                                     const file = e.target.files?.[0];
                                     if (!file) return;
                                     if (!file.type.startsWith('image/')) { toast.error('Please select an image file'); return; }
                                     if (file.size > 5 * 1024 * 1024) { toast.error('Image must be less than 5MB'); return; }
+
                                     setReceiptFile(file);
                                     const reader = new FileReader();
                                     reader.onloadend = () => setReceiptPreview(reader.result as string);
                                     reader.readAsDataURL(file);
+
+                                    if (!bookingId) return;
+                                    try {
+                                        setIsUploadingReceipt(true);
+                                        const compressedBase64 = await compressImage(file);
+                                        const response = await api.post(`/booking/${bookingId}/receipt`, { receiptBase64: compressedBase64 });
+                                        if (response.data?.success) {
+                                            toast.success(t('receipt.success'));
+                                            setReceiptUploaded(true);
+                                        } else {
+                                            toast.error(response.data?.message || 'Upload failed');
+                                            setReceiptFile(null);
+                                            setReceiptPreview(null);
+                                        }
+                                    } catch (err: any) {
+                                        toast.error(err.response?.data?.message || 'Failed to upload receipt');
+                                        setReceiptFile(null);
+                                        setReceiptPreview(null);
+                                    } finally {
+                                        setIsUploadingReceipt(false);
+                                        if (receiptInputRef.current) receiptInputRef.current.value = '';
+                                    }
                                 }}
                             />
 
                             {receiptUploaded ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', fontWeight: 600 }}>
-                                    <FiCheckCircle size={20} /> Receipt uploaded successfully!
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', fontWeight: 600, flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                                    <FiCheckCircle size={20} /> {t('receipt.success')}
                                 </div>
                             ) : !receiptPreview ? (
                                 <motion.button
@@ -350,70 +735,49 @@ const BookTicketPage = () => {
                                         fontSize: '0.9rem', fontWeight: 500, width: '100%', justifyContent: 'center'
                                     }}
                                 >
-                                    <FiCreditCard /> Choose Receipt Image
+                                    <FiCreditCard /> {t('receipt.chooseImage')}
                                 </motion.button>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                     <div style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', maxHeight: '200px' }}>
-                                        <img src={receiptPreview} alt="Receipt" style={{ width: '100%', maxHeight: '200px', objectFit: 'contain', background: '#000', borderRadius: '10px' }} />
-                                        <button
-                                            type="button"
-                                            onClick={() => { setReceiptFile(null); setReceiptPreview(null); if (receiptInputRef.current) receiptInputRef.current.value = ''; }}
-                                            style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(239, 68, 68, 0.9)', color: 'white', border: 'none', width: '28px', height: '28px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                        >
-                                            ✕
-                                        </button>
+                                        <img src={receiptPreview} alt="Receipt" style={{ width: '100%', maxHeight: '200px', objectFit: 'contain', background: '#000', borderRadius: '10px', opacity: isUploadingReceipt ? 0.5 : 1 }} />
+                                        {isUploadingReceipt && (
+                                            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', color: 'white', fontWeight: 600, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+                                                <div className="spinner-ring" style={{ width: '30px', height: '30px', border: '3px solid rgba(255,255,255,0.3)', borderTopColor: 'white' }}></div>
+                                                {t('gen.uploading')}
+                                            </div>
+                                        )}
                                     </div>
-                                    <motion.button
-                                        type="button"
-                                        onClick={async () => {
-                                            if (!receiptPreview || !bookingId) return;
-                                            try {
-                                                setIsUploadingReceipt(true);
-                                                const response = await api.post(`/booking/${bookingId}/receipt`, { receiptBase64: receiptPreview });
-                                                if (response.data?.success) {
-                                                    toast.success('Receipt uploaded! Awaiting organizer verification.');
-                                                    setReceiptUploaded(true);
-                                                } else {
-                                                    toast.error(response.data?.message || 'Upload failed');
-                                                }
-                                            } catch (err: any) {
-                                                toast.error(err.response?.data?.message || 'Failed to upload receipt');
-                                            } finally {
-                                                setIsUploadingReceipt(false);
-                                            }
-                                        }}
-                                        disabled={isUploadingReceipt}
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
-                                        style={{
-                                            padding: '10px 20px', borderRadius: '10px',
-                                            background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: 'white',
-                                            border: 'none', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600,
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
-                                        }}
-                                    >
-                                        {isUploadingReceipt ? 'Uploading...' : 'Submit Receipt'}
-                                    </motion.button>
                                 </div>
                             )}
                         </div>
                     </div>
 
                     <motion.button
-                        className="view-bookings-btn"
-                        onClick={() => router.push('/bookings')}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                        className={`view-bookings-btn ${isUploadingReceipt ? 'disabled' : ''}`}
+                        onClick={() => {
+                            if (!isUploadingReceipt) router.push('/bookings');
+                        }}
+                        disabled={isUploadingReceipt}
+                        whileHover={!isUploadingReceipt ? { scale: 1.02 } : {}}
+                        whileTap={!isUploadingReceipt ? { scale: 0.98 } : {}}
+                        style={{ opacity: isUploadingReceipt ? 0.7 : 1, cursor: isUploadingReceipt ? 'not-allowed' : 'pointer' }}
                     >
-                        Done — View My Bookings
+                        {isUploadingReceipt ? (
+                            <>
+                                <span className="btn-spinner"></span>
+                                {t('gen.uploading')}
+                            </>
+                        ) : (
+                            t('receipt.viewBookings')
+                        )}
                     </motion.button>
                 </motion.div>
             </motion.div>
         );
     }
 
-    const maxTickets = event.remainingTickets || event.totalTickets || 0;
+    const maxTickets = event.remainingTickets ?? event.totalTickets ?? 0;
     const ticketPrice = event.ticketPrice || 0;
     const totalDisplayPrice = event.hasTheaterSeating ? seatTotalPrice : numberOfTickets * ticketPrice;
 
@@ -423,41 +787,43 @@ const BookTicketPage = () => {
                 <div className="booking-bg-effect"></div>
 
                 {event.hasTheaterSeating ? (
-                    <div className="theater-fullpage-container">
+                    <div className="theater-fullpage-container" dir="ltr">
                         {/* Compact Header Bar */}
-                        <motion.div className="theater-header-bar" initial={{ y: -30, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
+                        <motion.div className="theater-header-bar" initial={{ y: -30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                             <motion.button
                                 className="back-btn-compact"
                                 onClick={() => showAttendeeForm ? handleBackToSeats() : router.back()}
-                                whileHover={{ x: -3 }}
+                                whileHover={{ x: isRTL ? 3 : -3 }}
+                                style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
                             >
-                                <FiArrowLeft size={18} />
-                                <span>{showAttendeeForm ? 'Back to Seats' : 'Back'}</span>
+                                <FiArrowLeft size={18} style={{ transform: isRTL ? 'rotate(180deg)' : 'none' }} />
+                                <span>{showAttendeeForm ? t('booking.backToSeats') : t('gen.back')}</span>
                             </motion.button>
 
-                            <div className="event-info-compact">
+                            <div className="event-info-compact" style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flex: 1, minWidth: 0 }}>
                                 <img src={getImageUrl(event.image)} alt="" className="event-thumb" />
-                                <div>
-                                    <h2>{event.title}</h2>
-                                    <div className="event-meta-compact">
+                                <div style={{ overflow: 'hidden', textAlign: isRTL ? 'right' : 'left' }}>
+                                    <h2 style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{event.title}</h2>
+                                    <div className="event-meta-compact" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                                         <span><FiCalendar /> {formatDate(event.date)}</span>
+                                        {event.startTime && <span><FiClock /> {event.startTime} {event.endTime ? `- ${event.endTime}` : ''}</span>}
                                         <span><FiMapPin /> {event.location || 'TBA'}</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="booking-summary-compact">
+                            <div className="booking-summary-compact" style={{ flexDirection: isRTL ? 'row-reverse' : 'row', marginLeft: isRTL ? '0' : 'auto', marginRight: isRTL ? 'auto' : '0' }}>
                                 {selectedSeats.length > 0 && (
                                     <>
-                                        <div className="header-seats-chips">
+                                        <div className="header-seats-chips" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                                             {selectedSeats.map(seat => (
-                                                <span key={`${seat.section}-${seat.row}-${seat.seatNumber}`} className="header-seat-chip">
-                                                    {seat.row}{seat.seatNumber}
+                                                <span key={`${seat.section}-${seat.row}-${seat.seatNumber}`} className="header-seat-chip" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                                                    {seat.seatLabel || `${seat.row}${seat.seatNumber}`}
                                                     <span className="header-chip-price">{seat.price} EGP</span>
                                                 </span>
                                             ))}
                                         </div>
-                                        <span className="seats-count">{selectedSeats.length} seat{selectedSeats.length !== 1 ? 's' : ''}</span>
+                                        <span className="seats-count">{selectedSeats.length} {t('gen.seat')}{selectedSeats.length !== 1 ? (isRTL ? '' : 's') : ''}</span>
                                         <span className="total-amount">{seatTotalPrice.toFixed(2)} EGP</span>
                                     </>
                                 )}
@@ -474,7 +840,7 @@ const BookTicketPage = () => {
                                     animate={{ opacity: 1, x: 0 }}
                                     exit={{ opacity: 0, x: -20 }}
                                 >
-                                    <SeatSelector eventId={event._id} onSeatsSelected={handleSeatsSelected} maxSeats={10} />
+                                    <SeatSelector eventId={event._id} onSeatsSelected={handleSeatsSelected} maxSeats={10} highlightedSeats={existingSeats} initialSeatsData={initialSeatsData} />
                                 </motion.div>
                             ) : (
                                 <motion.div
@@ -485,12 +851,66 @@ const BookTicketPage = () => {
                                     exit={{ opacity: 0, x: 20 }}
                                 >
                                     <div className="attendee-form-container">
-                                        <div className="attendee-form-header">
+                                        <div className="attendee-form-header" style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: '15px' }}>
                                             <FiUsers size={24} />
-                                            <div>
-                                                <h3>Attendee Information</h3>
-                                                <p>Enter name and phone for each seat</p>
+                                            <div style={{ flex: 1, minWidth: '150px', textAlign: isRTL ? 'right' : 'left', overflow: 'hidden' }}>
+                                                <h3 style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t('attendee.title')}</h3>
+                                                <p style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t('attendee.subtitle')}</p>
                                             </div>
+                                            {holdExpiresAt && holdCountdown > 0 && (
+                                                <div style={{
+                                                    marginLeft: isRTL ? '0' : 'auto',
+                                                    marginRight: isRTL ? 'auto' : '0',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '12px',
+                                                    flexShrink: 0
+                                                }}>
+                                                    <motion.button
+                                                        className="cancel-hold-btn"
+                                                        onClick={() => setIsCancelModalOpen(true)}
+                                                        whileHover={{ scale: 1.05 }}
+                                                        whileTap={{ scale: 0.95 }}
+                                                        style={{
+                                                            background: 'rgba(239, 68, 68, 0.1)',
+                                                            color: '#ef4444',
+                                                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                                                            padding: '6px 12px',
+                                                            borderRadius: '8px',
+                                                            fontSize: '0.85rem',
+                                                            fontWeight: 600,
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '6px',
+                                                            flexDirection: isRTL ? 'row-reverse' : 'row'
+                                                        }}
+                                                    >
+                                                        <FiTrash2 size={14} /> {t('timer.cancel')}
+                                                    </motion.button>
+
+                                                    <div style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '8px',
+                                                        padding: '8px 16px',
+                                                        borderRadius: '12px',
+                                                        background: holdCountdown <= 60
+                                                            ? 'rgba(239, 68, 68, 0.15)'
+                                                            : 'rgba(139, 92, 246, 0.12)',
+                                                        border: `1px solid ${holdCountdown <= 60
+                                                            ? 'rgba(239, 68, 68, 0.4)'
+                                                            : 'rgba(139, 92, 246, 0.3)'}`,
+                                                        color: holdCountdown <= 60 ? '#ef4444' : '#a78bfa',
+                                                        fontWeight: 600,
+                                                        fontSize: '0.95rem',
+                                                        fontVariantNumeric: 'tabular-nums',
+                                                        animation: holdCountdown <= 30 ? 'pulse 1s infinite' : undefined,
+                                                    }}>
+                                                        <FiClock size={16} />
+                                                        {Math.floor(holdCountdown / 60)}:{String(holdCountdown % 60).padStart(2, '0')}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="attendee-cards-list">
@@ -504,29 +924,42 @@ const BookTicketPage = () => {
                                                 >
                                                     <div className="attendee-card-header">
                                                         <span className="attendee-seat-badge">
-                                                            Seat {seat.row}{seat.seatNumber}
+                                                            {seat.seatLabel || `Seat ${seat.row}${seat.seatNumber}`}
                                                         </span>
                                                         <span className="attendee-seat-price">{seat.price} EGP</span>
                                                     </div>
                                                     <div className="attendee-fields">
-                                                        <div className="attendee-field">
-                                                            <FiUser className="field-icon" />
+                                                        <div className="attendee-field" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                                                            <FiUser className="field-icon" style={{ marginLeft: isRTL ? '10px' : '0', marginRight: isRTL ? '0' : '10px' }} />
                                                             <input
                                                                 type="text"
-                                                                placeholder="Full Name"
-                                                                value={attendeeInfo[index]?.attendeeName || ''}
-                                                                onChange={(e) => handleAttendeeChange(index, 'attendeeName', e.target.value)}
+                                                                placeholder={t('attendee.firstName.placeholder')}
+                                                                value={attendeeInfo[index]?.attendeeFirstName || ''}
+                                                                onChange={(e) => handleAttendeeChange(index, 'attendeeFirstName', e.target.value)}
                                                                 className="attendee-input"
+                                                                style={{ textAlign: isRTL ? 'right' : 'left' }}
                                                             />
                                                         </div>
-                                                        <div className="attendee-field">
-                                                            <FiPhone className="field-icon" />
+                                                        <div className="attendee-field" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                                                            <FiUser className="field-icon" style={{ marginLeft: isRTL ? '10px' : '0', marginRight: isRTL ? '0' : '10px' }} />
+                                                            <input
+                                                                type="text"
+                                                                placeholder={t('attendee.lastName.placeholder')}
+                                                                value={attendeeInfo[index]?.attendeeLastName || ''}
+                                                                onChange={(e) => handleAttendeeChange(index, 'attendeeLastName', e.target.value)}
+                                                                className="attendee-input"
+                                                                style={{ textAlign: isRTL ? 'right' : 'left' }}
+                                                            />
+                                                        </div>
+                                                        <div className="attendee-field" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                                                            <FiPhone className="field-icon" style={{ marginLeft: isRTL ? '10px' : '0', marginRight: isRTL ? '0' : '10px' }} />
                                                             <input
                                                                 type="tel"
-                                                                placeholder="Phone Number"
+                                                                placeholder={t('attendee.phone.placeholder')}
                                                                 value={attendeeInfo[index]?.attendeePhone || ''}
                                                                 onChange={(e) => handleAttendeeChange(index, 'attendeePhone', e.target.value)}
                                                                 className="attendee-input"
+                                                                style={{ textAlign: isRTL ? 'right' : 'left' }}
                                                             />
                                                         </div>
                                                     </div>
@@ -540,17 +973,35 @@ const BookTicketPage = () => {
                                             background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(109, 40, 217, 0.08))',
                                             border: '1px solid rgba(139, 92, 246, 0.25)'
                                         }}>
-                                            <h4 style={{ margin: '0 0 10px', fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '10px', color: '#a78bfa' }}>
-                                                <FiCreditCard size={22} /> Payment via InstaPay
+                                            <h4 style={{ margin: '0 0 10px', fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '10px', color: '#a78bfa', flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                                                <FiCreditCard size={22} /> {t('payment.instapay')}
                                             </h4>
-                                            <p style={{ fontSize: '0.95rem', color: '#d1d5db', margin: 0, lineHeight: 1.5 }}>
-                                                After confirming, pay <strong style={{ color: '#fbbf24' }}>{seatTotalPrice.toFixed(2)} EGP</strong> via InstaPay — payment details will be shown after booking.
+                                            <p style={{ fontSize: '0.95rem', color: '#d1d5db', margin: 0, lineHeight: 1.5, textAlign: isRTL ? 'right' : 'left' }}>
+                                                {t('payment.instapay.desc').replace('{total}', seatTotalPrice.toFixed(2))}
                                             </p>
                                         </div>
                                     </div>
                                 </motion.div>
                             )}
                         </AnimatePresence>
+
+                        {/* Mobile-only selection summary below theater */}
+                        {selectedSeats.length > 0 && !showAttendeeForm && (
+                            <div className="mobile-selection-summary">
+                                <div className="mobile-selection-seats">
+                                    {selectedSeats.map(seat => (
+                                        <span key={`mob-${seat.section}-${seat.row}-${seat.seatNumber}`} className="mobile-seat-chip">
+                                            {seat.seatLabel || `${seat.row}${seat.seatNumber}`}
+                                            <span className="mobile-chip-price">{seat.price} EGP</span>
+                                        </span>
+                                    ))}
+                                </div>
+                                <div className="mobile-selection-total">
+                                    <span>{selectedSeats.length} seat{selectedSeats.length !== 1 ? 's' : ''} selected</span>
+                                    <strong>{seatTotalPrice.toFixed(2)} EGP</strong>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Fixed Bottom Action Bar */}
                         <motion.div className="theater-action-bar" initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
@@ -561,15 +1012,21 @@ const BookTicketPage = () => {
                                     type="button"
                                     className="confirm-booking-btn"
                                     onClick={handleNext}
-                                    disabled={selectedSeats.length === 0}
+                                    disabled={selectedSeats.length === 0 || isLoading}
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}
                                 >
-                                    <FiArrowRight />
-                                    {selectedSeats.length > 0
-                                        ? `Next — ${selectedSeats.length} Seat${selectedSeats.length !== 1 ? 's' : ''} — ${seatTotalPrice.toFixed(2)} EGP`
-                                        : 'Select Seats to Continue'
-                                    }
+                                    {isLoading ? (
+                                        <><span className="btn-spinner"></span>{t('gen.processing')}</>
+                                    ) : (
+                                        <>
+                                            <FiArrowRight style={{ transform: isRTL ? 'rotate(180deg)' : 'none' }} />
+                                            {selectedSeats.length > 0
+                                                ? `${t('gen.next')} — ${selectedSeats.length} ${t('gen.seat')}${selectedSeats.length !== 1 ? (isRTL ? '' : 's') : ''} — ${seatTotalPrice.toFixed(2)} EGP`
+                                                : t('booking.selectSeats')
+                                            }
+                                        </>
+                                    )}
                                 </motion.button>
                             ) : (
                                 <motion.button
@@ -581,9 +1038,9 @@ const BookTicketPage = () => {
                                     whileTap={{ scale: 0.98 }}
                                 >
                                     {isLoading ? (
-                                        <><span className="btn-spinner"></span>Processing...</>
+                                        <><span className="btn-spinner"></span>{t('gen.processing')}</>
                                     ) : (
-                                        <><FiCreditCard /> Confirm Booking — {seatTotalPrice.toFixed(2)} EGP</>
+                                        <><FiCreditCard /> {t('gen.confirm')} — {seatTotalPrice.toFixed(2)} EGP</>
                                     )}
                                 </motion.button>
                             )}
@@ -603,6 +1060,7 @@ const BookTicketPage = () => {
                                         <h3>{event.title}</h3>
                                         <div className="preview-meta">
                                             <span><FiCalendar /> {formatDate(event.date)}</span>
+                                            {event.startTime && <span><FiClock /> {event.startTime} {event.endTime ? `- ${event.endTime}` : ''}</span>}
                                             <span><FiMapPin /> {event.location || 'TBA'}</span>
                                             <span><FiTag /> {event.category || 'General'}</span>
                                         </div>
@@ -630,6 +1088,15 @@ const BookTicketPage = () => {
                         </motion.div>
                     </div>
                 )}
+
+                <CancelSeatsModal
+                    isOpen={isCancelModalOpen}
+                    onClose={() => setIsCancelModalOpen(false)}
+                    onConfirm={handleCancelSeatsConfirm}
+                    seats={selectedSeats}
+                    isLoading={isLoading}
+                    bookingType="pending"
+                />
             </motion.div>
         </ProtectedRoute>
     );

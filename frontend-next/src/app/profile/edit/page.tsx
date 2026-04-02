@@ -6,7 +6,7 @@ import api from '@/services/api';
 import { ProtectedRoute } from '@/auth/ProtectedRoute';
 import { toast } from 'react-toastify';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiUser, FiMail, FiCamera, FiCheck, FiX, FiArrowLeft, FiDollarSign, FiPhone, FiImage } from 'react-icons/fi';
+import { FiUser, FiMail, FiCamera, FiCheck, FiX, FiArrowLeft, FiDollarSign, FiPhone, FiImage, FiLink } from 'react-icons/fi';
 import '@/components/UserComponent/UpdateProfilePage.css';
 
 const UpdateProfilePageContent = () => {
@@ -19,6 +19,7 @@ const UpdateProfilePageContent = () => {
         phone: '',
         profilePicture: '',
         instapayNumber: '',
+        instapayLink: '',
         instapayQR: ''
     });
 
@@ -41,6 +42,7 @@ const UpdateProfilePageContent = () => {
                     phone: freshUser.phone || '',
                     profilePicture: freshUser.profilePicture || '',
                     instapayNumber: freshUser.instapayNumber || '',
+                    instapayLink: freshUser.instapayLink || '',
                     instapayQR: freshUser.instapayQR || ''
                 });
                 if (freshUser.profilePicture) {
@@ -58,6 +60,7 @@ const UpdateProfilePageContent = () => {
                         phone: user.phone || '',
                         profilePicture: user.profilePicture || '',
                         instapayNumber: user.instapayNumber || '',
+                        instapayLink: (user as any).instapayLink || '',
                         instapayQR: user.instapayQR || ''
                     });
                     if (user.profilePicture) {
@@ -123,8 +126,8 @@ const UpdateProfilePageContent = () => {
         setError('');
 
         const phone = formData.phone.trim();
-        if (phone && !/^\d{11}$/.test(phone)) {
-            const msg = "Phone number must be exactly 11 digits";
+        if (phone && !/^01\d{9}$/.test(phone)) {
+            const msg = "Phone number must be 11 digits starting with 01";
             setError(msg);
             toast.error(msg);
             return;
@@ -145,13 +148,17 @@ const UpdateProfilePageContent = () => {
 
         if (user?.role === 'Organizer' && formData.instapayNumber) {
             const instapay = formData.instapayNumber.trim();
-            if (!/^\d{11}$/.test(instapay)) {
+            if (instapay && !/^\d{11}$/.test(instapay)) {
                 const msg = "InstaPay number must be exactly 11 digits";
                 setError(msg);
                 toast.error(msg);
                 return;
             }
             submissionData.instapayNumber = instapay;
+        }
+
+        if (user?.role === 'Organizer' && formData.instapayLink) {
+            submissionData.instapayLink = formData.instapayLink.trim();
         }
 
         try {
@@ -332,73 +339,95 @@ const UpdateProfilePageContent = () => {
 
                         {user?.role === 'Organizer' && (
                             <>
-                            <motion.div
-                                className="form-group"
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: 0.4 }}
-                            >
-                                <label>
-                                    <FiDollarSign className="label-icon" />
-                                    InstaPay Number
-                                </label>
-                                <div className="input-wrapper">
-                                    <input
-                                        type="text"
-                                        name="instapayNumber"
-                                        value={formData.instapayNumber}
-                                        onChange={handleChange}
-                                        placeholder="e.g. 01221627432"
-                                        inputMode="numeric"
-                                        pattern="[0-9]*"
-                                    />
-                                    <div className="focus-border"></div>
-                                </div>
-                            </motion.div>
-
-                            <motion.div
-                                className="form-group"
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: 0.45 }}
-                            >
-                                <label>
-                                    <FiImage className="label-icon" />
-                                    InstaPay QR Code
-                                </label>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                    {instapayQRImage && (
-                                        <div style={{ position: 'relative', width: 'fit-content' }}>
-                                            <img
-                                                src={instapayQRImage}
-                                                alt="InstaPay QR"
-                                                style={{ width: '160px', height: '160px', objectFit: 'contain', borderRadius: '10px', border: '2px solid var(--border-color, rgba(255,255,255,0.1))', background: '#fff' }}
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => { setInstapayQRImage(null); setInstapayQRChanged(true); setFormData(prev => ({ ...prev, instapayQR: '' })); }}
-                                                style={{ position: 'absolute', top: '-8px', right: '-8px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}
-                                            >
-                                                <FiX size={14} />
-                                            </button>
-                                        </div>
-                                    )}
-                                    <label
-                                        htmlFor="instapay-qr-upload"
-                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 18px', background: 'rgba(139, 92, 246, 0.15)', color: '#a78bfa', border: '1px dashed rgba(139,92,246,0.4)', borderRadius: '10px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 500, width: 'fit-content', transition: 'all 0.2s' }}
-                                    >
-                                        <FiImage size={18} />
-                                        {instapayQRImage ? 'Change QR Image' : 'Upload QR Image'}
+                                <motion.div
+                                    className="form-group"
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: 0.4 }}
+                                >
+                                    <label>
+                                        <FiDollarSign className="label-icon" />
+                                        InstaPay Number
                                     </label>
-                                    <input
-                                        id="instapay-qr-upload"
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleInstapayQRUpload}
-                                        style={{ display: 'none' }}
-                                    />
-                                </div>
-                            </motion.div>
+                                    <div className="input-wrapper">
+                                        <input
+                                            type="text"
+                                            name="instapayNumber"
+                                            value={formData.instapayNumber}
+                                            onChange={handleChange}
+                                            placeholder="e.g. 01221627432"
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
+                                        />
+                                        <div className="focus-border"></div>
+                                    </div>
+                                </motion.div>
+
+                                <motion.div
+                                    className="form-group"
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: 0.42 }}
+                                >
+                                    <label>
+                                        <FiLink className="label-icon" />
+                                        InstaPay Link / Reference (Optional)
+                                    </label>
+                                    <div className="input-wrapper">
+                                        <input
+                                            type="url"
+                                            name="instapayLink"
+                                            value={formData.instapayLink}
+                                            onChange={handleChange}
+                                            placeholder="https://instapay.to/yourname"
+                                        />
+                                        <div className="focus-border"></div>
+                                    </div>
+                                </motion.div>
+
+                                <motion.div
+                                    className="form-group"
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: 0.45 }}
+                                >
+                                    <label>
+                                        <FiImage className="label-icon" />
+                                        InstaPay QR Code
+                                    </label>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                        {instapayQRImage && (
+                                            <div style={{ position: 'relative', width: 'fit-content' }}>
+                                                <img
+                                                    src={instapayQRImage}
+                                                    alt="InstaPay QR"
+                                                    style={{ width: '160px', height: '160px', objectFit: 'contain', borderRadius: '10px', border: '2px solid var(--border-color, rgba(255,255,255,0.1))', background: '#fff' }}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setInstapayQRImage(null); setInstapayQRChanged(true); setFormData(prev => ({ ...prev, instapayQR: '' })); }}
+                                                    style={{ position: 'absolute', top: '-8px', right: '-8px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}
+                                                >
+                                                    <FiX size={14} />
+                                                </button>
+                                            </div>
+                                        )}
+                                        <label
+                                            htmlFor="instapay-qr-upload"
+                                            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 18px', background: 'rgba(139, 92, 246, 0.15)', color: '#a78bfa', border: '1px dashed rgba(139,92,246,0.4)', borderRadius: '10px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 500, width: 'fit-content', transition: 'all 0.2s' }}
+                                        >
+                                            <FiImage size={18} />
+                                            {instapayQRImage ? 'Change QR Image' : 'Upload QR Image'}
+                                        </label>
+                                        <input
+                                            id="instapay-qr-upload"
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleInstapayQRUpload}
+                                            style={{ display: 'none' }}
+                                        />
+                                    </div>
+                                </motion.div>
                             </>
                         )}
                     </div>

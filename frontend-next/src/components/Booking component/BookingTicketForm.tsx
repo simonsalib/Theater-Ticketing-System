@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     FiCalendar, FiMapPin, FiTag, FiMinus, FiPlus,
     FiShoppingCart, FiArrowLeft, FiCheckCircle, FiAlertCircle,
-    FiCreditCard, FiUsers, FiGrid, FiUser, FiPhone, FiArrowRight
+    FiCreditCard, FiUsers, FiGrid, FiUser, FiPhone, FiArrowRight, FiClock
 } from 'react-icons/fi';
 import api from '@/services/api';
 import { getImageUrl } from '@/utils/imageHelper';
@@ -18,10 +18,12 @@ interface Seat {
     seatNumber: number;
     section?: string;
     price?: number;
+    seatLabel?: string;
 }
 
 interface AttendeeInfo {
-    attendeeName: string;
+    attendeeFirstName: string;
+    attendeeLastName: string;
     attendeePhone: string;
 }
 
@@ -29,6 +31,8 @@ interface Event {
     _id: string;
     title: string;
     date?: string;
+    startTime?: string;
+    endTime?: string;
     location?: string;
     category?: string;
     image?: string;
@@ -36,6 +40,7 @@ interface Event {
     totalTickets?: number;
     remainingTickets?: number;
     hasTheaterSeating?: boolean;
+    cancellationDeadline?: string;
 }
 
 interface BookTicketFormProps {
@@ -90,7 +95,7 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
     };
 
     const handleTicketChange = (delta: number) => {
-        const maxTickets = selectedEvent?.remainingTickets || selectedEvent?.totalTickets || 0;
+        const maxTickets = selectedEvent?.remainingTickets ?? selectedEvent?.totalTickets ?? 0;
         const newValue = numberOfTickets + delta;
 
         if (newValue >= 1 && newValue <= Math.min(maxTickets, 10)) {
@@ -114,7 +119,7 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
         // Initialize attendee info for each seat (preserve existing data)
         const newAttendeeInfo = selectedSeats.map((seat, index) => {
             const existing = attendeeInfo[index];
-            return existing || { attendeeName: '', attendeePhone: '' };
+            return (existing as any) || { attendeeFirstName: '', attendeeLastName: '', attendeePhone: '' };
         });
         setAttendeeInfo(newAttendeeInfo);
         setShowAttendeeForm(true);
@@ -147,15 +152,27 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
 
         // Validate attendee info
         if (selectedEvent.hasTheaterSeating) {
+            const seenNames = new Set<string>();
+
             for (let i = 0; i < attendeeInfo.length; i++) {
-                if (!attendeeInfo[i].attendeeName.trim()) {
-                    setError(`Please enter name for seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber}`);
+                const firstName = attendeeInfo[i].attendeeFirstName.trim();
+                const lastName = attendeeInfo[i].attendeeLastName.trim();
+                const fullName = `${firstName.toLowerCase()} ${lastName.toLowerCase()}`.trim();
+
+                if (!firstName || !lastName) {
+                    setError(`Please enter first and last name for ${selectedSeats[i].seatLabel || `Seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber}`}`);
                     return;
                 }
 
+                if (seenNames.has(fullName)) {
+                    setError(`Duplicate attendee name detected: ${firstName} ${lastName}. Each attendee must have a unique name.`);
+                    return;
+                }
+                seenNames.add(fullName);
+
                 const phone = attendeeInfo[i].attendeePhone.trim();
-                if (!/^\d{11}$/.test(phone)) {
-                    setError(`Phone number for seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber} must be exactly 11 digits`);
+                if (!/^01\d{9}$/.test(phone)) {
+                    setError(`Phone for ${selectedSeats[i].seatLabel || `Seat ${selectedSeats[i].row}${selectedSeats[i].seatNumber}`} must be 11 digits starting with 01`);
                     return;
                 }
             }
@@ -167,7 +184,6 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
         try {
             const payload: any = {
                 eventId: selectedEvent._id,
-                status: 'confirmed'
             };
 
             if (selectedEvent.hasTheaterSeating) {
@@ -175,7 +191,9 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
                     row: seat.row,
                     seatNumber: seat.seatNumber,
                     section: seat.section,
-                    attendeeName: attendeeInfo[index]?.attendeeName || '',
+                    seatLabel: seat.seatLabel,
+                    attendeeFirstName: attendeeInfo[index]?.attendeeFirstName || '',
+                    attendeeLastName: attendeeInfo[index]?.attendeeLastName || '',
                     attendeePhone: attendeeInfo[index]?.attendeePhone.trim() || '',
                 }));
             } else {
@@ -202,7 +220,7 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
         }
     };
 
-    const maxTickets = selectedEvent?.remainingTickets || selectedEvent?.totalTickets || 0;
+    const maxTickets = selectedEvent?.remainingTickets ?? selectedEvent?.totalTickets ?? 0;
     const ticketPrice = selectedEvent?.ticketPrice || 0;
     const totalPrice = selectedEvent?.hasTheaterSeating ? seatTotalPrice : numberOfTickets * ticketPrice;
     const ticketCount = selectedEvent?.hasTheaterSeating ? selectedSeats.length : numberOfTickets;
@@ -210,6 +228,7 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
     const formatDate = (dateString: string | undefined): string => {
         if (!dateString) return 'TBA';
         return new Date(dateString).toLocaleDateString('en-US', {
+            timeZone: 'Africa/Cairo',
             weekday: 'short',
             month: 'short',
             day: 'numeric',
@@ -282,7 +301,7 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
                         <div className="success-seats">
                             {selectedSeats.map(seat => (
                                 <span key={`${seat.section}-${seat.row}-${seat.seatNumber}`} className="seat-chip">
-                                    {seat.row}{seat.seatNumber}
+                                    {seat.seatLabel || `${seat.row}${seat.seatNumber}`}
                                 </span>
                             ))}
                         </div>
@@ -337,7 +356,7 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
                                     <div className="header-seats-chips">
                                         {selectedSeats.map(seat => (
                                             <span key={`${seat.section}-${seat.row}-${seat.seatNumber}`} className="header-seat-chip">
-                                                {seat.row}{seat.seatNumber}
+                                                {seat.seatLabel || `${seat.row}${seat.seatNumber}`}
                                                 <span className="header-chip-price">{seat.price} EGP</span>
                                             </span>
                                         ))}
@@ -392,7 +411,7 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
                                             >
                                                 <div className="attendee-card-header">
                                                     <span className="attendee-seat-badge">
-                                                        Seat {seat.row}{seat.seatNumber}
+                                                        {seat.seatLabel || `Seat ${seat.row}${seat.seatNumber}`}
                                                     </span>
                                                     <span className="attendee-seat-price">{seat.price} EGP</span>
                                                 </div>
@@ -401,9 +420,19 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
                                                         <FiUser className="field-icon" />
                                                         <input
                                                             type="text"
-                                                            placeholder="Full Name"
-                                                            value={attendeeInfo[index]?.attendeeName || ''}
-                                                            onChange={(e) => handleAttendeeChange(index, 'attendeeName', e.target.value)}
+                                                            placeholder="First Name"
+                                                            value={attendeeInfo[index]?.attendeeFirstName || ''}
+                                                            onChange={(e) => handleAttendeeChange(index, 'attendeeFirstName', e.target.value)}
+                                                            className="attendee-input"
+                                                        />
+                                                    </div>
+                                                    <div className="attendee-field">
+                                                        <FiUser className="field-icon" />
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Last Name"
+                                                            value={attendeeInfo[index]?.attendeeLastName || ''}
+                                                            onChange={(e) => handleAttendeeChange(index, 'attendeeLastName', e.target.value)}
                                                             className="attendee-input"
                                                         />
                                                     </div>
@@ -411,7 +440,7 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
                                                         <FiPhone className="field-icon" />
                                                         <input
                                                             type="tel"
-                                                            placeholder="Phone Number"
+                                                            placeholder="01xxxxxxxxx"
                                                             value={attendeeInfo[index]?.attendeePhone || ''}
                                                             onChange={(e) => handleAttendeeChange(index, 'attendeePhone', e.target.value)}
                                                             className="attendee-input"
@@ -433,6 +462,21 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
                         initial={{ y: 50, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                     >
+                        {selectedSeats.length > 0 && !showAttendeeForm && (
+                            <div className="seat-context-label">
+                                {(() => {
+                                    const lastSeat = selectedSeats[selectedSeats.length - 1];
+                                    const label = lastSeat.seatLabel || `${lastSeat.row}${lastSeat.seatNumber}`;
+                                    return (
+                                        <>
+                                            <span className="seat-context-title">Selected Seat:</span>
+                                            <span className="seat-context-value">{label}</span>
+                                        </>
+                                    );
+                                })()}
+                            </div>
+                        )}
+
                         {error && (
                             <div className="error-inline">
                                 <FiAlertCircle /> {error}
@@ -520,8 +564,10 @@ const BookTicketForm = ({ event: preSelectedEvent, eventId, onBookingComplete }:
                                     <h3>{selectedEvent?.title}</h3>
                                     <div className="preview-meta">
                                         <span><FiCalendar /> {formatDate(selectedEvent?.date)}</span>
+                                        {selectedEvent?.startTime && <span><FiClock /> {selectedEvent.startTime} {selectedEvent.endTime ? `- ${selectedEvent.endTime}` : ''}</span>}
                                         <span><FiMapPin /> {selectedEvent?.location || 'TBA'}</span>
                                         <span><FiTag /> {selectedEvent?.category || 'General'}</span>
+                                        {selectedEvent?.cancellationDeadline && <span style={{ color: new Date() > new Date(selectedEvent.cancellationDeadline) ? '#ef4444' : 'inherit' }}><FiAlertCircle /> Cancel Before: {new Date(selectedEvent.cancellationDeadline).toLocaleString('en-US', { timeZone: 'Africa/Cairo', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>}
                                     </div>
                                 </div>
                             </motion.div>

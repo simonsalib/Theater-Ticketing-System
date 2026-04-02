@@ -27,7 +27,10 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
         description: initialData?.description || '',
         date: initialData?.date ? new Date(initialData.date).toISOString().split('T')[0] : '',
         location: initialData?.location || '',
-        category: initialData?.category || '',
+        category: initialData?.category || 'theater',
+        startTime: initialData?.startTime || '',
+        endTime: initialData?.endTime || '',
+        cancellationDeadline: initialData?.cancellationDeadline ? new Date(initialData.cancellationDeadline).toISOString().split('T')[0] : '',
         ticketPrice: initialData?.ticketPrice || 0,
         totalTickets: initialData?.totalTickets || 0,
         imageFile: null as File | null,
@@ -44,6 +47,16 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
     const [selectedTheaterLayout, setSelectedTheaterLayout] = useState<any>(null);
     const [showSeatConfigurator, setShowSeatConfigurator] = useState(false);
     const [eventSeatConfig, setEventSeatConfig] = useState<any[]>(initialData?.seatConfig || []);
+    const [preBookedSeats, setPreBookedSeats] = useState<any[]>(() => {
+        // Load organizer-reserved seats (those without a bookingId) from backend's bookedSeats
+        const booked = (initialData as any)?.bookedSeats;
+        if (Array.isArray(booked)) {
+            return booked
+                .filter((s: any) => !s.bookingId)
+                .map((s: any) => ({ section: s.section || 'main', row: s.row, seatNumber: s.seatNumber }));
+        }
+        return [];
+    });
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -128,8 +141,9 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
         });
     };
 
-    const handleSeatConfigSave = (newConfig: any[], newPricing: any[]) => {
+    const handleSeatConfigSave = (newConfig: any[], newPricing: any[], newPreBooked: any[] = []) => {
         setEventSeatConfig(newConfig);
+        setPreBookedSeats(newPreBooked);
         const pricingObj: Record<string, number> = {};
         newPricing.forEach(p => { pricingObj[p.seatType] = p.price; });
         setFormData(prev => ({ ...prev, seatPricing: pricingObj }));
@@ -197,6 +211,9 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
                 date: formData.date,
                 location: formData.location,
                 category: formData.category,
+                startTime: formData.startTime,
+                endTime: formData.endTime,
+                cancellationDeadline: formData.cancellationDeadline ? new Date(formData.cancellationDeadline).toISOString() : undefined,
                 ticketPrice: formData.hasTheaterSeating ? 0 : formData.ticketPrice,
                 totalTickets: formData.totalTickets,
                 hasTheaterSeating: formData.hasTheaterSeating,
@@ -212,8 +229,11 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
                 if (eventSeatConfig && eventSeatConfig.length > 0) {
                     requestData.seatConfig = eventSeatConfig;
                 }
+                if (preBookedSeats && preBookedSeats.length > 0) {
+                    requestData.preBookedSeats = preBookedSeats;
+                }
             }
-
+            
             let response;
             if (isEdit && eventId) {
                 response = await api.put(`/event/${eventId}`, requestData);
@@ -239,6 +259,7 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
                 theaterLayout={selectedTheaterLayout}
                 initialSeatConfig={eventSeatConfig}
                 initialPricing={formData.seatPricing}
+                initialPreBookedSeats={preBookedSeats}
                 onSave={handleSeatConfigSave}
                 onCancel={() => setShowSeatConfigurator(false)}
             />
@@ -263,12 +284,23 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
 
                 <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div className="form-group">
-                        <label htmlFor="date">Date*</label>
+                        <label htmlFor="date">Event Date*</label>
                         <input type="date" id="date" name="date" value={formData.date} onChange={handleChange} required />
                     </div>
                     <div className="form-group">
-                        <label htmlFor="category">Category*</label>
-                        <input type="text" id="category" name="category" value={formData.category} onChange={handleChange} required placeholder="e.g. Movie, Play, Concert" />
+                        <label htmlFor="cancellationDeadline">Ticket Cancellation Request Deadline*</label>
+                        <input type="date" id="cancellationDeadline" name="cancellationDeadline" value={formData.cancellationDeadline} onChange={handleChange} required />
+                    </div>
+                </div>
+
+                <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div className="form-group">
+                        <label htmlFor="startTime">Start Time*</label>
+                        <input type="time" id="startTime" name="startTime" value={formData.startTime} onChange={handleChange} required />
+                    </div>
+                    <div className="form-group">
+                        <label htmlFor="endTime">End Time*</label>
+                        <input type="time" id="endTime" name="endTime" value={formData.endTime} onChange={handleChange} required />
                     </div>
                 </div>
 

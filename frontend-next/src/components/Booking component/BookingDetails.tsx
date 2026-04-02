@@ -4,14 +4,19 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import api from '@/services/api';
 import ConfirmationDialog from '@/components/AdminComponent/ConfirmationDialog';
-import { FiCheckCircle, FiUploadCloud } from 'react-icons/fi';
+import CancelSeatsModal from './CancelSeatsModal';
+import RequestCancellationModal from './RequestCancellationModal';
+import { FiCheckCircle, FiUploadCloud, FiRotateCcw, FiClock } from 'react-icons/fi';
+import { toast } from 'react-toastify';
 import './BookingDetails.css';
 
 interface Seat {
     row: string;
     seatNumber: number;
+    section: string;
     seatType: string;
     price: number;
+    seatLabel?: string;
 }
 
 interface Booking {
@@ -27,6 +32,13 @@ interface Booking {
     selectedSeats?: Seat[];
     isReceiptUploaded?: boolean;
     instapayReceipt?: string;
+    cancellationRequest?: {
+        status: 'none' | 'pending' | 'approved' | 'rejected';
+        requestedAt?: string;
+        reason?: string;
+        seatsToCancel?: { row: string; seatNumber: number; section: string }[];
+        cancelAll?: boolean;
+    };
 }
 
 interface Event {
@@ -50,6 +62,10 @@ const BookingDetails = ({ id }: BookingDetailsProps) => {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [showCancelConfirm, setShowCancelConfirm] = useState<boolean>(false);
+    const [showCancelSeatsModal, setShowCancelSeatsModal] = useState(false);
+    const [showRequestCancelModal, setShowRequestCancelModal] = useState(false);
+    const [cancelLoading, setCancelLoading] = useState(false);
+    const [scannedSeatKeys, setScannedSeatKeys] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         fetchBookingDetails();
@@ -105,9 +121,58 @@ const BookingDetails = ({ id }: BookingDetailsProps) => {
         }
     };
 
+    const handleCancelSeatsConfirm = async (seatKeys: string[], cancelAll: boolean) => {
+        try {
+            setCancelLoading(true);
+            await api.post(`/booking/${id}/cancel-seats`, { seatKeys, cancelAll });
+            toast.success(cancelAll ? 'Booking cancelled successfully' : 'Selected seats cancelled');
+            setShowCancelSeatsModal(false);
+            fetchBookingDetails();
+        } catch (err: any) {
+            console.error('Error cancelling seats:', err);
+            toast.error(err.response?.data?.message || 'Failed to cancel seats');
+        } finally {
+            setCancelLoading(false);
+        }
+    };
+
+    const openRequestCancelModal = async () => {
+        if (booking?.status === 'confirmed') {
+            try {
+                const res = await api.get(`/tickets/booking/${id}`);
+                const tickets = res.data?.tickets || [];
+                const scanned = new Set<string>(
+                    tickets.filter((t: any) => t.isScanned).map((t: any) => `${t.section}-${t.seatRow}-${t.seatNumber}`)
+                );
+                setScannedSeatKeys(scanned);
+            } catch {
+                setScannedSeatKeys(new Set());
+            }
+        } else {
+            setScannedSeatKeys(new Set());
+        }
+        setShowRequestCancelModal(true);
+    };
+
+    const handleRequestCancellationConfirm = async (seatKeys: string[], cancelAll: boolean, reason: string) => {
+        try {
+            setCancelLoading(true);
+            await api.post(`/booking/${id}/request-cancellation`, { seatKeys, cancelAll, reason });
+            toast.success('Cancellation request submitted!');
+            setShowRequestCancelModal(false);
+            fetchBookingDetails();
+        } catch (err: any) {
+            console.error('Error requesting cancellation:', err);
+            toast.error(err.response?.data?.message || 'Failed to submit request');
+        } finally {
+            setCancelLoading(false);
+        }
+    };
+
     const formatDate = (dateString: string): string => {
         const date = new Date(dateString);
         return date.toLocaleString('en-US', {
+            timeZone: 'Africa/Cairo',
             weekday: 'long',
             year: 'numeric',
             month: 'long',
@@ -134,7 +199,7 @@ const BookingDetails = ({ id }: BookingDetailsProps) => {
     const eventData = event || booking.event || {};
 
     const bookingDate = booking.createdAt
-        ? new Date(booking.createdAt).toLocaleDateString()
+        ? new Date(booking.createdAt).toLocaleDateString('en-US', { timeZone: 'Africa/Cairo' })
         : 'Date not available';
 
     return (
@@ -278,7 +343,7 @@ const BookingDetails = ({ id }: BookingDetailsProps) => {
                                                 color: chipTextColor
                                             }}
                                         >
-                                            <strong>{seat.row}{seat.seatNumber}</strong>
+                                            <strong>{seat.seatLabel || `${seat.row}${seat.seatNumber}`}</strong>
                                             <span style={{
                                                 marginLeft: '8px',
                                                 fontSize: '0.8rem',
@@ -292,7 +357,7 @@ const BookingDetails = ({ id }: BookingDetailsProps) => {
                                                 color: '#22d3ee',
                                                 fontWeight: 600
                                             }}>
-                                                ${seat.price?.toFixed(2)} EGP
+                                                {seat.price?.toFixed(2)} EGP
                                             </span>
                                         </div>
                                     );
@@ -307,13 +372,58 @@ const BookingDetails = ({ id }: BookingDetailsProps) => {
                     {eventData._id && (
                         <Link href={`/events/${eventData._id}`} className="view-event-btn">View Event Page</Link>
                     )}
-                    {booking.status !== 'Cancelled' && (
-                        <button
-                            onClick={() => setShowCancelConfirm(true)}
-                            className="cancel-booking-btn"
-                        >
-                            Cancel Booking
-                        </button>
+                    {booking.status === 'pending' && !booking.isReceiptUploaded && (
+                        booking.hasTheaterSeating && booking.selectedSeats && booking.selectedSeats.length > 0 ? (
+                            <button
+                                onClick={() => setShowCancelSeatsModal(true)}
+                                className="cancel-booking-btn"
+                            >
+                                Cancel Seats
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => setShowCancelConfirm(true)}
+                                className="cancel-booking-btn"
+                            >
+                                Cancel Booking
+                            </button>
+                        )
+                    )}
+                    {booking.status === 'pending' && booking.isReceiptUploaded && booking.hasTheaterSeating && (
+                        <>
+                            {booking.cancellationRequest?.status === 'pending' && (
+                                <span style={{
+                                    display: 'flex', alignItems: 'center', gap: '6px',
+                                    padding: '0.75rem 1.5rem', borderRadius: '8px',
+                                    background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24',
+                                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                                    fontSize: '0.9rem', fontWeight: 600,
+                                }}>
+                                    <FiClock /> Cancellation Request Pending
+                                </span>
+                            )}
+                            {(() => {
+                                const pendingKeys = new Set(
+                                    (booking.cancellationRequest?.seatsToCancel || []).map(s => `${s.section}-${s.row}-${s.seatNumber}`)
+                                );
+                                const unrequestedSeats = (booking.selectedSeats || []).filter(s => !pendingKeys.has(`${s.section}-${s.row}-${s.seatNumber}`));
+                                const showButton = booking.cancellationRequest?.status !== 'pending'
+                                    || (booking.cancellationRequest?.status === 'pending' && unrequestedSeats.length > 0);
+                                return showButton ? (
+                                    <button
+                                        onClick={() => openRequestCancelModal()}
+                                        className="cancel-booking-btn"
+                                        style={{
+                                            background: 'rgba(245, 158, 11, 0.15)',
+                                            color: '#fbbf24',
+                                            borderColor: 'rgba(245, 158, 11, 0.3)',
+                                        }}
+                                    >
+                                        <FiRotateCcw style={{ marginRight: '6px' }} /> {booking.cancellationRequest?.status === 'pending' ? 'Cancel More Seats' : 'Request Cancellation'}
+                                    </button>
+                                ) : null;
+                            })()}
+                        </>
                     )}
                     {booking.status === 'pending' && !booking.isReceiptUploaded && (
                         <Link
@@ -330,6 +440,58 @@ const BookingDetails = ({ id }: BookingDetailsProps) => {
                             <FiUploadCloud /> Upload Receipt
                         </Link>
                     )}
+                    {booking.status === 'confirmed' && booking.hasTheaterSeating && (
+                        <>
+                            {booking.cancellationRequest?.status === 'pending' && (
+                                <span style={{
+                                    display: 'flex', alignItems: 'center', gap: '6px',
+                                    padding: '0.75rem 1.5rem', borderRadius: '8px',
+                                    background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24',
+                                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                                    fontSize: '0.9rem', fontWeight: 600,
+                                }}>
+                                    <FiClock /> Cancellation Request Pending
+                                </span>
+                            )}
+                            {(() => {
+                                const pendingKeys = new Set(
+                                    (booking.cancellationRequest?.seatsToCancel || []).map(s => `${s.section}-${s.row}-${s.seatNumber}`)
+                                );
+                                const unrequestedSeats = (booking.selectedSeats || []).filter(s => !pendingKeys.has(`${s.section}-${s.row}-${s.seatNumber}`));
+                                if (booking.cancellationRequest?.status === 'pending' && unrequestedSeats.length > 0) {
+                                    return (
+                                        <button
+                                            onClick={() => openRequestCancelModal()}
+                                            className="cancel-booking-btn"
+                                            style={{
+                                                background: 'rgba(245, 158, 11, 0.15)',
+                                                color: '#fbbf24',
+                                                borderColor: 'rgba(245, 158, 11, 0.3)',
+                                            }}
+                                        >
+                                            <FiRotateCcw style={{ marginRight: '6px' }} /> Cancel More Seats
+                                        </button>
+                                    );
+                                }
+                                if (booking.cancellationRequest?.status === 'rejected' || !booking.cancellationRequest?.status || booking.cancellationRequest.status === 'none') {
+                                    return (
+                                        <button
+                                            onClick={() => openRequestCancelModal()}
+                                            className="cancel-booking-btn"
+                                            style={{
+                                                background: 'rgba(245, 158, 11, 0.15)',
+                                                color: '#fbbf24',
+                                                borderColor: 'rgba(245, 158, 11, 0.3)',
+                                            }}
+                                        >
+                                            <FiRotateCcw style={{ marginRight: '6px' }} /> Request Ticket Return
+                                        </button>
+                                    );
+                                }
+                                return null;
+                            })()}
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -342,6 +504,37 @@ const BookingDetails = ({ id }: BookingDetailsProps) => {
                 onConfirm={handleCancelBooking}
                 onCancel={() => setShowCancelConfirm(false)}
             />
+
+            {booking.hasTheaterSeating && booking.selectedSeats && booking.selectedSeats.length > 0 && (
+                <>
+                    <CancelSeatsModal
+                        isOpen={showCancelSeatsModal}
+                        onClose={() => setShowCancelSeatsModal(false)}
+                        onConfirm={handleCancelSeatsConfirm}
+                        seats={booking.selectedSeats}
+                        isLoading={cancelLoading}
+                        bookingType="pending"
+                    />
+                    <RequestCancellationModal
+                        isOpen={showRequestCancelModal}
+                        onClose={() => setShowRequestCancelModal(false)}
+                        onConfirm={handleRequestCancellationConfirm}
+                        seats={(() => {
+                            const pendingKeys = new Set(
+                                (booking.cancellationRequest?.status === 'pending'
+                                    ? booking.cancellationRequest.seatsToCancel || []
+                                    : []
+                                ).map(s => `${s.section}-${s.row}-${s.seatNumber}`)
+                            );
+                            return booking.selectedSeats.filter(
+                                s => !pendingKeys.has(`${s.section}-${s.row}-${s.seatNumber}`)
+                                    && !scannedSeatKeys.has(`${s.section}-${s.row}-${s.seatNumber}`)
+                            );
+                        })()}
+                        isLoading={cancelLoading}
+                    />
+                </>
+            )}
         </div>
     );
 };

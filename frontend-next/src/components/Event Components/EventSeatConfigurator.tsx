@@ -9,8 +9,11 @@ const SEAT_TYPES = {
     STANDARD: 'standard',
     VIP: 'vip',
     PREMIUM: 'premium',
-    WHEELCHAIR: 'wheelchair'
+    WHEELCHAIR: 'wheelchair',
+    BOOKED: 'booked'
 };
+
+const PRICED_TYPES = ['standard', 'vip', 'premium', 'wheelchair'];
 
 interface SeatConfig {
     section: string;
@@ -19,16 +22,23 @@ interface SeatConfig {
     seatType: string;
 }
 
+interface PreBookedSeat {
+    section: string;
+    row: string;
+    seatNumber: number;
+}
+
 interface EventSeatConfiguratorProps {
     theaterLayout: TheaterLayout;
     initialSeatConfig?: SeatConfig[];
     initialPricing?: Record<string, number>;
-    onSave: (config: SeatConfig[], pricing: { seatType: string; price: number }[]) => void;
+    initialPreBookedSeats?: PreBookedSeat[];
+    onSave: (config: SeatConfig[], pricing: { seatType: string; price: number }[], preBookedSeats: PreBookedSeat[]) => void;
     onCancel: () => void;
 }
 
 const EventSeatConfigurator: React.FC<EventSeatConfiguratorProps> = ({
-    theaterLayout, initialSeatConfig = [], initialPricing = {}, onSave, onCancel
+    theaterLayout, initialSeatConfig = [], initialPricing = {}, initialPreBookedSeats = [], onSave, onCancel
 }) => {
     const [currentCategory, setCurrentCategory] = useState(SEAT_TYPES.VIP);
     const [seatMap, setSeatMap] = useState<Record<string, string>>({});
@@ -52,8 +62,14 @@ const EventSeatConfigurator: React.FC<EventSeatConfiguratorProps> = ({
                 initialMap[key] = cfg.seatType;
             });
         }
+        if (initialPreBookedSeats && initialPreBookedSeats.length > 0) {
+            initialPreBookedSeats.forEach(s => {
+                const key = `${s.section || 'main'}-${s.row}-${s.seatNumber}`;
+                initialMap[key] = 'booked';
+            });
+        }
         setSeatMap(initialMap);
-    }, [theaterLayout, initialSeatConfig]);
+    }, [theaterLayout, initialSeatConfig, initialPreBookedSeats]);
 
     const isSeatRemoved = (section: string, row: string, seatNum: number) => {
         const key = `${section}-${row}-${seatNum}`;
@@ -102,12 +118,21 @@ const EventSeatConfigurator: React.FC<EventSeatConfiguratorProps> = ({
     };
 
     const handleSave = () => {
-        const configArray = Object.entries(seatMap).map(([key, type]) => {
+        const configArray: SeatConfig[] = [];
+        const preBookedArray: PreBookedSeat[] = [];
+
+        Object.entries(seatMap).forEach(([key, type]) => {
             const parts = key.split('-');
-            return { section: parts[0], row: parts[1], seatNumber: parseInt(parts[2]), seatType: type };
+            const seat = { section: parts[0], row: parts[1], seatNumber: parseInt(parts[2]) };
+            if (type === 'booked') {
+                preBookedArray.push(seat);
+            } else {
+                configArray.push({ ...seat, seatType: type });
+            }
         });
+
         const pricingArray = Object.entries(pricing).map(([type, price]) => ({ seatType: type, price }));
-        onSave(configArray, pricingArray);
+        onSave(configArray, pricingArray, preBookedArray);
     };
 
     // Convert theaterLayout to the format expected by TheaterDesigner
@@ -175,12 +200,12 @@ const EventSeatConfigurator: React.FC<EventSeatConfiguratorProps> = ({
                         <h4><FiDollarSign /> Set Prices</h4>
                         <p className="section-hint">Define price for each seat type</p>
                         <div className="pricing-inputs">
-                            {Object.values(SEAT_TYPES).map(type => (
+                            {PRICED_TYPES.map(type => (
                                 <div key={type} className={`price-input-row type-${type}`}>
                                     <span className="price-cat-color"></span>
                                     <label>{type.charAt(0).toUpperCase() + type.slice(1)}</label>
                                     <div className="price-input-wrapper">
-                                        <span className="currency">$</span>
+                                        <span className="currency">EGP</span>
                                         <input
                                             type="text"
                                             inputMode="decimal"
@@ -200,6 +225,7 @@ const EventSeatConfigurator: React.FC<EventSeatConfiguratorProps> = ({
                             <div className="legend-item"><div className="legend-color vip" /><span>VIP</span></div>
                             <div className="legend-item"><div className="legend-color premium" /><span>Premium</span></div>
                             <div className="legend-item"><div className="legend-color wheelchair" /><span>Wheelchair</span></div>
+                            <div className="legend-item"><div className="legend-color booked" /><span>Booked (Reserved)</span></div>
                             <div className="legend-item"><div className="legend-color disabled" /><span>Removed</span></div>
                         </div>
                     </div>

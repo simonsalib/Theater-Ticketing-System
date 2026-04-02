@@ -30,7 +30,7 @@
 }
 
 .hero-title {
-    font-size: clamp(2.5rem, 5vw, 4rem);
+    font-size: clamp(2rem, 8vw, 4rem);
     margin-bottom: 1.5rem;
     font-weight: 800;
     text-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
@@ -117,6 +117,7 @@
     0% {
         transform: translate(0, 0);
     }
+
     100% {
         transform: translate(50px, 50px);
     }
@@ -140,7 +141,7 @@
     backdrop-filter: blur(15px);
     transition: all var(--transition-normal);
     border: 1px solid rgba(121, 40, 202, 0.2);
-    box-shadow: 
+    box-shadow:
         0 8px 20px rgba(0, 0, 0, 0.6),
         inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
@@ -148,7 +149,7 @@
 .stat-item:hover {
     transform: translateY(-15px) scale(1.03);
     background: rgba(15, 15, 15, 0.95);
-    box-shadow: 
+    box-shadow:
         0 20px 40px rgba(121, 40, 202, 0.4),
         0 0 0 1px rgba(121, 40, 202, 0.4),
         inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -184,7 +185,7 @@
 .features-section {
     padding: 120px 20px;
     background: #050505;
-    background-image: 
+    background-image:
         radial-gradient(circle at 20% 50%, rgba(121, 40, 202, 0.08) 0%, transparent 50%),
         radial-gradient(circle at 80% 80%, rgba(102, 126, 234, 0.08) 0%, transparent 50%),
         linear-gradient(180deg, #050505 0%, #0a0a0a 100%);
@@ -200,7 +201,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-image: 
+    background-image:
         radial-gradient(circle at 25% 25%, rgba(255, 0, 128, 0.03) 0%, transparent 20%),
         radial-gradient(circle at 75% 75%, rgba(121, 40, 202, 0.03) 0%, transparent 20%);
     animation: float 20s ease-in-out infinite;
@@ -208,15 +209,20 @@
 }
 
 @keyframes float {
-    0%, 100% {
+
+    0%,
+    100% {
         transform: translate(0, 0) scale(1);
     }
+
     25% {
         transform: translate(20px, -20px) scale(1.1);
     }
+
     50% {
         transform: translate(-20px, 20px) scale(0.9);
     }
+
     75% {
         transform: translate(20px, 20px) scale(1.05);
     }
@@ -225,12 +231,12 @@
 .section-title {
     text-align: center;
     font-size: clamp(2rem, 4vw, 3rem);
-    margin-bottom: 70px;
+    margin: 0 auto 70px;
     color: var(--text-primary);
     position: relative;
-    display: inline-block;
-    left: 50%;
-    transform: translateX(-50%);
+    display: block;
+    width: fit-content;
+    max-width: 100%;
     padding-bottom: 20px;
     letter-spacing: -0.5px;
 }
@@ -261,10 +267,13 @@
 }
 
 @keyframes pulse {
-    0%, 100% {
+
+    0%,
+    100% {
         opacity: 1;
         transform: translateX(-50%) scaleX(1);
     }
+
     50% {
         opacity: 0.7;
         transform: translateX(-50%) scaleX(1.1);
@@ -287,7 +296,7 @@
     border-radius: 20px;
     text-align: center;
     transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 
+    box-shadow:
         0 10px 30px rgba(0, 0, 0, 0.7),
         inset 0 1px 0 rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(121, 40, 202, 0.15);
@@ -324,7 +333,7 @@
 
 .feature-card:hover {
     transform: translateY(-20px) scale(1.02);
-    box-shadow: 
+    box-shadow:
         0 25px 60px rgba(121, 40, 202, 0.5),
         0 0 0 1px rgba(121, 40, 202, 0.5),
         inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -352,7 +361,7 @@
     font-size: 2.8rem;
     color: white;
     transition: all 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55);
-    box-shadow: 
+    box-shadow:
         0 10px 30px rgba(102, 126, 234, 0.4),
         inset 0 -5px 10px rgba(0, 0, 0, 0.3),
         inset 0 5px 10px rgba(255, 255, 255, 0.1);
@@ -367,13 +376,11 @@
     left: -5px;
     right: -5px;
     bottom: -5px;
-    background: conic-gradient(
-        from 0deg,
-        var(--primary),
-        var(--secondary),
-        var(--accent),
-        var(--primary)
-    );
+    background: conic-gradient(from 0deg,
+            var(--primary),
+            var(--secondary),
+            var(--accent),
+            var(--primary));
     border-radius: 50%;
     z-index: -1;
     opacity: 0;
@@ -385,6 +392,7 @@
     from {
         transform: rotate(0deg);
     }
+
     to {
         transform: rotate(360deg);
     }
@@ -397,7 +405,7 @@
 .feature-card:hover .feature-icon {
     transform: rotate(360deg) scale(1.15);
     background: var(--gradient-primary);
-    box-shadow: 
+    box-shadow:
         0 15px 40px rgba(121, 40, 202, 0.6),
         inset 0 -5px 10px rgba(0, 0, 0, 0.3),
         inset 0 5px 10px rgba(255, 255, 255, 0.2);
@@ -813,6 +821,7 @@
     from {
         opacity: 0;
     }
+
     to {
         opacity: 1;
     }
@@ -823,6 +832,7 @@
         transform: scale(0.7);
         opacity: 0;
     }
+
     to {
         transform: scale(1);
         opacity: 1;
@@ -834,6 +844,7 @@
         transform: translateY(80px);
         opacity: 0;
     }
+
     to {
         transform: translateY(0);
         opacity: 1;
@@ -845,7 +856,7 @@
     .events-grid {
         gap: 25px;
     }
-    
+
     .event-card {
         min-width: 300px;
         max-width: 300px;
@@ -853,46 +864,68 @@
 }
 
 @media (max-width: 768px) {
+    .section-title::before {
+        display: none;
+    }
+
+    .hero-title {
+        font-size: clamp(1.8rem, 8vw, 2.5rem);
+    }
+
+    .hero-subtitle {
+        font-size: 1rem;
+        margin-bottom: 1.8rem;
+    }
+
     .stats-container,
     .features-grid {
         grid-template-columns: 1fr;
-        gap: 30px;
+        gap: 20px;
     }
 
     .events-grid {
-        gap: 20px;
-        padding: 20px 10px;
+        gap: 15px;
+        padding: 15px 5px;
     }
-    
+
     .event-card {
-        min-width: 280px;
-        max-width: 280px;
+        min-width: 85vw;
+        max-width: 85vw;
+        scroll-snap-align: center;
     }
 
     .hero-buttons {
         flex-direction: column;
         align-items: center;
+        gap: 15px;
     }
 
     .btn-primary-hero,
     .btn-secondary-hero {
         width: 100%;
-        max-width: 350px;
+        max-width: 100%;
+        padding: 15px 20px;
+        font-size: 1rem;
     }
 
     .stat-item h3 {
-        font-size: 2.5rem;
+        font-size: 2.2rem;
+    }
+
+    .feature-card {
+        padding: 35px 25px;
     }
 
     .feature-icon {
-        width: 75px;
-        height: 75px;
+        width: 70px;
+        height: 70px;
         font-size: 2rem;
+        margin-bottom: 25px;
     }
 
     .login-prompt-modal {
         margin: 20px;
-        padding: 40px 30px;
+        padding: 30px 20px;
     }
 
     .login-prompt-buttons {
@@ -907,18 +940,34 @@
 }
 
 @media (max-width: 480px) {
+    .hero-section {
+        min-height: 100svh;
+        padding-top: 60px;
+    }
+
     .stats-section,
     .features-section,
     .featured-section {
-        padding: 60px 15px;
+        padding: 50px 15px;
+    }
+
+    .feature-card {
+        padding: 25px 15px;
+    }
+
+    .feature-card h3 {
+        font-size: 1.5rem;
     }
 
     .event-info {
-        padding: 25px 20px;
+        padding: 20px 15px;
     }
-    
-    .event-card {
-        min-width: 260px;
-        max-width: 260px;
+
+    .event-image-container {
+        height: 200px;
+    }
+
+    .events-titles {
+        font-size: 1.3rem;
     }
 }

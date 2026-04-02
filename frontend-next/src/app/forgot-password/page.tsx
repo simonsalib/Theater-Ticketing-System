@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/services/api';
 import { toast } from 'react-toastify';
+import { FiEye, FiEyeOff } from 'react-icons/fi';
 import PasswordStrengthIndicator from '@/components/shared/PasswordStrengthIndicator';
 import '@/components/ForgotPasswordForm.css';
 
@@ -14,6 +15,8 @@ const ForgotPasswordForm = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const router = useRouter();
 
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -94,12 +97,22 @@ const ForgotPasswordForm = () => {
                         <form onSubmit={handleResetPassword}>
                             <div className="form-group">
                                 <label>New Password</label>
-                                <input type="password" name="newPassword" className="form-input" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} placeholder="Create a secure password" />
+                                <div style={{ position: 'relative' }}>
+                                    <input type={showPassword ? "text" : "password"} name="newPassword" className="form-input" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} placeholder="Create a secure password" style={{ paddingRight: '2.5rem' }} />
+                                    <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'rgba(255, 255, 255, 0.5)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                                    </button>
+                                </div>
                                 <PasswordStrengthIndicator password={newPassword} />
                             </div>
                             <div className="form-group">
                                 <label>Confirm Password</label>
-                                <input type="password" name="confirmPassword" className="form-input" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={8} placeholder="Confirm your password" />
+                                <div style={{ position: 'relative' }}>
+                                    <input type={showConfirmPassword ? "text" : "password"} name="confirmPassword" className="form-input" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={8} placeholder="Confirm your password" style={{ paddingRight: '2.5rem' }} />
+                                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'rgba(255, 255, 255, 0.5)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        {showConfirmPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                                    </button>
+                                </div>
                                 {confirmPassword && newPassword !== confirmPassword && (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.4rem', fontSize: '0.75rem', color: 'var(--danger)' }}>
                                         ○ Passwords do not match

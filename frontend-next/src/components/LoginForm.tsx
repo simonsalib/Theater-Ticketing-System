@@ -3,7 +3,9 @@
 import { useState, ChangeEvent, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { FiEye, FiEyeOff } from "react-icons/fi";
 import { useAuth } from "@/auth/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { toast } from "react-toastify";
 import api from "@/services/api";
 import './LoginForm.css';
@@ -14,12 +16,14 @@ interface FormData {
 }
 
 export default function LoginForm() {
+    const { t } = useLanguage();
     const [formData, setFormData] = useState<FormData>({
         email: "",
         password: ""
     });
     const [error, setError] = useState<string>("");
     const [loading, setLoading] = useState<boolean>(false);
+    const [showPassword, setShowPassword] = useState<boolean>(false);
     const router = useRouter();
     const { login } = useAuth();
 
@@ -56,12 +60,20 @@ export default function LoginForm() {
         setError("");
 
         try {
-            const result = await login(formData) as any;
+            const result = await login({
+                ...formData,
+                email: formData.email.toLowerCase(),
+            }) as any;
             console.log("Login result in LoginForm:", result);
 
             if (result.success) {
                 toast.success("Login successful!");
-                router.push("/events");
+                // Redirect scanners to scanner dashboard
+                if (result.user?.role === 'Scanner') {
+                    router.push("/scanner");
+                } else {
+                    router.push("/events");
+                }
             } else if (result.requiresPasswordChange) {
                 toast.info("Please set your own password");
                 router.push(`/set-password?email=${encodeURIComponent(result.email)}`);
@@ -91,7 +103,7 @@ export default function LoginForm() {
 
         try {
             await api.post("/auth/verify-registration", {
-                email: formData.email,
+                email: formData.email.toLowerCase(),
                 otp: otpString
             });
 
@@ -99,7 +111,10 @@ export default function LoginForm() {
             setShowOtpForm(false);
 
             // Try logging in again
-            const result = await login(formData);
+            const result = await login({
+                ...formData,
+                email: formData.email.toLowerCase(),
+            });
             if (result.success) {
                 router.push("/events");
             }
@@ -119,7 +134,7 @@ export default function LoginForm() {
 
             try {
                 await api.post("/auth/login", {
-                    email: formData.email,
+                    email: formData.email.toLowerCase(),
                     password: formData.password
                 });
             } catch (err: any) {
@@ -148,7 +163,7 @@ export default function LoginForm() {
             </div>
             <div className="login-card">
                 <div className="card-decoration"></div>
-                <h1 className="login-title">{showOtpForm ? "Verify Your Account" : "Welcome Back"}</h1>
+                <h1 className="login-title">{showOtpForm ? t('otp.login.title') : t('login.title')}</h1>
 
                 {error && <div className="error-message">{error}</div>}
 
@@ -156,13 +171,13 @@ export default function LoginForm() {
                     <form onSubmit={handleSubmit}>
                         <div className="form-group">
                             <label className="form-label">
-                                <span className="label-text">Email Address</span>
+                                <span className="label-text">{t('login.email')}</span>
                             </label>
                             <div className="input-container">
                                 <input
-                                    type="email"
+                                    type="text"
                                     name="email"
-                                    placeholder="Enter your email"
+                                    placeholder={t('login.email.placeholder') + ' or $username'}
                                     className="form-input"
                                     value={formData.email}
                                     onChange={handleChange}
@@ -174,19 +189,41 @@ export default function LoginForm() {
 
                         <div className="form-group">
                             <label className="form-label">
-                                <span className="label-text">Password</span>
+                                <span className="label-text">{t('login.password')}</span>
                             </label>
                             <div className="input-container">
                                 <input
-                                    type="password"
+                                    type={showPassword ? "text" : "password"}
                                     name="password"
-                                    placeholder="Enter your password"
+                                    placeholder={t('login.password.placeholder')}
                                     className="form-input"
                                     value={formData.password}
                                     onChange={handleChange}
                                     required
+                                    style={{ paddingRight: '2.5rem' }}
                                 />
                                 <i className="input-icon fas fa-lock"></i>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="password-toggle-btn"
+                                    style={{
+                                        position: 'absolute',
+                                        right: '1.2rem',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'var(--text-muted)',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        padding: '0',
+                                    }}
+                                >
+                                    {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                                </button>
                             </div>
                         </div>
 
@@ -198,10 +235,10 @@ export default function LoginForm() {
                             {loading ? (
                                 <>
                                     <span className="form-loader"></span>
-                                    Signing In...
+                                    {t('login.submit.loading')}
                                 </>
                             ) : (
-                                <>Sign In</>
+                                <>{t('login.submit')}</>
                             )}
                         </button>
                     </form>
@@ -209,7 +246,7 @@ export default function LoginForm() {
                     <div className="otp-form-container">
                         <form className="otp-form" onSubmit={handleVerifyOtp}>
                             <div className="content">
-                                <p>Enter verification code</p>
+                                <p>{t('otp.enter')}</p>
                                 <div className="inp">
                                     {otp.map((digit, index) => (
                                         <input
@@ -232,7 +269,7 @@ export default function LoginForm() {
                                     className="verify-btn"
                                     disabled={verifyLoading || otp.some(digit => !digit)}
                                 >
-                                    {verifyLoading ? 'Verifying...' : 'Verify'}
+                                    {verifyLoading ? t('otp.verifying') : t('otp.verify')}
                                 </button>
                                 <p style={{ textAlign: "center", marginTop: "10px", fontSize: "0.8rem" }}>
                                     <a
@@ -240,7 +277,7 @@ export default function LoginForm() {
                                         onClick={handleResendCode}
                                         style={{ color: "var(--primary)", textDecoration: "underline" }}
                                     >
-                                        Didn&apos;t receive a code? Resend
+                                        {t('otp.resend')}
                                     </a>
                                 </p>
                             </div>
@@ -252,8 +289,8 @@ export default function LoginForm() {
                 )}
 
                 <div className="redirect-link">
-                    <div>Don&apos;t have an account? <Link href="/register">Register</Link></div>
-                    <div>Forgot your password? <Link href="/forgot-password">Reset Password</Link></div>
+                    <div>{t('login.noAccount')} <Link href="/register">{t('login.register')}</Link></div>
+                    <div>{t('login.forgot')} <Link href="/forgot-password">{t('login.reset')}</Link></div>
                 </div>
             </div>
         </div>

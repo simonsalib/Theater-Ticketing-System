@@ -7,6 +7,7 @@ export enum UserRole {
     STANDARD = 'Standard User',
     ORGANIZER = 'Organizer',
     ADMIN = 'System Admin',
+    SCANNER = 'Scanner',
 }
 
 @Schema({ timestamps: true })
@@ -14,14 +15,20 @@ export class User {
     @Prop({ required: true, minlength: 3, maxlength: 30 })
     name: string;
 
-    @Prop({ required: true, unique: true })
+    @Prop({ required: false, unique: true, sparse: true })
     email: string;
+
+    @Prop({ required: false, unique: true, sparse: true })
+    username: string;
 
     @Prop()
     phone: string;
 
     @Prop()
     instapayNumber: string;
+
+    @Prop()
+    instapayLink: string;
 
     @Prop()
     instapayQR: string;
@@ -50,6 +57,13 @@ export class User {
 
     @Prop({ default: false })
     requiresPasswordChange: boolean;
+
+    @Prop({ default: false })
+    isBlocked: boolean;
+
+    @Prop({ default: 'en', enum: ['en', 'ar'] })
+    language: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
+

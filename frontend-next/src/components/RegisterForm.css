@@ -403,6 +403,8 @@
     display: flex;
     justify-content: center;
     gap: 10px;
+    direction: ltr !important;
+    flex-direction: row !important;
 }
 
 .input {

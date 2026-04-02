@@ -7,6 +7,9 @@ export interface Organizer {
     _id?: string;
     name?: string;
     email?: string;
+    instapayNumber?: string;
+    instapayQR?: string;
+    instapayLink?: string;
 }
 
 export interface Event {
@@ -18,12 +21,16 @@ export interface Event {
     date: string;
     location: string;
     category: string;
+    startTime?: string;
+    endTime?: string;
+    cancellationDeadline?: string;
     image?: string;
     ticketPrice: number;
     remainingTickets: number;
     totalTickets: number;
     status: 'pending' | 'approved' | 'declined' | 'Pending' | 'Approved' | 'Rejected' | string;
     organizer: string | Organizer;
+    organizerId?: string | Organizer;
     theaterId?: string;
     hasTheaterSeating: boolean;
     seatPricing?: SeatPricing[];
@@ -49,6 +56,7 @@ export interface Booking {
         seatNumber: number;
         seatType?: string;
         price?: number;
+        seatLabel?: string;
     }>;
     selectedSeats?: Array<{
         section: string;
@@ -56,6 +64,7 @@ export interface Booking {
         seatNumber: number;
         seatType?: string;
         price?: number;
+        seatLabel?: string;
     }>;
 }
 

@@ -353,6 +353,8 @@
     display: flex;
     justify-content: center;
     gap: 6px;
+    direction: ltr !important;
+    flex-direction: row !important;
 }
 
 .otp-input {

@@ -1,46 +1,58 @@
+'use client';
 import React from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { FaWhatsapp } from 'react-icons/fa';
 import './Footer.css';
 
 const Footer: React.FC = () => {
     const currentYear = new Date().getFullYear();
+    const { t } = useLanguage();
+    const pathname = usePathname();
+
+    // Hide footer for scanner routes
+    if (pathname?.startsWith('/scanner')) {
+        return null;
+    }
 
     return (
         <footer className="footer">
             <div className="footer-container">
                 <div className="footer-section">
                     <h3>Event Tickets</h3>
-                    <p>Your go-to platform for booking event tickets online.</p>
+                    <p>{t('footer.tagline')}</p>
                 </div>
 
                 <div className="footer-section">
-                    <h3>Quick Links</h3>
+                    <h3>{t('footer.quickLinks')}</h3>
                     <ul>
-                        <li><Link href="/">Events</Link></li>
-                        <li><Link href="/about">About Us</Link></li>
-                        <li><Link href="/contact">Contact</Link></li>
+                        <li><Link href="/events">{t('footer.link.events')}</Link></li>
+                        <li><Link href="/about">{t('footer.link.about')}</Link></li>
                     </ul>
                 </div>
 
                 <div className="footer-section">
-                    <h3>Contact Us</h3>
-                    <p>Email: bebonageh68@gmail.com</p>
-                    <p>Phone: 01221627432</p>
-                    <p>Address: 12 st.mary rod al farag Street, City, Country</p>
+                    <h3>{t('footer.followUs')}</h3>
+                    <div className="social-links">
+                        <a href="https://www.facebook.com/profile.php?id=100066715155700" target="_blank" rel="noopener noreferrer">Facebook</a>
+                        <a href="https://www.instagram.com/taralally_theater/" target="_blank" rel="noopener noreferrer">Instagram</a>
+                    </div>
                 </div>
 
                 <div className="footer-section">
-                    <h3>Follow Us</h3>
-                    <div className="social-links">
-                        <a href="https://facebook.com" target="_blank" rel="noopener noreferrer">Facebook</a>
-                        <a href="https://twitter.com" target="_blank" rel="noopener noreferrer">Twitter</a>
-                        <a href="https://instagram.com" target="_blank" rel="noopener noreferrer">Instagram</a>
+                    <h3>{t('footer.contactUs')}</h3>
+                    <div className="contact-info">
+                        <a href="mailto:Youthmeeting@gmail.com">Youthmeeting@gmail.com</a>
+                        <a href="https://wa.me/message/3EXT2TKWUGFII1" target="_blank" rel="noopener noreferrer" className="whatsapp-support">
+                            <FaWhatsapp className="whatsapp-icon" /> WhatsApp Support
+                        </a>
                     </div>
                 </div>
             </div>
 
             <div className="footer-bottom">
-                <p>&copy; {currentYear} Event Tickets. All rights reserved.</p>
+                <p>&copy; {currentYear} Event Tickets. {t('footer.rights')}</p>
             </div>
         </footer>
     );

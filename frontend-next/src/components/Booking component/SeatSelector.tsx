@@ -14,7 +14,7 @@ import './SeatSelector.css';
 // Match TheaterDesigner colors for consistency
 const SEAT_TYPE_COLORS: Record<string, { bg: string; border: string; label: string }> = {
     standard: { bg: '#6B7280', border: '#94A3B8', label: 'Standard' },
-    vip: { bg: '#F97316', border: '#FB923C', label: 'VIP' },
+    vip: { bg: '#F59E0B', border: '#FCD34D', label: 'VIP' },
     premium: { bg: '#6366F1', border: '#A5B4FC', label: 'Premium' },
     wheelchair: { bg: '#0EA5E9', border: '#7DD3FC', label: 'Wheelchair' }
 };
@@ -25,6 +25,7 @@ interface SeatSelectorProps {
     maxSeats?: number;
     readOnly?: boolean;
     highlightedSeats?: { row: string; seatNumber: number; section: string }[];
+    initialSeatsData?: any;
 }
 
 const SeatSelector: React.FC<SeatSelectorProps> = ({
@@ -32,47 +33,58 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
     onSeatsSelected,
     maxSeats = 10,
     readOnly = false,
-    highlightedSeats = []
+    highlightedSeats = [],
+    initialSeatsData
 }) => {
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(!initialSeatsData);
     const [error, setError] = useState<string | null>(null);
-    const [theaterData, setTheaterData] = useState<Theater | null>(null);
-    const [seats, setSeats] = useState<Seat[]>([]);
-    const [seatPricing, setSeatPricing] = useState<SeatPricing[]>([]);
+    const [theaterData, setTheaterData] = useState<Theater | null>(initialSeatsData?.theater || null);
+    const [seats, setSeats] = useState<Seat[]>(initialSeatsData?.seats || []);
+    const [seatPricing, setSeatPricing] = useState<SeatPricing[]>(initialSeatsData?.seatPricing || []);
     const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
-    const [hoveredSeat, setHoveredSeat] = useState<Seat | null>(null);
     const [scale, setScale] = useState(1);
     const [activeSection, setActiveSection] = useState<'main' | 'balcony'>('main');
     const containerRef = React.useRef<HTMLDivElement>(null);
 
     // Fetch seat availability
     useEffect(() => {
-        const fetchSeats = async () => {
+        if (initialSeatsData && !loading) return; // For initial load only if provided
+
+        const fetchSeats = async (isPoll = false) => {
             try {
-                setLoading(true);
-                setError(null);
+                if (!isPoll) setLoading(true);
                 const response = await api.get<any>(`/booking/event/${eventId}/seats`);
 
                 if (response.data.success) {
                     const data = response.data.data;
                     setTheaterData(data.theater);
-                    setSeats(data.seats);
+                    
+                    // Atomic update to prevent jerky UI
+                    setSeats(prevSeats => {
+                        // If it's a poll, only update if data changed (optional optimization)
+                        return data.seats;
+                    });
                     setSeatPricing(data.seatPricing);
-
-                    // DEBUG: Log booked seats
-                    const bookedSeats = data.seats.filter((s: any) => s.isBooked);
-                    console.log('[SeatSelector] Total seats:', data.seats.length);
-                    console.log('[SeatSelector] Booked seats:', bookedSeats.length, bookedSeats.map((s: any) => `${s.section}-${s.row}-${s.seatNumber}`));
                 }
             } catch (err: any) {
                 console.error('Error fetching seats:', err);
-                setError(err.response?.data?.message || 'Failed to load seats');
+                if (!isPoll) setError(err.response?.data?.message || 'Failed to load seats');
             } finally {
-                setLoading(false);
+                if (!isPoll) setLoading(false);
             }
         };
+
         fetchSeats();
-    }, [eventId]);
+
+        // Implement Polling to prevent "Ghost" seats
+        const pollInterval = setInterval(() => {
+            if (!readOnly) {
+                fetchSeats(true);
+            }
+        }, 10000); // 10 seconds
+
+        return () => clearInterval(pollInterval);
+    }, [eventId, readOnly]);
 
     // Group seats by SECTION and ROW for easy lookup
     const seatMap = useMemo(() => {
@@ -111,6 +123,30 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
         return stagePos === 'bottom' ? [...labels].reverse() : labels;
     }, [theaterData, generateRowLabels]);
 
+    const getSeatSide = useCallback(
+        (section: 'main' | 'balcony', seatNumber: number): 'Left Side' | 'Right Side' => {
+            if (!theaterData) return 'Left Side';
+            const floor =
+                section === 'balcony'
+                    ? theaterData.layout.balcony
+                    : theaterData.layout.mainFloor;
+            const seatsPerRow = floor?.seatsPerRow || 0;
+            if (!seatsPerRow) return 'Left Side';
+
+            const stagePos = (theaterData.layout.stage?.position || 'top') as
+                | 'top'
+                | 'bottom';
+            const mid = (seatsPerRow + 1) / 2;
+            const isLogicalLeft = seatNumber <= mid;
+
+            if (stagePos === 'top') {
+                return isLogicalLeft ? 'Left Side' : 'Right Side';
+            }
+            return isLogicalLeft ? 'Right Side' : 'Left Side';
+        },
+        [theaterData],
+    );
+
     // Handle seat click
     const handleSeatClick = useCallback((seat: Seat) => {
         if (readOnly || seat.isBooked || seat.isPending || !seat.isActive) return;
@@ -128,12 +164,16 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                         s.seatNumber === seat.seatNumber &&
                         s.section === seat.section)
                 );
-            } else {
-                if (prev.length >= maxSeats) return prev;
-                return [...prev, seat];
             }
+            if (prev.length >= maxSeats) return prev;
+
+            const side = getSeatSide(seat.section as 'main' | 'balcony', seat.seatNumber);
+            const labelWithSide = `${seat.row} (${side}) ${seat.seatNumber}`;
+            const augmentedSeat = { ...seat, seatLabel: labelWithSide };
+
+            return [...prev, augmentedSeat];
         });
-    }, [maxSeats]);
+    }, [maxSeats, getSeatSide, readOnly]);
 
     // Calculate total price
     const totalPrice = useMemo(() => {
@@ -147,85 +187,67 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
 
     const clearSelection = () => setSelectedSeats([]);
 
-    // Auto-scale logic - Calculate scale to fit theater on screen
-    const [baseWidth, setBaseWidth] = useState(1100);
+    // Auto-scale logic - Ref-based measurement matching TheaterDesigner approach
+    const canvasRef = React.useRef<HTMLDivElement>(null);
+    const hasInitialScale = React.useRef(false);
 
     useEffect(() => {
         if (!theaterData) return;
 
         const calculateScale = () => {
-            const screenWidth = window.innerWidth;
-            const isMobile = screenWidth < 768;
+            if (!canvasRef.current) return;
+            const container = canvasRef.current.parentElement;
+            if (!container) return;
 
-            // Calculate actual content dimensions to determine base width
-            let maxSeatsInAnyRow = 0;
-            const sections = [theaterData.layout.mainFloor, theaterData.layout.balcony];
+            window.requestAnimationFrame(() => {
+                if (!canvasRef.current || !container) return;
 
-            sections.forEach(section => {
-                if (section?.rows) {
-                    maxSeatsInAnyRow = Math.max(maxSeatsInAnyRow, section.seatsPerRow || 0);
-                }
+                // Temporarily reset scale AND make canvas absolute so it doesn't inflate parent width
+                const originalTransform = canvasRef.current.style.transform;
+                const originalPosition = canvasRef.current.style.position;
+                canvasRef.current.style.transform = 'scale(1)';
+                canvasRef.current.style.position = 'absolute';
+                const canvasWidth = canvasRef.current.scrollWidth || canvasRef.current.offsetWidth;
+                const canvasHeight = canvasRef.current.scrollHeight || canvasRef.current.offsetHeight;
+                canvasRef.current.style.transform = originalTransform;
+                canvasRef.current.style.position = originalPosition;
+
+                if (canvasWidth === 0) return;
+
+                // On mobile, always use viewport width for initial layout, but DON'T fight zoom
+                // Use window.innerWidth instead of visualViewport to avoid shrinking when zooming in
+                const isMobile = window.innerWidth <= 768;
+                const availableWidth = isMobile ? window.innerWidth : Math.min(container.clientWidth, window.innerWidth);
+
+                // Final scale: allow as low as 0.3 for very zoomed-out views,
+                // cap at 1.0 — never upscale beyond natural size
+                let calculatedScale = availableWidth / canvasWidth;
+                calculatedScale = Math.max(0.3, Math.min(1, calculatedScale));
+
+                setScale(calculatedScale);
+
+                // Adjust container height to match the scaled canvas so nothing is clipped
+                container.style.height = `${Math.ceil(canvasHeight * calculatedScale) + 40}px`;
             });
-
-            // Seat grid width: seats * (32px + 4px gap) + row labels (2 * 35px) + safety padding
-            const seatGridWidth = (maxSeatsInAnyRow * 36) + 70 + 20;
-
-            // Check max reach of absolute labels
-            let maxLabelX = 0;
-            if (theaterData.layout.labels && Array.isArray(theaterData.layout.labels)) {
-                theaterData.layout.labels.forEach((label: any) => {
-                    // Labels can be pixel-based (offset from center) or legacy percentage-based
-                    if (label.isPixelBased || (label.position?.x && !label.position.x.toString().includes('%'))) {
-                        const xVal = typeof label.position.x === 'number'
-                            ? label.position.x
-                            : parseFloat(label.position.x);
-
-                        if (!isNaN(xVal)) {
-                            // If pixel based, it's offset from center. 
-                            // To fit this label, we need at least (abs(x) + width) * 2 to keep theater centered
-                            const reach = label.isPixelBased
-                                ? (Math.abs(xVal) + 80) * 2
-                                : xVal + 80;
-                            maxLabelX = Math.max(maxLabelX, reach);
-                        }
-                    }
-                });
-            }
-
-            // The true width of the theater content
-            const theaterContentWidth = Math.max(seatGridWidth, maxLabelX);
-
-            // Tighter base width that matches the content exactly
-            // 40px accounts for the .section internal padding (20px each side)
-            const calculatedBaseWidth = Math.max(500, theaterContentWidth + 40);
-            setBaseWidth(calculatedBaseWidth);
-
-            // Available width with minimal screen padding
-            const padding = isMobile ? 8 : 40;
-            const availableWidth = screenWidth - padding;
-
-            // Final scale
-            let calculatedScale = availableWidth / calculatedBaseWidth;
-
-            // ENHANCED MOBILE VISIBILITY:
-            // Don't let the scale drop too low on mobile. If it's too small, 
-            // we prefer a larger size with horizontal scrolling.
-            if (isMobile) {
-                // FORCE EXPANDED VIEW: Minimum scale for "Giant Chairs" visibility: 0.85
-                // This ensures "all chairs" are expanded and big as requested.
-                // We prioritize visibility over fitting the whole map horizontally.
-                calculatedScale = Math.max(0.85, calculatedScale);
-            }
-
-            // Max scale for desktop/large screens
-            calculatedScale = Math.min(0.85, calculatedScale);
-
-            setScale(calculatedScale);
         };
 
-        calculateScale();
-        window.addEventListener('resize', calculateScale);
-        return () => window.removeEventListener('resize', calculateScale);
+        // Delay initial calculation to ensure content has rendered
+        const timer = setTimeout(calculateScale, hasInitialScale.current ? 0 : 200);
+        hasInitialScale.current = true;
+
+        // Use a throttled resize handler
+        let resizeTimer: any;
+        const handleResize = () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(calculateScale, 150);
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => {
+            clearTimeout(timer);
+            clearTimeout(resizeTimer);
+            window.removeEventListener('resize', handleResize);
+        };
     }, [theaterData]);
 
     // Render single seat
@@ -282,11 +304,11 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
             pointerEvents: 'none' as const,
         } : {};
 
-        const isSeatDisabled = isConfirmedBooked || isPending || !seat.isActive || readOnly;
+        const isSeatDisabled = isConfirmedBooked || isPending || !seat.isActive || readOnly || isHighlighted;
 
         return (
             <React.Fragment key={seatKey}>
-                <motion.button
+                <button
                     className={`seat-btn ${seat.seatType} ${isSelected ? 'selected' : ''} ${isHighlighted ? 'highlighted' : ''} ${isConfirmedBooked ? 'booked' : ''} ${isPending ? 'pending' : ''} ${!seat.isActive ? 'disabled' : ''}`}
                     style={{
                         '--seat-bg': typeColors.bg,
@@ -294,11 +316,7 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                         ...bookedStyles
                     } as any}
                     onClick={() => handleSeatClick(seat)}
-                    onMouseEnter={() => !readOnly && setHoveredSeat(seat)}
-                    onMouseLeave={() => setHoveredSeat(null)}
                     disabled={isSeatDisabled}
-                    whileHover={!isConfirmedBooked && !isPending && seat.isActive && !readOnly ? { scale: 1.15 } : {}}
-                    whileTap={!isConfirmedBooked && !isPending && seat.isActive && !readOnly ? { scale: 0.95 } : {}}
                 >
                     {(isSelected || isHighlighted) ? (
                         <FiCheck className="check-icon" />
@@ -309,7 +327,7 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                     ) : (
                         <span className="seat-num">{seat.seatNumber}</span>
                     )}
-                </motion.button>
+                </button>
                 {vCorridorSpaces}
             </React.Fragment>
         );
@@ -323,6 +341,7 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
             </div>
         ));
     };
+
 
     const renderRow = (section: 'main' | 'balcony', rowLabel: string, rowIndex: number) => {
         const floor = section === 'balcony' ? theaterData?.layout.balcony : theaterData?.layout.mainFloor;
@@ -340,14 +359,18 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
             slots.push(renderSeatSlot(section, rowLabel, s));
         }
 
+        const isStageTop = theaterData?.layout?.stage?.position === 'top';
+        const leftSideLabel = isStageTop ? `${rowLabel} Left` : `${rowLabel} Right`;
+        const rightSideLabel = isStageTop ? `${rowLabel} Right` : `${rowLabel} Left`;
+
         return (
             <React.Fragment key={`${section}-${rowLabel}`}>
                 <div className="seat-row">
-                    <div className="row-label">{rowLabel}</div>
+                    <div className="row-label">{leftSideLabel}</div>
                     <div className="seats-container">
                         {slots}
                     </div>
-                    <div className="row-label">{rowLabel}</div>
+                    <div className="row-label">{rightSideLabel}</div>
                 </div>
                 {renderHCorridorGap(section, rowIndex)}
             </React.Fragment>
@@ -373,7 +396,7 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
     if (error) return <div className="seat-selector error"><FiAlertCircle /><p>{error}</p><button onClick={() => window.location.reload()}>Retry</button></div>;
 
     return (
-        <div className="seat-selector">
+        <div className="seat-selector" dir="ltr">
             {/* Section Switcher - only show if theater has balcony */}
             {theaterData?.layout.hasBalcony && (
                 <div className="section-switcher">
@@ -404,20 +427,37 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                         </div>
                     );
                 })}
-                <div className="legend-item"><div className="legend-color booked" style={{ background: '#1a1a1a', borderColor: '#ef4444' }} /><span>Confirmed</span></div>
-                <div className="legend-item"><div className="legend-color" style={{ background: '#78650d', borderColor: '#fbbf24', border: '2px solid #fbbf24' }} /><span>Pending</span></div>
                 <div className="legend-item">
-                    <div className={`legend-color ${readOnly ? 'highlighted' : 'selected-legend'}`} />
-                    <span>{readOnly ? 'Your Seats' : 'Selected'}</span>
+                    <div className="legend-color booked" style={{ background: '#1a1a1a', borderColor: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ color: '#ef4444', fontSize: '10px', fontWeight: 'bold' }}>X</span>
+                    </div>
+                    <span>Booked</span>
                 </div>
+                <div className="legend-item">
+                    <div className="legend-color" style={{ background: '#78650d', borderColor: '#fbbf24', border: '2px solid #fbbf24', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <FiLoader style={{ color: '#fbbf24', fontSize: '9px' }} />
+                    </div>
+                    <span>Pending</span>
+                </div>
+                {highlightedSeats.length > 0 && (
+                    <div className="legend-item">
+                        <div className="legend-color highlighted" />
+                        <span>Your Seats</span>
+                    </div>
+                )}
+                {!readOnly && (
+                    <div className="legend-item">
+                        <div className="legend-color selected-legend" />
+                        <span>Selected</span>
+                    </div>
+                )}
             </div>
 
             <div className="theater-frame">
                 <div className="theater-canvas-container" ref={containerRef}>
-                    <div className="theater-canvas" style={{
+                    <div className="theater-canvas" ref={canvasRef} style={{
                         transform: `scale(${scale})`,
-                        width: `${baseWidth}px`,
-                        transformOrigin: 'top center'
+                        transformOrigin: scale < 1 ? 'top left' : 'top center'
                     }}>
                         {/* Stage at top */}
                         {(theaterData?.layout.stage?.position || 'top') === 'top' && (
@@ -427,8 +467,8 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                                 initial={{ opacity: 0, y: -20 }}
                                 animate={{ opacity: 1, y: 0 }}
                             >
-                                <span>STAGE</span>
                                 <FiChevronsUp className="stage-icon" />
+                                <span>STAGE</span>
                             </motion.div>
                         )}
 
@@ -490,17 +530,6 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                     </div>
                 </div>
             </div>
-
-            <AnimatePresence>
-                {hoveredSeat && !hoveredSeat.isBooked && hoveredSeat.isActive && (
-                    <motion.div className="seat-tooltip" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                        <strong>{hoveredSeat.row}{hoveredSeat.seatNumber}</strong>
-                        <span className="tooltip-type">{SEAT_TYPE_COLORS[hoveredSeat.seatType]?.label}</span>
-                        <span className="tooltip-price">{hoveredSeat.price} EGP</span>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
         </div>
     );
 };

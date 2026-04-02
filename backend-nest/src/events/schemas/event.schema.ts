@@ -30,6 +30,12 @@ class BookedSeat {
 
     @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Booking' })
     bookingId: MongooseSchema.Types.ObjectId;
+
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'SeatHold' })
+    holdId: MongooseSchema.Types.ObjectId;
+
+    @Prop({ default: '' })
+    seatLabel: string;
 }
 
 @Schema()
@@ -48,6 +54,9 @@ class EventSeatConfig {
 
     @Prop({ default: 'main' })
     section: string;
+
+    @Prop({ default: '' })
+    seatLabel: string;
 }
 
 @Schema({ timestamps: true })
@@ -67,8 +76,17 @@ export class Event {
     @Prop({ required: true, trim: true })
     location: string;
 
-    @Prop({ required: true })
+    @Prop({ default: 'theater' })
     category: string;
+
+    @Prop()
+    startTime: string;
+
+    @Prop()
+    endTime: string;
+
+    @Prop({ type: Date })
+    cancellationDeadline: Date;
 
     @Prop({ default: 'default-image.jpg' })
     image: string;

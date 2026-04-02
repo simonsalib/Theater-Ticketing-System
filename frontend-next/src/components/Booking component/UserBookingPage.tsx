@@ -165,7 +165,7 @@ const UserBookingsPage = () => {
                                 <div className="booking-info">
                                     <h3>{event.title || 'Event Title Unavailable'}</h3>
                                     <span className="booking-date">
-                                        {booking.createdAt ? new Date(booking.createdAt).toLocaleDateString() : ''}
+                                        {booking.createdAt ? new Date(booking.createdAt).toLocaleDateString('en-US', { timeZone: 'Africa/Cairo' }) : ''}
                                     </span>
 
                                     <div className="booking-details">

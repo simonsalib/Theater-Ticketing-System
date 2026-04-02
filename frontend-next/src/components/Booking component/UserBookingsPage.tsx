@@ -4,9 +4,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import api from '@/services/api';
 import ConfirmationDialog from '../AdminComponent/ConfirmationDialog';
+import CancelSeatsModal from './CancelSeatsModal';
+import RequestCancellationModal from './RequestCancellationModal';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiCalendar, FiMapPin, FiClock, FiTrash2, FiEye, FiAlertCircle, FiCheckCircle, FiUploadCloud, FiGrid, FiCopy } from 'react-icons/fi';
+import { FiCalendar, FiMapPin, FiClock, FiTrash2, FiEye, FiAlertCircle, FiCheckCircle, FiUploadCloud, FiGrid, FiCopy, FiRotateCcw, FiExternalLink } from 'react-icons/fi';
 import { toast } from 'react-toastify';
+import { useLanguage } from '@/contexts/LanguageContext';
 import './UserBookingPage.css';
 
 interface Booking {
@@ -15,13 +18,20 @@ interface Booking {
     userId: string;
     numberOfTickets: number;
     totalPrice: number;
-    status: 'pending' | 'confirmed' | 'cancelled';
-    selectedSeats?: { section: string; row: string; seatNumber: number }[];
+    status: 'pending' | 'confirmed' | 'canceled' | 'rejected';
+    selectedSeats?: { section: string; row: string; seatNumber: number; seatType?: string; price?: number; seatLabel?: string; attendeeFirstName?: string; attendeeLastName?: string; attendeePhone?: string }[];
     createdAt: string;
     pendingExpiresAt?: string;
     isReceiptUploaded?: boolean;
     instapayReceipt?: string;
     hasTheaterSeating?: boolean;
+    cancellationRequest?: {
+        status: 'none' | 'pending' | 'approved' | 'rejected';
+        requestedAt?: string;
+        reason?: string;
+        seatsToCancel?: { row: string; seatNumber: number; section: string; seatLabel?: string }[];
+        cancelAll?: boolean;
+    };
 }
 
 interface EventData {
@@ -31,16 +41,25 @@ interface EventData {
     location: string;
     image: string;
     ticketPrice: number;
+    cancellationDeadline?: string;
+    startTime?: string;
+    endTime?: string;
     organizerId?: {
         _id: string;
         name: string;
         instapayNumber?: string;
         instapayQR?: string;
+        instapayLink?: string;
     };
 }
 
-const UserBookingsPage = () => {
+interface UserBookingsPageProps {
+    isPrevious?: boolean;
+}
+
+const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false }) => {
     const router = useRouter();
+    const { t, language, isRTL } = useLanguage();
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [eventDetails, setEventDetails] = useState<Record<string, EventData>>({});
     const [loading, setLoading] = useState(true);
@@ -49,6 +68,17 @@ const UserBookingsPage = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [cancellationLoading, setCancellationLoading] = useState(false);
     const [copiedNumber, setCopiedNumber] = useState<string | null>(null);
+
+    // Cancel seats modal (for pending bookings with theater seating)
+    const [cancelSeatsBookingId, setCancelSeatsBookingId] = useState<string | null>(null);
+    const [showCancelSeatsModal, setShowCancelSeatsModal] = useState(false);
+    const [cancelSeatsLoading, setCancelSeatsLoading] = useState(false);
+
+    // Request cancellation modal (for confirmed bookings)
+    const [requestCancelBookingId, setRequestCancelBookingId] = useState<string | null>(null);
+    const [showRequestCancelModal, setShowRequestCancelModal] = useState(false);
+    const [requestCancelLoading, setRequestCancelLoading] = useState(false);
+    const [scannedSeatKeys, setScannedSeatKeys] = useState<Set<string>>(new Set());
 
     const [timers, setTimers] = useState<Record<string, string>>({});
 
@@ -60,6 +90,7 @@ const UserBookingsPage = () => {
         const updateTimers = () => {
             const newTimers: Record<string, string> = {};
             const now = new Date().getTime();
+            const expiredIds: string[] = [];
 
             bookings.forEach(booking => {
                 if (booking.status === 'pending' && booking.pendingExpiresAt) {
@@ -72,18 +103,26 @@ const UserBookingsPage = () => {
                         newTimers[booking._id] = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
                     } else {
                         newTimers[booking._id] = 'Expired';
-                        // Optionally update status locally to cancelled
-                        booking.status = 'cancelled';
+                        expiredIds.push(booking._id);
                     }
                 }
             });
             setTimers(newTimers);
+            // Update expired bookings via setState instead of direct mutation
+            if (expiredIds.length > 0) {
+                setBookings(prev =>
+                    prev.map(b =>
+                        expiredIds.includes(b._id) ? { ...b, status: 'canceled' } : b
+                    )
+                );
+            }
         };
 
         updateTimers();
         const interval = setInterval(updateTimers, 1000);
         return () => clearInterval(interval);
-    }, [bookings]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [bookings.length]);
 
     const fetchBookings = async () => {
         try {
@@ -97,9 +136,8 @@ const UserBookingsPage = () => {
                 bookingsData = response.data;
             }
 
-            setBookings(bookingsData);
 
-            // Fetch event details for each unique eventId
+            // Extract and map event details
             const events: Record<string, EventData> = {};
             const missingEventIds: string[] = [];
 
@@ -109,11 +147,11 @@ const UserBookingsPage = () => {
                     const id = (eventVal as any)._id || (eventVal as any).id;
                     if (id) {
                         events[id] = eventVal as any;
-                        // Replace the object with its ID in the booking record for local lookup
-                        booking.eventId = id;
                     }
-                } else if (typeof eventVal === 'string' && eventVal && !events[eventVal]) {
-                    missingEventIds.push(eventVal);
+                } else if (typeof eventVal === 'string' && eventVal) {
+                    if (!events[eventVal]) {
+                        missingEventIds.push(eventVal);
+                    }
                 }
             });
 
@@ -136,7 +174,23 @@ const UserBookingsPage = () => {
                 );
             }
 
+            // Re-filter bookings based on active vs expired events
+            const now = new Date();
+            const relevantBookings = bookingsData.filter(booking => {
+                const bEventId = typeof booking.eventId === 'object' ? (booking.eventId as any)._id : booking.eventId;
+                const event = events[bEventId];
+                if (!event || !event.date) return false;
+
+                const eventDate = new Date(event.date);
+                const expirationDate = new Date(eventDate.getTime() + 24 * 60 * 60 * 1000);
+                const isExpired = now >= expirationDate;
+
+                return isPrevious ? isExpired : !isExpired;
+            });
+
             setEventDetails(events);
+            setBookings(relevantBookings);
+            console.log('DEBUG: eventDetails populated:', events);
         } catch (err: any) {
             console.error("Error fetching bookings:", err);
             setError(err.response?.data?.message || "Failed to load bookings");
@@ -146,8 +200,75 @@ const UserBookingsPage = () => {
     };
 
     const handleCancelClick = (bookingId: string) => {
-        setDeleteBookingId(bookingId);
-        setShowDeleteConfirm(true);
+        const booking = bookings.find(b => b._id === bookingId);
+        if (booking?.hasTheaterSeating && booking.selectedSeats && booking.selectedSeats.length > 0) {
+            // Open seat selection modal for theater seating bookings
+            setCancelSeatsBookingId(bookingId);
+            setShowCancelSeatsModal(true);
+        } else {
+            // Non-theater booking: use simple confirmation
+            setDeleteBookingId(bookingId);
+            setShowDeleteConfirm(true);
+        }
+    };
+
+    const handleCancelSeatsConfirm = async (seatKeys: string[], cancelAll: boolean) => {
+        if (!cancelSeatsBookingId) return;
+        try {
+            setCancelSeatsLoading(true);
+            await api.post(`/booking/${cancelSeatsBookingId}/cancel-seats`, { seatKeys, cancelAll });
+            toast.success(cancelAll ? 'Booking cancelled successfully' : 'Selected seats cancelled successfully');
+            setShowCancelSeatsModal(false);
+            setCancelSeatsBookingId(null);
+            fetchBookings();
+        } catch (err: any) {
+            console.error('Error cancelling seats:', err);
+            toast.error(err.response?.data?.message || 'Failed to cancel seats');
+        } finally {
+            setCancelSeatsLoading(false);
+        }
+    };
+
+    const handleRequestCancellationClick = async (bookingId: string) => {
+        // Fetch scanned seats for confirmed bookings
+        const booking = bookings.find(b => b._id === bookingId);
+        if (booking?.status === 'confirmed') {
+            try {
+                const res = await api.get(`/tickets/booking/${bookingId}`);
+                const tickets = res.data?.tickets || [];
+                const scanned = new Set<string>(
+                    tickets.filter((t: any) => t.isScanned).map((t: any) => `${t.section}-${t.seatRow}-${t.seatNumber}`)
+                );
+                setScannedSeatKeys(scanned);
+            } catch {
+                setScannedSeatKeys(new Set());
+            }
+        } else {
+            setScannedSeatKeys(new Set());
+        }
+        setRequestCancelBookingId(bookingId);
+        setShowRequestCancelModal(true);
+    };
+
+    const handleRequestCancellationConfirm = async (seatKeys: string[], cancelAll: boolean, reason: string) => {
+        if (!requestCancelBookingId) return;
+        try {
+            setRequestCancelLoading(true);
+            await api.post(`/booking/${requestCancelBookingId}/request-cancellation`, {
+                seatKeys,
+                cancelAll,
+                reason,
+            });
+            toast.success('Cancellation request submitted! The organizer will review it.');
+            setShowRequestCancelModal(false);
+            setRequestCancelBookingId(null);
+            fetchBookings();
+        } catch (err: any) {
+            console.error('Error requesting cancellation:', err);
+            toast.error(err.response?.data?.message || 'Failed to submit cancellation request');
+        } finally {
+            setRequestCancelLoading(false);
+        }
     };
 
     const confirmCancel = async () => {
@@ -175,11 +296,27 @@ const UserBookingsPage = () => {
 
     const formatDate = (dateString: string) => {
         return new Date(dateString).toLocaleDateString('en-US', {
+            timeZone: 'Africa/Cairo',
             weekday: 'short',
             month: 'short',
             day: 'numeric',
             year: 'numeric'
         });
+    };
+
+    const formatSeatLabel = (seat: { section: string; seatLabel?: string; row: string; seatNumber: number; attendeeFirstName?: string; attendeeLastName?: string }) => {
+        let side = '';
+        if (seat.section === 'Left' || seat.section?.includes('Left')) {
+            side = language === 'ar' ? ` (${t('tickets.leftSide')})` : ' (Left Side)';
+        } else if (seat.section === 'Right' || seat.section?.includes('Right')) {
+            side = language === 'ar' ? ` (${t('tickets.rightSide')})` : ' (Right Side)';
+        }
+        
+        const label = seat.seatLabel || `${seat.row}${side} ${seat.seatNumber}`;
+        const attendee = (seat.attendeeFirstName || seat.attendeeLastName) 
+            ? ` (${seat.attendeeFirstName || ''} ${seat.attendeeLastName || ''}`.trim() + ')'
+            : '';
+        return label + attendee;
     };
 
     if (loading) return (
@@ -200,18 +337,52 @@ const UserBookingsPage = () => {
     return (
         <div className="user-bookings-container">
             <div className="bookings-hero">
-                <h1>My Bookings</h1>
-                <p>Manage your event reservations and tickets</p>
-                <div className="hero-stats">
-                    <div className="stat-card">
-                        <span className="stat-value">{bookings.length}</span>
-                        <span className="stat-label">Total</span>
-                    </div>
-                    <div className="stat-card">
-                        <span className="stat-value">{bookings.filter(b => b.status === 'confirmed').length}</span>
-                        <span className="stat-label">Confirmed</span>
-                    </div>
+                <h1>{isPrevious ? t('bookings.previousTitle') : t('bookings.currentTitle')}</h1>
+                <p>{isPrevious ? t('bookings.previousSubtitle') : t('bookings.currentSubtitle')}</p>
+                <div style={{ marginTop: '20px', display: 'flex', gap: '12px' }}>
+                    <Link
+                        href="/bookings"
+                        style={{
+                            padding: '10px 20px',
+                            background: !isPrevious ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                            color: !isPrevious ? '#a78bfa' : '#9ca3af',
+                            borderRadius: '12px',
+                            border: `1px solid ${!isPrevious ? 'rgba(139, 92, 246, 0.4)' : 'transparent'}`,
+                            textDecoration: 'none',
+                            fontWeight: 600,
+                            letterSpacing: '0.5px'
+                        }}
+                    >
+                        {t('bookings.activeBookings')}
+                    </Link>
+                    <Link
+                        href="/bookings/previous"
+                        style={{
+                            padding: '10px 20px',
+                            background: isPrevious ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                            color: isPrevious ? '#a78bfa' : '#9ca3af',
+                            borderRadius: '12px',
+                            border: `1px solid ${isPrevious ? 'rgba(139, 92, 246, 0.4)' : 'transparent'}`,
+                            textDecoration: 'none',
+                            fontWeight: 600,
+                            letterSpacing: '0.5px'
+                        }}
+                    >
+                        {t('bookings.previousBookings')}
+                    </Link>
                 </div>
+                {!isPrevious && (
+                    <div className="hero-stats">
+                        <div className="stat-card">
+                            <span className="stat-value">{bookings.length}</span>
+                            <span className="stat-label">Total Active</span>
+                        </div>
+                        <div className="stat-card">
+                            <span className="stat-value">{bookings.filter(b => b.status === 'confirmed').length}</span>
+                            <span className="stat-label">Confirmed Active</span>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Pending bookings banner at top */}
@@ -231,19 +402,19 @@ const UserBookingsPage = () => {
                     >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px', color: '#fbbf24', fontWeight: 700, fontSize: '1.3rem' }}>
                             <FiAlertCircle size={26} />
-                            Action Required — {pendingBookings.length} Pending Booking{pendingBookings.length > 1 ? 's' : ''}
+                            {t('pending.header')
+                                .replace('{count}', pendingBookings.length.toString())
+                                .replace('{plural}', pendingBookings.length > 1 ? (language === 'ar' ? 'ات' : 's') : '')
+                            }
                         </div>
 
                         {pendingBookings.map(booking => {
-                            const event = eventDetails[booking.eventId];
+                            const bEventId = typeof booking.eventId === 'object' ? (booking.eventId as any)._id : booking.eventId;
+                            const event = eventDetails[bEventId];
                             const timeLeft = timers[booking._id];
                             const instapayQR = event?.organizerId?.instapayQR;
-                            const rawInstapay = event?.organizerId?.instapayNumber ?? '';
-                            const instapayNumber = rawInstapay.startsWith('+20')
-                                ? rawInstapay.substring(3)
-                                : rawInstapay.startsWith('20') && rawInstapay.length >= 12
-                                    ? rawInstapay.substring(2)
-                                    : rawInstapay;
+                            const instapayNumber = event?.organizerId?.instapayNumber ?? '';
+                            const instapayLink = event?.organizerId?.instapayLink ?? '';
 
                             return (
                                 <div key={booking._id} style={{
@@ -252,14 +423,23 @@ const UserBookingsPage = () => {
                                 }}>
                                     {/* Event info + timer */}
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-                                        <div>
-                                            <strong style={{ fontSize: '1.2rem', display: 'block', marginBottom: '4px' }}>{event?.title || 'Event'}</strong>
+                                        <div style={{ flex: 1, minWidth: '200px' }}>
+                                            <strong style={{ 
+                                                fontSize: '1.2rem', 
+                                                display: 'block', 
+                                                marginBottom: '4px',
+                                                whiteSpace: 'nowrap',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                maxWidth: '100%'
+                                            }} title={event?.title}>{event?.title || t('home.featured.event')}</strong>
                                             <span style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '1rem', color: '#d1d5db', flexWrap: 'wrap' }}>
                                                 <span style={{ fontWeight: 700, color: '#fbbf24', fontSize: '1.1rem' }}>{booking.totalPrice.toFixed(2)} EGP</span>
-                                                <span>{booking.numberOfTickets} ticket{booking.numberOfTickets > 1 ? 's' : ''}</span>
+                                                <span>{booking.numberOfTickets} {booking.numberOfTickets > 1 ? t('gen.tickets') : t('gen.ticket')}</span>
                                                 {booking.selectedSeats && booking.selectedSeats.length > 0 && (
                                                     <span style={{ color: '#a78bfa' }}>
-                                                        Seats: {booking.selectedSeats.map(s => `${s.row}${s.seatNumber}`).join(', ')}
+                                                        {t('pending.seats')}{' '}
+                                                        {booking.selectedSeats.map(formatSeatLabel).join(', ')}
                                                     </span>
                                                 )}
                                             </span>
@@ -275,13 +455,13 @@ const UserBookingsPage = () => {
                                             </span>
                                         )}
                                         {timeLeft === 'Expired' && (
-                                            <span style={{ padding: '6px 16px', borderRadius: '24px', background: 'rgba(239, 68, 68, 0.25)', color: '#ef4444', fontSize: '1rem', fontWeight: 700 }}>Expired</span>
+                                            <span style={{ padding: '6px 16px', borderRadius: '24px', background: 'rgba(239, 68, 68, 0.25)', color: '#ef4444', fontSize: '1rem', fontWeight: 700 }}>{t('pending.expired')}</span>
                                         )}
                                     </div>
 
                                     {/* Payment info text */}
                                     <p style={{ fontSize: '0.95rem', color: '#e5e7eb', margin: '0 0 16px', lineHeight: 1.5 }}>
-                                        Pay <strong style={{ color: '#fbbf24' }}>{booking.totalPrice.toFixed(2)} EGP</strong> via InstaPay and upload your receipt before time runs out.
+                                        {t('pending.instruction').replace('{total}', booking.totalPrice.toFixed(2))}
                                     </p>
 
                                     {/* InstaPay QR image + number */}
@@ -305,7 +485,7 @@ const UserBookingsPage = () => {
                                             <div style={{ width: '100%' }}>
                                                 {instapayNumber && (
                                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                                        <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>InstaPay Number:</span>
+                                                        <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>{t('payment.instapay.number')}</span>
                                                         <span style={{ fontWeight: 700, fontSize: '0.95rem', letterSpacing: '0.4px' }}>{instapayNumber}</span>
                                                         <button
                                                             type="button"
@@ -314,7 +494,7 @@ const UserBookingsPage = () => {
                                                                     const ta = document.createElement('textarea'); ta.value = instapayNumber; ta.style.position = 'fixed'; ta.style.left = '-9999px'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
                                                                 });
                                                                 setCopiedNumber(booking._id);
-                                                                toast.success('InstaPay number copied!');
+                                                                toast.success(t('gen.copied'));
                                                                 setTimeout(() => setCopiedNumber(null), 2000);
                                                             }}
                                                             style={{
@@ -326,34 +506,91 @@ const UserBookingsPage = () => {
                                                                 transition: 'all 0.2s'
                                                             }}
                                                         >
-                                                            <FiCopy size={13} /> {copiedNumber === booking._id ? 'Copied!' : 'Copy'}
+                                                            <FiCopy size={13} /> {copiedNumber === booking._id ? t('gen.copied') : t('gen.copy')}
                                                         </button>
                                                     </div>
                                                 )}
                                                 {instapayQR && (
                                                     <p style={{ fontSize: '0.78rem', color: '#9ca3af', margin: '6px 0 0', textAlign: 'center' }}>
-                                                        Scan QR → Send {booking.totalPrice.toFixed(2)} EGP
+                                                        {t('payment.instapay.qrInstructions').replace('{total}', booking.totalPrice.toFixed(2))}
                                                     </p>
                                                 )}
                                             </div>
                                         </div>
                                     )}
 
-                                    <motion.button
-                                        onClick={() => handleUploadClick(booking._id)}
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
-                                        style={{
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', width: '100%',
-                                            padding: '14px', borderRadius: '12px',
-                                            background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: 'white',
-                                            border: 'none', cursor: 'pointer', fontSize: '1rem', fontWeight: 700,
-                                            boxShadow: '0 6px 20px rgba(139, 92, 246, 0.35)',
-                                            letterSpacing: '0.3px'
-                                        }}
-                                    >
-                                        <FiUploadCloud size={20} /> Upload Receipt Now
-                                    </motion.button>
+                                    {instapayLink && (
+                                        <div style={{
+                                            marginBottom: '16px',
+                                            display: 'flex',
+                                            justifyContent: 'center'
+                                        }}>
+                                            <a
+                                                href={instapayLink}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px',
+                                                    padding: '12px 24px',
+                                                    background: 'rgba(16, 185, 129, 0.15)',
+                                                    color: '#10b981',
+                                                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                                                    borderRadius: '12px',
+                                                    textDecoration: 'none',
+                                                    fontWeight: 600,
+                                                    transition: 'all 0.2s',
+                                                    boxShadow: '0 4px 15px rgba(16, 185, 129, 0.1)'
+                                                }}
+                                                onMouseOver={(e) => {
+                                                    e.currentTarget.style.background = 'rgba(16, 185, 129, 0.25)';
+                                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                                }}
+                                                onMouseOut={(e) => {
+                                                    e.currentTarget.style.background = 'rgba(16, 185, 129, 0.15)';
+                                                    e.currentTarget.style.transform = 'translateY(0)';
+                                                }}
+                                            >
+                                                <FiExternalLink /> {t('payment.instapay.link')}
+                                            </a>
+                                        </div>
+                                    )}
+
+                                    <div style={{ display: 'flex', gap: '12px' }}>
+                                        <motion.button
+                                            onClick={() => handleCancelClick(booking._id)}
+                                            whileHover={{ scale: 1.02 }}
+                                            whileTap={{ scale: 0.98 }}
+                                            style={{
+                                                flex: 1,
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                                                padding: '14px', borderRadius: '12px',
+                                                background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444',
+                                                border: '1px solid rgba(239, 68, 68, 0.3)', cursor: 'pointer', fontSize: '1rem', fontWeight: 700,
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            <FiTrash2 size={20} /> {t('pending.cancel')}
+                                        </motion.button>
+
+                                        <motion.button
+                                            onClick={() => handleUploadClick(booking._id)}
+                                            whileHover={{ scale: 1.02 }}
+                                            whileTap={{ scale: 0.98 }}
+                                            style={{
+                                                flex: 2,
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                                                padding: '14px', borderRadius: '12px',
+                                                background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: 'white',
+                                                border: 'none', cursor: 'pointer', fontSize: '1rem', fontWeight: 700,
+                                                boxShadow: '0 6px 20px rgba(139, 92, 246, 0.35)',
+                                                letterSpacing: '0.3px'
+                                            }}
+                                        >
+                                            <FiUploadCloud size={20} /> {t('pending.uploadNow')}
+                                        </motion.button>
+                                    </div>
                                 </div>
                             );
                         })}
@@ -364,44 +601,52 @@ const UserBookingsPage = () => {
             {bookings.length === 0 ? (
                 <div className="empty-bookings">
                     <div className="empty-icon"><FiCalendar size={60} /></div>
-                    <h3>No Bookings Found</h3>
-                    <p>You haven't made any bookings yet. Start exploring events now!</p>
-                    <Link href="/events" className="browse-btn">Browse Events</Link>
+                    <h3>{t('bookings.noBookings')}</h3>
+                    <p>{t('bookings.noBookingsDesc')}</p>
+                    <Link href="/events" className="browse-btn">{t('bookings.browseEvents')}</Link>
                 </div>
             ) : (
                 <div className="bookings-grid">
                     <AnimatePresence>
                         {bookings.map((booking, index) => {
-                            const event = eventDetails[booking.eventId];
-                            const isCancelled = booking.status === 'cancelled' || (booking as any).status === 'Cancelled';
-
+                            const eventId = typeof booking.eventId === 'object' ? (booking.eventId as any)._id : booking.eventId;
+                            const event = eventDetails[eventId];
+                            const isCancelled = booking.status === 'canceled';
+                            const isRejected = booking.status === 'rejected';
                             const isPending = booking.status === 'pending';
                             const timeLeft = timers[booking._id];
+                            const isPastCancellationDeadline = event?.cancellationDeadline
+                                ? new Date() > new Date(event.cancellationDeadline)
+                                : false;
 
                             return (
                                 <motion.div
                                     key={booking._id}
-                                    className={`booking-card ${isCancelled ? 'cancelled' : ''} ${isPending ? 'pending' : ''}`}
+                                    className={`booking-card ${isCancelled ? 'cancelled' : ''} ${isPending ? 'pending' : ''} ${isRejected ? 'rejected' : ''}`}
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: index * 0.05 }}
                                 >
                                     <div className="booking-status-badge">
-                                        {isCancelled ? 'Cancelled' : isPending ? (
+                                        {isCancelled ? t('status.canceled') : isPending ? (
                                             <>
-                                                Pending
+                                                {t('status.pending')}
                                                 {timeLeft && timeLeft !== 'Expired' && !booking.isReceiptUploaded && (
                                                     <span className="booking-timer">
                                                         <FiClock size={12} /> {timeLeft}
                                                     </span>
                                                 )}
                                             </>
-                                        ) : 'Confirmed'}
+                                        ) : isRejected ? t('status.rejected') : t('status.confirmed')}
                                     </div>
 
                                     <div className="booking-card-header">
-                                        <h3>{event?.title || 'Loading Event...'}</h3>
-                                        <span className="booking-id">ID: {booking._id.substring(0, 8)}...</span>
+                                        <h3 style={{
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            maxWidth: '100%'
+                                        }} title={event?.title}>{event?.title || (loading ? t('gen.loading') : t('booking.eventNotFound'))}</h3>
                                     </div>
 
                                     <div className="booking-card-body">
@@ -409,14 +654,26 @@ const UserBookingsPage = () => {
                                             <FiCalendar />
                                             <span>{event ? formatDate(event.date) : '...'}</span>
                                         </div>
+                                        {event?.startTime && (
+                                            <div className="info-item">
+                                                <FiClock />
+                                                <span>{event.startTime} {event.endTime ? ` - ${event.endTime}` : ''}</span>
+                                            </div>
+                                        )}
                                         <div className="info-item">
                                             <FiMapPin />
                                             <span>{event?.location || '...'}</span>
                                         </div>
                                         <div className="info-item">
                                             <FiClock />
-                                            <span>Booked on {formatDate(booking.createdAt)}</span>
+                                            <span>{t('booking.bookedOn')} {formatDate(booking.createdAt)}</span>
                                         </div>
+                                        {event?.cancellationDeadline && (
+                                            <div className="info-item" style={{ color: isPastCancellationDeadline ? '#ef4444' : '#f59e0b' }}>
+                                                <FiAlertCircle />
+                                                <span>{t('booking.cancelBefore')} {new Date(event.cancellationDeadline).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US', { timeZone: 'Africa/Cairo', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                            </div>
+                                        )}
 
                                         {isPending && booking.isReceiptUploaded && (
                                             <div style={{
@@ -424,25 +681,25 @@ const UserBookingsPage = () => {
                                                 background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)',
                                                 display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', fontSize: '0.85rem', fontWeight: 600
                                             }}>
-                                                <FiCheckCircle size={16} /> Receipt uploaded — awaiting verification
+                                                <FiCheckCircle size={16} /> {t('booking.receiptUploaded')}
                                             </div>
                                         )}
 
                                         <div className="booking-summary">
                                             <div className="summary-row">
-                                                <span>Tickets</span>
+                                                <span>{t('booking.tickets')}</span>
                                                 <strong>{booking.numberOfTickets}</strong>
                                             </div>
                                             {booking.selectedSeats && booking.selectedSeats.length > 0 && (
                                                 <div className="summary-row seats">
-                                                    <span>Seats</span>
+                                                    <span>{t('gen.seats')}</span>
                                                     <div className="seats-list">
-                                                        {booking.selectedSeats.map(s => `${s.row}${s.seatNumber}`).join(', ')}
+                                                        {booking.selectedSeats.map(formatSeatLabel).join(', ')}
                                                     </div>
                                                 </div>
                                             )}
                                             <div className="summary-row total">
-                                                <span>Total Price</span>
+                                                <span>{t('booking.totalPrice')}</span>
                                                 <strong>{booking.totalPrice.toFixed(2)} EGP</strong>
                                             </div>
                                         </div>
@@ -450,33 +707,85 @@ const UserBookingsPage = () => {
 
                                     <div className="booking-card-footer">
                                         <Link href={`/bookings/${booking._id}`} className="view-details-btn">
-                                            <FiEye /> Details
+                                            <FiEye /> {t('booking.details')}
                                         </Link>
-                                        {!isCancelled && (
-                                            <button
-                                                onClick={() => handleCancelClick(booking._id)}
-                                                className="cancel-btn"
-                                                disabled={cancellationLoading}
-                                            >
-                                                <FiTrash2 /> Cancel
-                                            </button>
+                                        {/* Direct cancel for confirmed bookings has been removed; users should use the request cancellation flow instead */}
+                                        {!isCancelled && isPending && booking.isReceiptUploaded && booking.hasTheaterSeating && (
+                                            <>
+                                                {booking.cancellationRequest?.status === 'pending' && (
+                                                    <span style={{
+                                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                                        padding: '0.5rem 1rem', borderRadius: '8px',
+                                                        background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24',
+                                                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                                                        fontSize: '0.85rem', fontWeight: 600,
+                                                    }}>
+                                                        <FiClock size={14} /> {t('booking.cancellationPending')}
+                                                    </span>
+                                                )}
+                                                {(() => {
+                                                    const pendingKeys = new Set(
+                                                        (booking.cancellationRequest?.seatsToCancel || []).map(s => `${s.section}-${s.row}-${s.seatNumber}`)
+                                                    );
+                                                    const unrequestedSeats = (booking.selectedSeats || []).filter(s => !pendingKeys.has(`${s.section}-${s.row}-${s.seatNumber}`));
+                                                    const showButton = booking.cancellationRequest?.status !== 'pending'
+                                                        || (booking.cancellationRequest?.status === 'pending' && unrequestedSeats.length > 0);
+
+                                                    if (!showButton) return null;
+
+                                                    if (isPastCancellationDeadline) {
+                                                        return <span style={{ fontSize: '0.85rem', color: '#ef4444', fontStyle: 'italic', padding: '0.5rem 0' }}>{t('booking.deadlinePassed')}</span>;
+                                                    }
+
+                                                    return (
+                                                        <button
+                                                            onClick={() => handleRequestCancellationClick(booking._id)}
+                                                            style={{
+                                                                display: 'flex', alignItems: 'center', gap: '6px',
+                                                                padding: '0.5rem 1rem', borderRadius: '8px',
+                                                                background: 'rgba(245, 158, 11, 0.1)', color: '#fbbf24',
+                                                                border: '1px solid rgba(245, 158, 11, 0.3)', cursor: 'pointer',
+                                                                fontSize: '0.85rem', fontWeight: 500, transition: 'all 0.2s'
+                                                            }}
+                                                        >
+                                                            <FiRotateCcw size={14} /> {booking.cancellationRequest?.status === 'pending' ? t('booking.cancelMore') : t('booking.requestCancellation')}
+                                                        </button>
+                                                    );
+                                                })()}
+                                            </>
                                         )}
                                         {isPending && !booking.isReceiptUploaded && (
-                                            <button
-                                                onClick={() => handleUploadClick(booking._id)}
-                                                className="upload-receipt-btn"
-                                                style={{
-                                                    display: 'flex', alignItems: 'center', gap: '6px',
-                                                    padding: '0.5rem 1rem', borderRadius: '8px',
-                                                    background: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa',
-                                                    border: '1px solid rgba(139, 92, 246, 0.4)', cursor: 'pointer',
-                                                    fontSize: '0.85rem', fontWeight: 500, transition: 'all 0.2s'
-                                                }}
-                                            >
-                                                <FiUploadCloud /> Upload Receipt
-                                            </button>
+                                            <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                                                <button
+                                                    onClick={() => handleCancelClick(booking._id)}
+                                                    style={{
+                                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                                        padding: '0.5rem 1rem', borderRadius: '8px',
+                                                        background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444',
+                                                        border: '1px solid rgba(239, 68, 68, 0.3)', cursor: 'pointer',
+                                                        fontSize: '0.85rem', fontWeight: 500, transition: 'all 0.2s',
+                                                        flex: 1, justifyContent: 'center'
+                                                    }}
+                                                >
+                                                    <FiTrash2 size={14} /> {t('gen.cancel')}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleUploadClick(booking._id)}
+                                                    className="upload-receipt-btn"
+                                                    style={{
+                                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                                        padding: '0.5rem 1rem', borderRadius: '8px',
+                                                        background: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa',
+                                                        border: '1px solid rgba(139, 92, 246, 0.4)', cursor: 'pointer',
+                                                        fontSize: '0.85rem', fontWeight: 500, transition: 'all 0.2s',
+                                                        flex: 2, justifyContent: 'center'
+                                                    }}
+                                                >
+                                                    <FiUploadCloud /> {t('pending.uploadNow')}
+                                                </button>
+                                            </div>
                                         )}
-                                        {booking.status === 'confirmed' && booking.hasTheaterSeating && (
+                                        {booking.status === 'confirmed' && booking.hasTheaterSeating && !isPrevious && (
                                             <Link
                                                 href={`/bookings/${booking._id}/tickets`}
                                                 className="view-tickets-btn"
@@ -489,8 +798,82 @@ const UserBookingsPage = () => {
                                                     boxShadow: '0 2px 10px rgba(139, 92, 246, 0.3)'
                                                 }}
                                             >
-                                                <FiGrid /> QR Tickets
+                                                <FiGrid /> {t('booking.viewTickets')}
                                             </Link>
+                                        )}
+                                        {booking.status === 'confirmed' && booking.hasTheaterSeating && (
+                                            <>
+                                                {booking.cancellationRequest?.status === 'pending' && (
+                                                    <span style={{
+                                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                                        padding: '0.5rem 1rem', borderRadius: '8px',
+                                                        background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24',
+                                                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                                                        fontSize: '0.85rem', fontWeight: 600,
+                                                    }}>
+                                                        <FiClock size={14} /> Cancellation Pending
+                                                    </span>
+                                                )}
+                                                {booking.cancellationRequest?.status === 'rejected' && !isPastCancellationDeadline && !isPrevious && (
+                                                    <button
+                                                        onClick={() => handleRequestCancellationClick(booking._id)}
+                                                        style={{
+                                                            display: 'flex', alignItems: 'center', gap: '6px',
+                                                            padding: '0.5rem 1rem', borderRadius: '8px',
+                                                            background: 'rgba(239, 68, 68, 0.1)', color: '#fca5a5',
+                                                            border: '1px solid rgba(239, 68, 68, 0.3)', cursor: 'pointer',
+                                                            fontSize: '0.85rem', fontWeight: 500, transition: 'all 0.2s'
+                                                        }}
+                                                    >
+                                                        <FiRotateCcw size={14} /> {t('booking.requestCancellation')}
+                                                    </button>
+                                                )}
+                                                {(() => {
+                                                    if (isPrevious) return null;
+                                                    const pendingKeys = new Set(
+                                                        (booking.cancellationRequest?.seatsToCancel || []).map(s => `${s.section}-${s.row}-${s.seatNumber}`)
+                                                    );
+                                                    const unrequestedSeats = (booking.selectedSeats || []).filter(s => !pendingKeys.has(`${s.section}-${s.row}-${s.seatNumber}`));
+
+                                                    if (isPastCancellationDeadline && booking.cancellationRequest?.status !== 'rejected') {
+                                                        return <span style={{ fontSize: '0.85rem', color: '#ef4444', fontStyle: 'italic', padding: '0.5rem 0' }}>{t('booking.deadlinePassed')}</span>;
+                                                    }
+
+                                                    if (booking.cancellationRequest?.status === 'pending' && unrequestedSeats.length > 0) {
+                                                        return (
+                                                            <button
+                                                                onClick={() => handleRequestCancellationClick(booking._id)}
+                                                                style={{
+                                                                    display: 'flex', alignItems: 'center', gap: '6px',
+                                                                    padding: '0.5rem 1rem', borderRadius: '8px',
+                                                                    background: 'rgba(245, 158, 11, 0.1)', color: '#fbbf24',
+                                                                    border: '1px solid rgba(245, 158, 11, 0.3)', cursor: 'pointer',
+                                                                    fontSize: '0.85rem', fontWeight: 500, transition: 'all 0.2s'
+                                                                }}
+                                                            >
+                                                                <FiRotateCcw size={14} /> {t('booking.cancelMore')}
+                                                            </button>
+                                                        );
+                                                    }
+                                                    if (!booking.cancellationRequest?.status || booking.cancellationRequest.status === 'none') {
+                                                        return (
+                                                            <button
+                                                                onClick={() => handleRequestCancellationClick(booking._id)}
+                                                                style={{
+                                                                    display: 'flex', alignItems: 'center', gap: '6px',
+                                                                    padding: '0.5rem 1rem', borderRadius: '8px',
+                                                                    background: 'rgba(245, 158, 11, 0.1)', color: '#fbbf24',
+                                                                    border: '1px solid rgba(245, 158, 11, 0.3)', cursor: 'pointer',
+                                                                    fontSize: '0.85rem', fontWeight: 500, transition: 'all 0.2s'
+                                                                }}
+                                                            >
+                                                                <FiRotateCcw size={14} /> {t('booking.requestCancellation')}
+                                                            </button>
+                                                        );
+                                                    }
+                                                    return null;
+                                                })()}
+                                            </>
                                         )}
                                     </div>
                                 </motion.div>
@@ -502,17 +885,62 @@ const UserBookingsPage = () => {
 
             <ConfirmationDialog
                 isOpen={showDeleteConfirm}
-                title="Cancel Booking"
-                message="Are you sure you want to cancel this booking? Your seats will be released."
-                itemName={eventDetails[bookings.find(b => b._id === deleteBookingId)?.eventId || '']?.title}
-                confirmText={cancellationLoading ? "Cancelling..." : "Yes, Cancel Booking"}
-                cancelText="Keep Booking"
+                title={t('pending.cancel')}
+                message={t('pending.cancelConfirm')}
+                itemName={(() => {
+                    const booking = bookings.find(b => b._id === deleteBookingId);
+                    const bEventId = typeof booking?.eventId === 'object' ? (booking?.eventId as any)._id : booking?.eventId;
+                    return eventDetails[bEventId || '']?.title;
+                })()}
+                confirmText={cancellationLoading ? t('gen.processing') : t('gen.confirm')}
+                cancelText={t('gen.cancel')}
                 variant="danger"
                 onConfirm={confirmCancel}
                 onCancel={() => setShowDeleteConfirm(false)}
                 isLoading={cancellationLoading}
                 disabled={cancellationLoading}
             />
+
+            {/* Cancel Seats Modal for pending bookings */}
+            {cancelSeatsBookingId && (() => {
+                const booking = bookings.find(b => b._id === cancelSeatsBookingId);
+                return (
+                    <CancelSeatsModal
+                        isOpen={showCancelSeatsModal}
+                        onClose={() => { setShowCancelSeatsModal(false); setCancelSeatsBookingId(null); }}
+                        onConfirm={handleCancelSeatsConfirm}
+                        seats={booking?.selectedSeats || []}
+                        isLoading={cancelSeatsLoading}
+                        bookingType="pending"
+                        isRTL={isRTL}
+                    />
+                );
+            })()}
+
+            {/* Request Cancellation Modal for confirmed/pending-receipt bookings */}
+            {requestCancelBookingId && (() => {
+                const booking = bookings.find(b => b._id === requestCancelBookingId);
+                const pendingKeys = new Set(
+                    (booking?.cancellationRequest?.status === 'pending'
+                        ? booking.cancellationRequest.seatsToCancel || []
+                        : []
+                    ).map(s => `${s.section}-${s.row}-${s.seatNumber}`)
+                );
+                const availableSeats = (booking?.selectedSeats || []).filter(
+                    s => !pendingKeys.has(`${s.section}-${s.row}-${s.seatNumber}`)
+                        && !scannedSeatKeys.has(`${s.section}-${s.row}-${s.seatNumber}`)
+                );
+                return (
+                    <RequestCancellationModal
+                        isOpen={showRequestCancelModal}
+                        onClose={() => { setShowRequestCancelModal(false); setRequestCancelBookingId(null); }}
+                        onConfirm={handleRequestCancellationConfirm}
+                        seats={availableSeats}
+                        isLoading={requestCancelLoading}
+                        isRTL={isRTL}
+                    />
+                );
+            })()}
 
         </div>
     );

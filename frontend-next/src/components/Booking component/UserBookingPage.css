@@ -197,6 +197,11 @@
     color: #f59e0b;
 }
 
+.booking-card.rejected .booking-status-badge {
+    background: rgba(239, 68, 68, 0.1);
+    color: #fca5a5;
+}
+
 .booking-timer {
     display: inline-flex;
     align-items: center;
@@ -286,17 +291,21 @@
 
 .booking-card-footer {
     display: flex;
+    flex-wrap: wrap;
     gap: 1rem;
     padding: 1.5rem;
     background: rgba(0, 0, 0, 0.1);
 }
 
-.view-details-btn,
-.cancel-btn {
+.booking-card-footer>a,
+.booking-card-footer>button,
+.booking-card-footer>span {
     flex: 1;
+    min-width: 140px;
     display: flex;
     align-items: center;
     justify-content: center;
+    text-align: center;
     gap: 0.5rem;
     padding: 0.75rem;
     border-radius: 12px;
@@ -304,6 +313,7 @@
     font-weight: 600;
     transition: all 0.2s;
     cursor: pointer;
+    box-sizing: border-box;
 }
 
 .view-details-btn {
@@ -335,6 +345,14 @@
 
 /* Responsive */
 @media (max-width: 640px) {
+    .user-bookings-container {
+        padding: 1rem 1rem 4rem;
+    }
+
+    .bookings-hero {
+        padding: 2rem 0.5rem 1rem;
+    }
+
     .bookings-hero h1 {
         font-size: 2.2rem;
     }
@@ -345,5 +363,27 @@
 
     .bookings-grid {
         grid-template-columns: 1fr;
+        gap: 1.25rem;
+    }
+
+    .booking-card-header {
+        padding: 1.5rem 1.25rem 0.75rem;
+    }
+
+    .booking-card-body {
+        padding: 0 1.25rem 1.25rem;
+    }
+
+    .booking-card-footer {
+        padding: 1.25rem;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .booking-card-footer a,
+    .booking-card-footer button,
+    .booking-card-footer span {
+        width: 100%;
+        justify-content: center;
     }
 }

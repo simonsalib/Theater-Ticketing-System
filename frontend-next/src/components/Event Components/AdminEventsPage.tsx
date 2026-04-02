@@ -87,7 +87,7 @@ const AdminEventsPage = () => {
                 status: newStatus
             });
 
-            setEvents(events.map(event => {
+            setEvents(prev => prev.map(event => {
                 if ((event.id || event._id) === eventId) {
                     return { ...event, status: newStatus };
                 }

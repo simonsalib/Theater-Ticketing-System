@@ -35,12 +35,10 @@ const EventList = () => {
     }, [router, user]);
 
     useEffect(() => {
-        if (events.length > 0) {
-            const filtered = events.filter(event =>
-                (event.title || event.name || '').toLowerCase().includes(searchTerm.toLowerCase())
-            );
-            setFilteredEvents(filtered);
-        }
+        const filtered = events.filter(event =>
+            (event.title || event.name || '').toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        setFilteredEvents(filtered);
     }, [searchTerm, events]);
 
     const fetchEvents = async () => {

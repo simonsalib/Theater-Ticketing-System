@@ -58,6 +58,13 @@ export class UsersController {
     }
 
     // User: Get my bookings
+    @Put('language')
+    @UseGuards(JwtAuthGuard)
+    async updateLanguage(@Req() req: any, @Body('language') language: 'en' | 'ar') {
+        const data = await this.usersService.updateLanguage(req.user._id, language);
+        return { success: true, data };
+    }
+
     @Get('bookings')
     @UseGuards(JwtAuthGuard)
     async getMyBookings(@Req() req: any) {
@@ -107,6 +114,18 @@ export class UsersController {
     async updateRole(@Param('id') id: string, @Body('role') role: string) {
         const data = await this.usersService.updateRole(id, role);
         return { success: true, data };
+    }
+
+    @Put(':id/block')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN)
+    async blockUser(@Param('id') id: string, @Body('isBlocked') isBlocked: boolean) {
+        const data = await this.usersService.blockUser(id, isBlocked);
+        return {
+            success: true,
+            message: isBlocked ? 'User blocked successfully' : 'User unblocked successfully',
+            data,
+        };
     }
 
     @Delete(':id')

@@ -21,10 +21,17 @@ interface ScanResult {
     seatNumber: number;
     section: string;
     seatType: string;
-    attendeeName: string;
+    seatLabel?: string;
+    attendeeFirstName?: string;
+    attendeeLastName?: string;
     attendeePhone: string;
     isFree: boolean;
     message: string;
+    eventTitle?: string;
+    eventDate?: string;
+    eventLocation?: string;
+    startTime?: string;
+    endTime?: string;
 }
 
 interface ScanStats {
@@ -43,6 +50,10 @@ const QRScannerPage = () => {
     const [scanError, setScanError] = useState<string | null>(null);
     const [stats, setStats] = useState<ScanStats | null>(null);
     const [eventTitle, setEventTitle] = useState('');
+    const [eventDate, setEventDate] = useState('');
+    const [eventLocation, setEventLocation] = useState('');
+    const [startTime, setStartTime] = useState('');
+    const [endTime, setEndTime] = useState('');
     const [scanHistory, setScanHistory] = useState<ScanResult[]>([]);
     const scannerRef = useRef<any>(null);
     const scannerContainerRef = useRef<HTMLDivElement>(null);
@@ -74,6 +85,10 @@ const QRScannerPage = () => {
             const res = await api.get(`/event/${eventId}`);
             const data = res.data.success ? res.data.data : res.data;
             setEventTitle(data.title || '');
+            setEventDate(data.date || '');
+            setEventLocation(data.location || '');
+            setStartTime(data.startTime || '');
+            setEndTime(data.endTime || '');
         } catch (err) {
             console.error('Error fetching event:', err);
         }
@@ -192,6 +207,37 @@ const QRScannerPage = () => {
 
                         <h1>📷 QR Code Scanner</h1>
                         <h2>{eventTitle}</h2>
+                        <div className="scanner-stats" style={{ marginTop: '8px' }}>
+                            {eventDate && (
+                                <div className="stat-item">
+                                    <span className="stat-number" style={{ fontSize: '0.9rem' }}>
+                                        {new Date(eventDate).toLocaleDateString('en-US', {
+                                            timeZone: 'Africa/Cairo',
+                                            year: 'numeric',
+                                            month: 'short',
+                                            day: 'numeric',
+                                        })}
+                                    </span>
+                                    <span className="stat-label">Date</span>
+                                </div>
+                            )}
+                            {startTime && (
+                                <div className="stat-item">
+                                    <span className="stat-number" style={{ fontSize: '0.9rem' }}>
+                                        {startTime} {endTime ? `- ${endTime}` : ''}
+                                    </span>
+                                    <span className="stat-label">Time</span>
+                                </div>
+                            )}
+                            {eventLocation && (
+                                <div className="stat-item">
+                                    <span className="stat-number" style={{ fontSize: '0.9rem' }}>
+                                        {eventLocation}
+                                    </span>
+                                    <span className="stat-label">Location</span>
+                                </div>
+                            )}
+                        </div>
 
                         {/* Stats Bar */}
                         {stats && (
@@ -298,8 +344,21 @@ const QRScannerPage = () => {
                                                         <span className="field-value">{scanResult.seatNumber}</span>
                                                     </div>
                                                     <div className="result-field">
-                                                        <span className="field-label">Seat Name</span>
-                                                        <span className="field-value seat-name">{scanResult.seatRow}{scanResult.seatNumber}</span>
+                                                        <span className="field-label">Seat</span>
+                                                        <span className="field-value seat-name">
+                                                            {scanResult.seatLabel || `${scanResult.seatRow}${scanResult.seatNumber}`}
+                                                        </span>
+                                                    </div>
+                                                    <div className="result-field">
+                                                        <span className="field-label">Side</span>
+                                                        <span className="field-value">
+                                                            {(() => {
+                                                                const label = (scanResult.seatLabel || `${scanResult.seatRow}${scanResult.seatNumber}`).toLowerCase();
+                                                                if (label.includes('left')) return 'Left Side';
+                                                                if (label.includes('right')) return 'Right Side';
+                                                                return '—';
+                                                            })()}
+                                                        </span>
                                                     </div>
                                                     <div className="result-field">
                                                         <span className="field-label">Type</span>
@@ -315,14 +374,14 @@ const QRScannerPage = () => {
                                             </div>
 
                                             {/* Attendee Info */}
-                                            {(scanResult.attendeeName || scanResult.attendeePhone) && (
+                                            {(scanResult.attendeeFirstName || scanResult.attendeeLastName || scanResult.attendeePhone) && (
                                                 <div className="result-section">
                                                     <h4><FiUser size={16} /> Attendee Details</h4>
                                                     <div className="result-grid">
-                                                        {scanResult.attendeeName && (
+                                                        {(scanResult.attendeeFirstName || scanResult.attendeeLastName) && (
                                                             <div className="result-field">
                                                                 <span className="field-label"><FiUser size={12} /> Name</span>
-                                                                <span className="field-value">{scanResult.attendeeName}</span>
+                                                                <span className="field-value">{scanResult.attendeeFirstName} {scanResult.attendeeLastName}</span>
                                                             </div>
                                                         )}
                                                         {scanResult.attendeePhone && (
@@ -375,9 +434,11 @@ const QRScannerPage = () => {
                                 <div className="history-list">
                                     {scanHistory.map((item, index) => (
                                         <div key={index} className={`history-item ${item.isFree ? 'valid' : 'invalid'}`}>
-                                            <span className="history-seat">{item.seatRow}{item.seatNumber}</span>
+                                            <span className="history-seat">
+                                                {item.seatLabel || `${item.seatRow}${item.seatNumber}`}
+                                            </span>
                                             <span className="history-section">{item.section}</span>
-                                            <span className="history-name">{item.attendeeName || item.userName}</span>
+                                            <span className="history-name">{(item.attendeeFirstName || item.attendeeLastName) ? `${item.attendeeFirstName || ''} ${item.attendeeLastName || ''}`.trim() : item.userName}</span>
                                             <span className={`history-status ${item.isFree ? 'free' : 'not-free'}`}>
                                                 {item.isFree ? '✅' : '❌'}
                                             </span>

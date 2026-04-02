@@ -26,11 +26,20 @@ export class AuthService {
     ) { }
 
     async register(registerDto: any) {
-        const { email, password, name, phone } = registerDto;
+        let { email, password, name, phone } = registerDto;
+        email = email.toLowerCase();
+
+        // Validate phone: must be 11 digits starting with 01
+        if (phone && !/^01\d{9}$/.test(phone)) {
+            throw new BadRequestException('Phone number must be 11 digits starting with 01');
+        }
 
         // Check if email already exists as a verified user
         const existingUser = await this.usersService.findOneByEmail(email);
         if (existingUser) {
+            if ((existingUser as any).isBlocked) {
+                throw new ForbiddenException('This account has been blocked. Please contact support.');
+            }
             throw new ConflictException('User already exists');
         }
 
@@ -63,6 +72,7 @@ export class AuthService {
     }
 
     async verifyRegistration(email: string, otp: string) {
+        email = email.toLowerCase();
         // First check pending registrations
         const pending = await this.pendingModel.findOne({ email }).exec();
         if (!pending) {
@@ -119,9 +129,27 @@ export class AuthService {
     async login(loginDto: any) {
         const { email, password } = loginDto;
 
-        const user = await this.usersService.findOneByEmail(email);
-        if (!user) {
-            throw new NotFoundException('Email not found');
+        // Check if this is a username-based login (starts with $)
+        const isUsernameLogin = email && email.startsWith('$');
+        let user;
+
+        if (isUsernameLogin) {
+            const username = email.substring(1); // Remove the $ prefix
+            user = await this.usersService.findOneByUsername(username);
+
+            // Fallback: search for the full string in case it was stored with the $ prefix
+            if (!user) {
+                user = await this.usersService.findOneByUsername(email);
+            }
+
+            if (!user) {
+                throw new NotFoundException('Username not found');
+            }
+        } else {
+            user = await this.usersService.findOneByEmail(email.toLowerCase());
+            if (!user) {
+                throw new NotFoundException('Email not found');
+            }
         }
 
         const passwordMatch = await bcrypt.compare(password, user.password);
@@ -129,30 +157,37 @@ export class AuthService {
             throw new UnauthorizedException('Incorrect password');
         }
 
-        // Admin-created users must change password on first login
-        if (user.requiresPasswordChange) {
-            throw new ForbiddenException({
-                message: 'Please set your own password.',
-                requiresPasswordChange: true,
-                email: email,
-            });
+        if ((user as any).isBlocked) {
+            throw new ForbiddenException('Your account has been blocked. Please contact support.');
         }
 
-        if (!user.isVerified) {
-            const otp = Math.floor(100000 + Math.random() * 900000).toString();
-            const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+        // Scanners skip password change and verification checks
+        if (user.role !== UserRole.SCANNER) {
+            // Admin-created users must change password on first login
+            if (user.requiresPasswordChange) {
+                throw new ForbiddenException({
+                    message: 'Please set your own password.',
+                    requiresPasswordChange: true,
+                    email: email,
+                });
+            }
 
-            user.otp = otp;
-            user.otpExpires = otpExpires;
-            await user.save();
+            if (!user.isVerified) {
+                const otp = Math.floor(100000 + Math.random() * 900000).toString();
+                const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
-            await this.mailService.sendVerificationOTP(email, otp);
+                user.otp = otp;
+                user.otpExpires = otpExpires;
+                await user.save();
 
-            throw new ForbiddenException({
-                message:
-                    'Account not verified. A new verification code has been sent to your email.',
-                requiresVerification: true,
-            });
+                await this.mailService.sendVerificationOTP(user.email, otp);
+
+                throw new ForbiddenException({
+                    message:
+                        'Account not verified. A new verification code has been sent to your email.',
+                    requiresVerification: true,
+                });
+            }
         }
 
         const payload = { sub: user._id, role: user.role };
@@ -163,19 +198,21 @@ export class AuthService {
             token,
             user: {
                 _id: user._id,
-                name: user.name,
-                email: user.email,
+                name: user.role === UserRole.SCANNER ? `$${user.name}` : user.name,
+                email: user.email || '',
                 role: user.role,
                 phone: (user as any).phone,
                 profilePicture: user.profilePicture,
                 instapayNumber: (user as any).instapayNumber,
                 instapayQR: (user as any).instapayQR,
+                instapayLink: (user as any).instapayLink,
+                username: (user as any).username,
             },
         };
     }
 
     async forgetPassword(email: string) {
-        const user = await this.usersService.findOneByEmail(email);
+        const user = await this.usersService.findOneByEmail(email.toLowerCase());
         if (!user) {
             throw new NotFoundException('User not found');
         }
@@ -195,7 +232,7 @@ export class AuthService {
     async resetPassword(resetDto: any) {
         const { email, otp, newPassword } = resetDto;
 
-        const user = await this.usersService.findOneByEmail(email);
+        const user = await this.usersService.findOneByEmail(email.toLowerCase());
         if (!user) {
             throw new NotFoundException('User not found');
         }
@@ -221,7 +258,7 @@ export class AuthService {
     async submitNewPassword(submitDto: any) {
         const { email, newPassword } = submitDto;
 
-        const user = await this.usersService.findOneByEmail(email);
+        const user = await this.usersService.findOneByEmail(email.toLowerCase());
         if (!user) {
             throw new NotFoundException('User not found');
         }
@@ -253,7 +290,7 @@ export class AuthService {
     async verifyAndActivate(verifyDto: any) {
         const { email, otp } = verifyDto;
 
-        const user = await this.usersService.findOneByEmail(email);
+        const user = await this.usersService.findOneByEmail(email.toLowerCase());
         if (!user) {
             throw new NotFoundException('User not found');
         }
@@ -292,6 +329,7 @@ export class AuthService {
                 profilePicture: user.profilePicture,
                 instapayNumber: (user as any).instapayNumber,
                 instapayQR: (user as any).instapayQR,
+                instapayLink: (user as any).instapayLink,
             },
         };
     }

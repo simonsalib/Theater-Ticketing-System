@@ -1,4 +1,4 @@
-export type UserRole = 'System Admin' | 'Organizer' | 'Standard User';
+export type UserRole = 'System Admin' | 'Organizer' | 'Standard User' | 'Scanner';
 
 export interface User {
     _id: string;
@@ -10,9 +10,13 @@ export interface User {
     phone?: string;
     profilePicture?: string;
     instapayNumber?: string;
+    instapayLink?: string;
     instapayQR?: string;
     isVerified?: boolean;
+    isBlocked?: boolean;
+    language?: 'en' | 'ar';
     createdAt?: string;
+    username?: string;
 }
 
 export interface AuthResponse {

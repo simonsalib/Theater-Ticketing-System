@@ -1,13 +1,16 @@
 "use client";
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiCalendar, FiMapPin, FiTag, FiX, FiMaximize2, FiShoppingCart, FiInfo } from 'react-icons/fi';
+import { FiCalendar, FiMapPin, FiTag, FiX, FiMaximize2, FiShoppingCart, FiInfo, FiAlertCircle, FiClock, FiShieldOff, FiLoader } from 'react-icons/fi';
 import './EventCard.css';
 import { getImageUrl } from '@/utils/imageHelper';
 import { Event } from '@/types/event';
 import { useAuth } from '@/auth/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { useInView } from 'react-intersection-observer';
+import api from '@/services/api';
 
 interface EventCardProps {
     event: Event;
@@ -19,14 +22,70 @@ const EventCard: React.FC<EventCardProps> = ({ event, index = 0 }) => {
     const [imageLoaded, setImageLoaded] = useState(false);
     const router = useRouter();
     const { user } = useAuth();
+    const { t } = useLanguage();
+
+    // Intersection observer for lazy loading seat data
+    const { ref, inView } = useInView({
+        triggerOnce: true,
+        threshold: 0.1,
+    });
+
+    const [seatData, setSeatData] = useState<any>(null);
+    const [seatLoading, setSeatLoading] = useState(false);
 
     // Support both _id (MongoDB) and id (Standard)
     const eventId = event._id || (event as any).id;
+
+    // Fetch seat data when theater event comes into view
+    React.useEffect(() => {
+        if (inView && event.hasTheaterSeating && !seatData && !seatLoading) {
+            const fetchSeatData = async () => {
+                try {
+                    setSeatLoading(true);
+                    const response = await api.get<any>(`/booking/event/${eventId}/seats`);
+                    const data = response.data.success ? response.data.data : response.data;
+                    if (data) {
+                        setSeatData(data);
+                    }
+                } catch (err) {
+                    console.error('Error fetching card seat data:', err);
+                } finally {
+                    setSeatLoading(false);
+                }
+            };
+            fetchSeatData();
+        }
+    }, [inView, event.hasTheaterSeating, eventId, seatData, seatLoading]);
+
+    const seatCounts = React.useMemo(() => {
+        if (!seatData || !seatData.seats) return null;
+
+        const activeSeats = seatData.seats.filter((s: any) => s.isActive);
+        const hasBalcony = activeSeats.some((s: any) => (s.section || 'main') === 'balcony');
+
+        const getStats = (section?: string) => {
+            const sectionSeats = section
+                ? activeSeats.filter((s: any) => (s.section || 'main') === section)
+                : activeSeats;
+            return {
+                available: sectionSeats.filter((s: any) => !s.isBooked).length,
+                count: sectionSeats.length
+            };
+        };
+
+        return {
+            total: getStats(),
+            main: getStats('main'),
+            balcony: getStats('balcony'),
+            hasBalcony
+        };
+    }, [seatData]);
 
     const formatDate = (dateString?: string) => {
         if (!dateString) return 'TBA';
         const date = new Date(dateString);
         return date.toLocaleDateString('en-US', {
+            timeZone: 'Africa/Cairo',
             month: 'short',
             day: 'numeric',
             year: 'numeric'
@@ -35,13 +94,36 @@ const EventCard: React.FC<EventCardProps> = ({ event, index = 0 }) => {
 
     const getTicketStatus = () => {
         const remaining = event.remainingTickets ?? 0;
-        if (remaining === 0) return { text: 'Sold Out', class: 'sold-out' };
-        if (remaining < 20) return { text: `${remaining} left!`, class: 'limited' };
-        return { text: `${remaining} available`, class: 'available' };
+        if (remaining === 0) return { text: t('card.soldOut'), class: 'sold-out' };
+        if (remaining < 20) return { text: `${remaining} ${t('card.left')}`, class: 'limited' };
+        return { text: `${remaining} ${t('card.available')}`, class: 'available' };
     };
 
     const ticketStatus = getTicketStatus();
     const isSoldOut = (event.remainingTickets ?? 0) === 0;
+
+    const isExpired = useMemo(() => {
+        if (!event.date) return false;
+        const eventDate = new Date(event.date);
+        const expirationDate = new Date(eventDate.getTime() + 24 * 60 * 60 * 1000); // 1 day after event date
+        return new Date() >= expirationDate;
+    }, [event.date]);
+
+    const isPastDeadline = useMemo(() => {
+        if (!event.cancellationDeadline) return false;
+        return new Date() > new Date(event.cancellationDeadline);
+    }, [event.cancellationDeadline]);
+
+    const formatDeadline = (deadline?: string) => {
+        if (!deadline) return null;
+        return new Date(deadline).toLocaleDateString('en-US', {
+            timeZone: 'Africa/Cairo',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
 
     // Get price from standard chairs if it's a theater event
     const standardPrice = useMemo(() => {
@@ -55,6 +137,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, index = 0 }) => {
     return (
         <>
             <motion.div
+                ref={ref}
                 className="event-card-modern"
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -84,7 +167,40 @@ const EventCard: React.FC<EventCardProps> = ({ event, index = 0 }) => {
                             onLoad={() => setImageLoaded(true)}
                         />
                         <div className="image-gradient-overlay"></div>
-                        <div className={`ticket-badge ${ticketStatus.class}`}>{ticketStatus.text}</div>
+                        
+                        {!isExpired && (
+                            event.hasTheaterSeating ? (
+                                <div className="availability-mini-grid">
+                                    {seatLoading ? (
+                                        <div className="mini-stat-loading">
+                                            <FiLoader className="spin" size={14} />
+                                        </div>
+                                    ) : seatCounts ? (
+                                        <>
+                                            <div className="mini-stat total" title={t('events.stats.total')}>
+                                                <span className="mini-value">{seatCounts.total.available}</span>
+                                                <span className="mini-label">{t('events.stats.total')}</span>
+                                            </div>
+                                            <div className="mini-stat main" title={t('events.stats.main')}>
+                                                <span className="mini-value">{seatCounts.main.available}</span>
+                                                <span className="mini-label">{t('events.stats.main')}</span>
+                                            </div>
+                                            {seatCounts.hasBalcony && (
+                                                <div className="mini-stat balcony" title={t('events.stats.balcony')}>
+                                                    <span className="mini-value">{seatCounts.balcony.available}</span>
+                                                    <span className="mini-label">{t('events.stats.balcony')}</span>
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <div className={`ticket-badge ${ticketStatus.class}`}>{ticketStatus.text}</div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className={`ticket-badge ${ticketStatus.class}`}>{ticketStatus.text}</div>
+                            )
+                        )}
+
                         <motion.div className="expand-icon" initial={{ opacity: 0 }} whileHover={{ opacity: 1, scale: 1.1 }}>
                             <FiMaximize2 size={20} />
                         </motion.div>
@@ -99,9 +215,16 @@ const EventCard: React.FC<EventCardProps> = ({ event, index = 0 }) => {
 
                 <div className="card-content">
                     <div className="card-info-header">
-                        <h3 className="card-title">{event.title}</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <h3 className="card-title">{event.title}</h3>
+                            {isExpired && (
+                                <div className="expired-event-badge">
+                                    <FiAlertCircle size={15} /> <span>Expired Event</span>
+                                </div>
+                            )}
+                        </div>
                         {standardPrice !== undefined && (
-                            <div className="price-tag">
+                            <div className="price-tag" style={{ alignSelf: 'flex-start' }}>
                                 <span className="price-amount">{standardPrice.toFixed(2)} EGP</span>
                             </div>
                         )}
@@ -112,6 +235,26 @@ const EventCard: React.FC<EventCardProps> = ({ event, index = 0 }) => {
                             <div className="meta-item">
                                 <FiCalendar className="meta-icon" />
                                 <span>{formatDate(event.date)}</span>
+                            </div>
+                        )}
+                        {event.startTime && (
+                            <div className="meta-item">
+                                <FiClock className="meta-icon" />
+                                <span>{event.startTime} {event.endTime ? `- ${event.endTime}` : ''}</span>
+                            </div>
+                        )}
+                        {event.cancellationDeadline && (
+                            <div className={`meta-item ${isPastDeadline ? 'deadline-passed' : 'deadline-active'}`}>
+                                <FiShieldOff className="meta-icon" />
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>Refund Deadline:</span>
+                                    <span>{formatDeadline(event.cancellationDeadline)}</span>
+                                    {isPastDeadline && !isExpired && (
+                                        <span className="deadline-warning-text" style={{ color: '#ef4444', fontSize: '0.7rem', fontWeight: 700 }}>
+                                            Returns Disabled
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         )}
                         {event.location && (
@@ -136,10 +279,10 @@ const EventCard: React.FC<EventCardProps> = ({ event, index = 0 }) => {
                                 router.push(`/events/${eventId}`);
                             }}
                         >
-                            <FiInfo /> <span>Details</span>
+                            <FiInfo /> <span>{t('card.details')}</span>
                         </button>
 
-                        {(user?.role === "Standard User" || !user) && !isSoldOut && (
+                        {(user?.role === "Standard User" || !user) && !isSoldOut && !isExpired && (
                             <button
                                 className="card-action-btn primary"
                                 onClick={(e) => {
@@ -147,13 +290,13 @@ const EventCard: React.FC<EventCardProps> = ({ event, index = 0 }) => {
                                     router.push(`/bookings/new/${eventId}`);
                                 }}
                             >
-                                <FiShoppingCart /> <span>Book Now</span>
+                                <FiShoppingCart /> <span>{t('card.bookNow')}</span>
                             </button>
                         )}
 
-                        {isSoldOut && (
+                        {(isSoldOut && !isExpired) && (
                             <button className="card-action-btn disabled" disabled>
-                                Sold Out
+                                {t('card.soldOut')}
                             </button>
                         )}
                     </div>
