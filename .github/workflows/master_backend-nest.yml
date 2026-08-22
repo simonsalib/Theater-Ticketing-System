@@ -4,7 +4,16 @@ on:
   push:
     branches:
       - master
+    paths:
+      - 'backend-nest/**'
+      - '.github/workflows/master_backend-nest.yml'
+      - '.node-version'
+      - '.nvmrc'
   workflow_dispatch:
+
+concurrency:
+  group: backend-nest-production-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   NODE_VERSION: '24.x'
