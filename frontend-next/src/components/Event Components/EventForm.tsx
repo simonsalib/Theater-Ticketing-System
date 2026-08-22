@@ -12,6 +12,8 @@ import { Theater } from '@/types/theater';
 import { Event } from '@/types/event';
 import { toast } from 'react-toastify';
 
+const PRICED_SEAT_TYPES = ['standard', 'vip', 'premium', 'wheelchair'];
+
 interface EventFormProps {
     initialData?: Partial<Event>;
     isEdit?: boolean;
@@ -124,10 +126,18 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
     const updatePricingCategories = (layout: any, currentOverrides: any[]) => {
         const categories = new Set(['standard']);
         if (layout.seatCategories) {
-            Object.values(layout.seatCategories).forEach((cat: any) => categories.add(cat));
+            Object.values(layout.seatCategories).forEach((cat: any) => {
+                if (PRICED_SEAT_TYPES.includes(cat)) {
+                    categories.add(cat);
+                }
+            });
         }
         if (currentOverrides) {
-            currentOverrides.forEach(cfg => categories.add(cfg.seatType));
+            currentOverrides.forEach(cfg => {
+                if (PRICED_SEAT_TYPES.includes(cfg.seatType)) {
+                    categories.add(cfg.seatType);
+                }
+            });
         }
 
         setFormData(prev => {
@@ -222,10 +232,12 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
 
             if (formData.hasTheaterSeating && formData.theaterId) {
                 requestData.theater = formData.theaterId;
-                requestData.seatPricing = Object.entries(formData.seatPricing).map(([type, price]) => ({
-                    seatType: type,
-                    price: price
-                }));
+                requestData.seatPricing = Object.entries(formData.seatPricing)
+                    .filter(([type]) => PRICED_SEAT_TYPES.includes(type))
+                    .map(([type, price]) => ({
+                        seatType: type,
+                        price: price
+                    }));
                 if (eventSeatConfig && eventSeatConfig.length > 0) {
                     requestData.seatConfig = eventSeatConfig;
                 }

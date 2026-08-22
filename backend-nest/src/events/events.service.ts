@@ -11,6 +11,9 @@ import { Booking, BookingDocument } from '../bookings/schemas/booking.schema';
 import { MailService } from '../mail/mail.service';
 import { UserRole } from '../users/schemas/user.schema';
 
+const EVENT_STATUSES = ['approved', 'pending', 'declined'];
+const PRICED_SEAT_TYPES = ['standard', 'vip', 'premium', 'wheelchair'];
+
 @Injectable()
 export class EventsService {
     constructor(
@@ -44,6 +47,8 @@ export class EventsService {
         } = createDto;
 
         const isTheater = hasTheaterSeating === 'true' || hasTheaterSeating === true;
+        const normalizedSeatPricing = this.normalizeSeatPricing(seatPricing);
+        const normalizedSeatConfig = this.normalizeSeatConfig(seatConfig);
 
         // Convert preBookedSeats to bookedSeats format (no bookingId = organizer-reserved)
         const bookedSeats = [];
@@ -73,12 +78,12 @@ export class EventsService {
             image: image || 'default-image.jpg',
             theater: isTheater ? theater : null,
             hasTheaterSeating: isTheater,
-            seatPricing: typeof seatPricing === 'string' ? JSON.parse(seatPricing) : seatPricing || [],
-            seatConfig: typeof seatConfig === 'string' ? JSON.parse(seatConfig) : seatConfig || [],
+            seatPricing: normalizedSeatPricing,
+            seatConfig: normalizedSeatConfig,
             bookedSeats,
         });
 
-        return event.save();
+        return this.saveEvent(event);
     }
 
     async findAllApproved(): Promise<EventDocument[]> {
@@ -126,22 +131,43 @@ export class EventsService {
             }
         }
 
+        if (updateDto.venue !== undefined && updateDto.location === undefined) {
+            updateDto.location = updateDto.venue;
+            delete updateDto.venue;
+        }
+
+        if (updateDto.imageUrl !== undefined) {
+            updateDto.image = updateDto.imageUrl;
+            delete updateDto.imageUrl;
+        }
+
+        if (updateDto.status !== undefined) {
+            updateDto.status = String(updateDto.status).toLowerCase();
+            if (!EVENT_STATUSES.includes(updateDto.status)) {
+                throw new BadRequestException('Invalid event status');
+            }
+        }
+
         if (updateDto.hasTheaterSeating !== undefined) {
             updateDto.hasTheaterSeating =
                 updateDto.hasTheaterSeating === 'true' ||
                 updateDto.hasTheaterSeating === true;
         }
 
-        if (updateDto.seatPricing && typeof updateDto.seatPricing === 'string') {
-            try {
-                updateDto.seatPricing = JSON.parse(updateDto.seatPricing);
-            } catch (e) { }
+        if (updateDto.ticketPrice !== undefined) {
+            updateDto.ticketPrice = Number(updateDto.ticketPrice) || 0;
         }
 
-        if (updateDto.seatConfig && typeof updateDto.seatConfig === 'string') {
-            try {
-                updateDto.seatConfig = JSON.parse(updateDto.seatConfig);
-            } catch (e) { }
+        if (updateDto.totalTickets !== undefined) {
+            updateDto.totalTickets = Number(updateDto.totalTickets) || 0;
+        }
+
+        if (updateDto.seatPricing !== undefined) {
+            updateDto.seatPricing = this.normalizeSeatPricing(updateDto.seatPricing);
+        }
+
+        if (updateDto.seatConfig !== undefined) {
+            updateDto.seatConfig = this.normalizeSeatConfig(updateDto.seatConfig);
         }
 
         // Handle preBookedSeats: replace organizer-reserved seats (those without bookingId)
@@ -161,7 +187,61 @@ export class EventsService {
         }
 
         Object.assign(event, updateDto);
-        return event.save();
+        return this.saveEvent(event);
+    }
+
+    private parseArrayField(value: any, fieldName: string): any[] {
+        if (value === undefined || value === null || value === '') {
+            return [];
+        }
+
+        if (typeof value === 'string') {
+            try {
+                const parsed = JSON.parse(value);
+                if (!Array.isArray(parsed)) {
+                    throw new Error();
+                }
+                return parsed;
+            } catch {
+                throw new BadRequestException(`Invalid ${fieldName}`);
+            }
+        }
+
+        if (!Array.isArray(value)) {
+            throw new BadRequestException(`Invalid ${fieldName}`);
+        }
+
+        return value;
+    }
+
+    private normalizeSeatPricing(value: any): any[] {
+        return this.parseArrayField(value, 'seatPricing')
+            .filter((item: any) => PRICED_SEAT_TYPES.includes(String(item?.seatType || '').toLowerCase()))
+            .map((item: any) => ({
+                seatType: String(item.seatType).toLowerCase(),
+                price: Number(item.price) || 0,
+            }));
+    }
+
+    private normalizeSeatConfig(value: any): any[] {
+        return this.parseArrayField(value, 'seatConfig').map((item: any) => ({
+            row: item.row,
+            seatNumber: Number(item.seatNumber),
+            section: item.section || 'main',
+            seatType: String(item.seatType || 'standard').toLowerCase(),
+            seatLabel: item.seatLabel || '',
+        }));
+    }
+
+    private async saveEvent(event: EventDocument): Promise<EventDocument> {
+        try {
+            return await event.save();
+        } catch (err: any) {
+            if (err?.name === 'ValidationError' || err?.name === 'CastError') {
+                throw new BadRequestException(err.message);
+            }
+            throw err;
+        }
     }
 
     async requestDeletionOTP(id: string, user: any): Promise<void> {
