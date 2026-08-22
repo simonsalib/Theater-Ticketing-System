@@ -11,122 +11,122 @@ class SeatPricing {
         enum: ['standard', 'vip', 'premium', 'wheelchair'],
         required: true,
     })
-    seatType: string;
+    seatType!: string;
 
     @Prop({ min: 0, default: 0 })
-    price: number;
+    price!: number;
 }
 
 @Schema()
 class BookedSeat {
     @Prop({ required: true })
-    row: string;
+    row!: string;
 
     @Prop({ required: true })
-    seatNumber: number;
+    seatNumber!: number;
 
     @Prop({ enum: ['main', 'balcony'], default: 'main' })
-    section: string;
+    section!: string;
 
     @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Booking' })
-    bookingId: MongooseSchema.Types.ObjectId;
+    bookingId!: MongooseSchema.Types.ObjectId;
 
     @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'SeatHold' })
-    holdId: MongooseSchema.Types.ObjectId;
+    holdId!: MongooseSchema.Types.ObjectId;
 
     @Prop({ default: '' })
-    seatLabel: string;
+    seatLabel!: string;
 }
 
 @Schema()
 class EventSeatConfig {
     @Prop()
-    row: string;
+    row!: string;
 
     @Prop()
-    seatNumber: number;
+    seatNumber!: number;
 
     @Prop({
         enum: ['standard', 'vip', 'premium', 'wheelchair', 'disabled'],
         default: 'standard',
     })
-    seatType: string;
+    seatType!: string;
 
     @Prop({ default: 'main' })
-    section: string;
+    section!: string;
 
     @Prop({ default: '' })
-    seatLabel: string;
+    seatLabel!: string;
 }
 
 @Schema({ timestamps: true })
 export class Event {
     @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
-    organizerId: User | MongooseSchema.Types.ObjectId;
+    organizerId!: User | MongooseSchema.Types.ObjectId;
 
     @Prop({ required: true, trim: true })
-    title: string;
+    title!: string;
 
     @Prop({ required: true, trim: true })
-    description: string;
+    description!: string;
 
     @Prop({ required: true })
-    date: Date;
+    date!: Date;
 
     @Prop({ required: true, trim: true })
-    location: string;
+    location!: string;
 
     @Prop({ default: 'theater' })
-    category: string;
+    category!: string;
 
     @Prop()
-    startTime: string;
+    startTime!: string;
 
     @Prop()
-    endTime: string;
+    endTime!: string;
 
     @Prop({ type: Date })
-    cancellationDeadline: Date;
+    cancellationDeadline!: Date;
 
     @Prop({ default: 'default-image.jpg' })
-    image: string;
+    image!: string;
 
     @Prop({ default: 0, min: 0 })
-    ticketPrice: number;
+    ticketPrice!: number;
 
     @Prop({ default: 0, min: 0 })
-    totalTickets: number;
+    totalTickets!: number;
 
     @Prop({ default: 0, min: 0 })
-    remainingTickets: number;
+    remainingTickets!: number;
 
     @Prop({
         required: true,
         enum: ['approved', 'pending', 'declined'],
         default: 'pending',
     })
-    status: string;
+    status!: string;
 
     @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Theater', default: null })
-    theater: Theater | MongooseSchema.Types.ObjectId;
+    theater!: Theater | MongooseSchema.Types.ObjectId;
 
     @Prop({ default: false })
-    hasTheaterSeating: boolean;
+    hasTheaterSeating!: boolean;
 
     @Prop({ type: [SeatPricing] })
-    seatPricing: SeatPricing[];
+    seatPricing!: SeatPricing[];
 
     @Prop({ type: [BookedSeat] })
-    bookedSeats: BookedSeat[];
+    bookedSeats!: BookedSeat[];
 
     @Prop({ type: [EventSeatConfig] })
-    seatConfig: EventSeatConfig[];
+    seatConfig!: EventSeatConfig[];
 
     @Prop({ default: null })
-    otp: string;
+    otp!: string;
 
     @Prop({ default: null })
-    otpExpires: Date;
+    otpExpires!: Date;
 }
 
 export const EventSchema = SchemaFactory.createForClass(Event);

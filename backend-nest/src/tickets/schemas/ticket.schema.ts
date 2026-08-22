@@ -6,58 +6,58 @@ export type TicketDocument = Ticket & Document;
 @Schema({ timestamps: true })
 export class Ticket {
   @Prop({ type: Types.ObjectId, ref: 'Booking', required: true })
-  bookingId: Types.ObjectId;
+  bookingId!: Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, ref: 'Event', required: true })
-  eventId: Types.ObjectId;
+  eventId!: Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
-  userId: Types.ObjectId;
+  userId!: Types.ObjectId;
 
   // Seat info
   @Prop({ required: true })
-  seatRow: string;
+  seatRow!: string;
 
   @Prop({ required: true })
-  seatNumber: number;
+  seatNumber!: number;
 
   @Prop({ required: true })
-  section: string;
+  section!: string;
 
   @Prop({ required: true })
-  seatType: string;
+  seatType!: string;
 
   @Prop({ required: true })
-  price: number;
+  price!: number;
 
   @Prop({ default: '' })
-  attendeeFirstName: string;
+  attendeeFirstName!: string;
 
   @Prop({ default: '' })
-  attendeeLastName: string;
+  attendeeLastName!: string;
 
   @Prop({ default: '' })
-  attendeePhone: string;
+  attendeePhone!: string;
 
   @Prop({ default: '' })
-  seatLabel: string;
+  seatLabel!: string;
 
   // QR code
   @Prop({ required: true })
-  qrData: string; // unique identifier encoded in QR
+  qrData!: string; // unique identifier encoded in QR
 
   @Prop({ required: true })
-  qrCodeImage: string; // base64 data URL of QR image
+  qrCodeImage!: string; // base64 data URL of QR image
 
   // Scan tracking
   @Prop({ default: false })
-  isScanned: boolean;
+  isScanned!: boolean;
 
   @Prop({ type: Date, default: null })
-  scannedAt: Date | null;
+  scannedAt!: Date | null;
 
   @Prop({ type: Types.ObjectId, ref: 'User', default: null })
-  scannedBy: Types.ObjectId | null;
+  scannedBy!: Types.ObjectId | null;
 }
 
 export const TicketSchema = SchemaFactory.createForClass(Ticket);

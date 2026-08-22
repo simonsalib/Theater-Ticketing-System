@@ -8,14 +8,11 @@ const getBaseUrl = () => {
 
     if (typeof window !== 'undefined') {
         const hostname = window.location.hostname;
-        // If we're on the production azure domain, use it as the base
-        if (hostname.includes('azurewebsites.net')) {
-            return `https://${hostname}`;
-        }
-        // Client-side development: use the current hostname
+
         return `http://${hostname}:8000`;
+      // In the browser, use the current hostname so devices on the local network
+     // call <LAN-IP>:8000 instead of their own localhost:8000.
     }
-    // Server-side fallback
     return "http://localhost:8000";
 };
 
