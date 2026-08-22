@@ -1,4 +1,8 @@
 import type { NextConfig } from "next";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const appRoot = path.dirname(fileURLToPath(import.meta.url));
 
 const securityHeaders = [
   {
@@ -16,6 +20,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: appRoot,
+  },
   async headers() {
     return [
       {
