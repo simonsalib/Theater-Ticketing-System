@@ -8,46 +8,46 @@ export type BookingDocument = Booking & Document;
 @Schema()
 class SelectedSeat {
     @Prop({ required: true })
-    row: string;
+    row!: string;
 
     @Prop({ required: true })
-    seatNumber: number;
+    seatNumber!: number;
 
     @Prop({ enum: ['main', 'balcony'], default: 'main' })
-    section: string;
+    section!: string;
 
     @Prop({
         enum: ['standard', 'vip', 'premium', 'wheelchair'],
         default: 'standard',
     })
-    seatType: string;
+    seatType!: string;
 
     @Prop({ min: 0, required: true })
-    price: number;
+    price!: number;
 
     @Prop()
-    attendeeFirstName: string;
+    attendeeFirstName!: string;
 
     @Prop()
-    attendeeLastName: string;
+    attendeeLastName!: string;
 
     @Prop()
-    attendeePhone: string;
+    attendeePhone!: string;
 
     @Prop({ default: '' })
-    seatLabel: string;
+    seatLabel!: string;
 }
 
 @Schema()
 class CancellationSeat {
     @Prop({ required: true })
-    row: string;
+    row!: string;
 
     @Prop({ required: true })
-    seatNumber: number;
+    seatNumber!: number;
 
     @Prop({ enum: ['main', 'balcony'], default: 'main' })
-    section: string;
+    section!: string;
 
     @Prop({ default: '' })
     seatLabel?: string;
@@ -59,61 +59,70 @@ class CancellationRequest {
         enum: ['none', 'pending', 'approved', 'rejected'],
         default: 'none',
     })
-    status: string;
+    status!: string;
 
     @Prop({ type: Date, default: null })
-    requestedAt: Date;
+    requestedAt!: Date;
 
     @Prop({ default: '' })
-    reason: string;
+    reason!: string;
 
     @Prop({ type: [CancellationSeat], default: [] })
-    seatsToCancel: CancellationSeat[];
+    seatsToCancel!: CancellationSeat[];
 
     @Prop({ default: false })
-    cancelAll: boolean;
+    cancelAll!: boolean;
 }
 
 @Schema({ timestamps: true })
 export class Booking {
     @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
-    StandardId: User | MongooseSchema.Types.ObjectId;
+    StandardId!: User | MongooseSchema.Types.ObjectId;
 
     @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Event', required: true })
-    eventId: Event | MongooseSchema.Types.ObjectId;
+    eventId!: Event | MongooseSchema.Types.ObjectId;
 
     @Prop({ required: true, min: 1 })
-    numberOfTickets: number;
+    numberOfTickets!: number;
 
     @Prop({ required: true, min: 0 })
-    totalPrice: number;
+    totalPrice!: number;
 
     @Prop({
         enum: ['pending', 'confirmed', 'canceled', 'rejected'],
         default: 'pending',
     })
-    status: string;
+    status!: string;
 
     @Prop({ default: false })
-    hasTheaterSeating: boolean;
+    hasTheaterSeating!: boolean;
 
     @Prop({ type: Date, default: null })
-    pendingExpiresAt: Date;
+    pendingExpiresAt!: Date;
 
     @Prop({ type: [SelectedSeat] })
-    selectedSeats: SelectedSeat[];
+    selectedSeats!: SelectedSeat[];
 
     @Prop()
-    instapayReceipt: string;
+    instapayReceipt!: string;
+
+    @Prop()
+    instapayReceiptPublicId?: string;
+
+    @Prop()
+    instapayReceiptFormat?: string;
+
+    @Prop({ default: 'upload' })
+    instapayReceiptDeliveryType?: string;
 
     @Prop({ default: false })
-    isReceiptUploaded: boolean;
+    isReceiptUploaded!: boolean;
 
     @Prop({ type: CancellationRequest, default: () => ({ status: 'none' }) })
-    cancellationRequest: CancellationRequest;
+    cancellationRequest!: CancellationRequest;
 
     @Prop({ type: [CancellationRequest], default: [] })
-    cancellationHistory: CancellationRequest[];
+    cancellationHistory!: CancellationRequest[];
 }
 
 export const BookingSchema = SchemaFactory.createForClass(Booking);
