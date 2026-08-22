@@ -7,121 +7,121 @@ export type TheaterDocument = Theater & Document;
 @Schema({ _id: false })
 class Stage {
     @Prop({ enum: ['top', 'bottom', 'left', 'right'], default: 'top' })
-    position!: string;
+    position: string;
 
     @Prop({ default: 80, min: 20, max: 100 })
-    width!: number;
+    width: number;
 
     @Prop({ default: 15, min: 5, max: 40 })
-    height!: number;
+    height: number;
 }
 
 @Schema({ _id: false })
 class FloorInfo {
     @Prop({ default: 0 })
-    rows!: number;
+    rows: number;
 
     @Prop({ default: 0 })
-    seatsPerRow!: number;
+    seatsPerRow: number;
 
     @Prop({ type: [Number], default: [] })
-    aislePositions!: number[];
+    aislePositions: number[];
 
     @Prop({ type: [String], default: [] })
-    rowLabels!: string[];
+    rowLabels: string[];
 }
 
 @Schema({ _id: false })
 class TheaterLayout {
     @Prop({ type: Stage, default: () => ({}) })
-    stage!: Stage;
+    stage: Stage;
 
     @Prop({ type: FloorInfo, default: () => ({}) })
-    mainFloor!: FloorInfo;
+    mainFloor: FloorInfo;
 
     @Prop({ default: false })
-    hasBalcony!: boolean;
+    hasBalcony: boolean;
 
     @Prop({ type: FloorInfo, default: null })
-    balcony!: FloorInfo;
+    balcony: FloorInfo;
 
     @Prop({ type: [String], default: [] })
-    removedSeats!: string[];
+    removedSeats: string[];
 
     @Prop({ type: [String], default: [] })
-    disabledSeats!: string[];
+    disabledSeats: string[];
 
     @Prop({ type: MongooseSchema.Types.Mixed, default: {} })
-    hCorridors!: Record<string, number>;
+    hCorridors: Record<string, number>;
 
     @Prop({ type: MongooseSchema.Types.Mixed, default: {} })
-    vCorridors!: Record<string, number>;
+    vCorridors: Record<string, number>;
 
     @Prop({ type: MongooseSchema.Types.Mixed, default: {} })
-    seatCategories!: Record<string, string>;
+    seatCategories: Record<string, string>;
 
     @Prop({
         type: [MongooseSchema.Types.Mixed],
         default: [],
     })
-    labels!: any[];
+    labels: any[];
 }
 
 @Schema()
 class SeatConfig {
     @Prop({ required: true })
-    row!: string;
+    row: string;
 
     @Prop({ required: true })
-    seatNumber!: number;
+    seatNumber: number;
 
     @Prop({
         enum: ['standard', 'vip', 'premium', 'wheelchair', 'disabled'],
         default: 'standard',
     })
-    seatType!: string;
+    seatType: string;
 
     @Prop({ enum: ['main', 'balcony'], default: 'main' })
-    section!: string;
+    section: string;
 
     @Prop({ default: true })
-    isActive!: boolean;
+    isActive: boolean;
 
     @Prop({ default: '' })
-    seatLabel!: string;
+    seatLabel: string;
 }
 
 @Schema({ timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } })
 export class Theater {
     @Prop({ required: true, trim: true, maxlength: 100 })
-    name!: string;
+    name: string;
 
     @Prop({ trim: true, maxlength: 500 })
-    description!: string;
+    description: string;
 
     @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
-    createdBy!: User | MongooseSchema.Types.ObjectId;
+    createdBy: User | MongooseSchema.Types.ObjectId;
 
     @Prop({ type: TheaterLayout, required: true })
-    layout!: TheaterLayout;
+    layout: TheaterLayout;
 
     @Prop({ type: [SeatConfig] })
-    seatConfig!: SeatConfig[];
+    seatConfig: SeatConfig[];
 
     @Prop({ default: 0 })
-    totalSeats!: number;
+    totalSeats: number;
 
     @Prop({ default: 0 })
-    vipSeats!: number;
+    vipSeats: number;
 
     @Prop({ default: 0 })
-    premiumSeats!: number;
+    premiumSeats: number;
 
     @Prop({ default: true })
-    isActive!: boolean;
+    isActive: boolean;
 
     @Prop({ default: null })
-    image!: string;
+    image: string;
 }
 
 export const TheaterSchema = SchemaFactory.createForClass(Theater);

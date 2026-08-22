@@ -13,38 +13,38 @@ export enum UserRole {
 @Schema({ timestamps: true })
 export class User {
     @Prop({ required: true, minlength: 3, maxlength: 30 })
-    name!: string;
+    name: string;
 
     @Prop({ required: false, unique: true, sparse: true })
-    email!: string;
+    email: string;
 
     @Prop({ required: false, unique: true, sparse: true })
-    username!: string;
+    username: string;
 
     @Prop()
-    phone!: string;
+    phone: string;
 
     @Prop()
-    instapayNumber!: string;
+    instapayNumber: string;
 
     @Prop()
-    instapayLink!: string;
+    instapayLink: string;
 
     @Prop()
-    instapayQR!: string;
+    instapayQR: string;
 
     @Prop({ required: false })
     profilePicture?: string;
 
     @Prop({ required: true })
-    password!: string;
+    password: string;
 
     @Prop({
         required: true,
         enum: UserRole,
         default: UserRole.STANDARD,
     })
-    role!: string;
+    role: string;
 
     @Prop()
     otp?: string;
@@ -53,16 +53,16 @@ export class User {
     otpExpires?: Date;
 
     @Prop({ default: false })
-    isVerified!: boolean;
+    isVerified: boolean;
 
     @Prop({ default: false })
-    requiresPasswordChange!: boolean;
+    requiresPasswordChange: boolean;
 
     @Prop({ default: false })
-    isBlocked!: boolean;
+    isBlocked: boolean;
 
     @Prop({ default: 'en', enum: ['en', 'ar'] })
-    language!: string;
+    language: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

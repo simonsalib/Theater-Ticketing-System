@@ -6,10 +6,8 @@ import {
     OnModuleInit,
     Logger,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { v2 as cloudinary } from 'cloudinary';
 import { Booking, BookingDocument } from './schemas/booking.schema';
 import { SeatHold, SeatHoldDocument } from './schemas/seat-hold.schema';
 import { Event, EventDocument } from '../events/schemas/event.schema';
@@ -26,20 +24,7 @@ export class BookingsService implements OnModuleInit {
         @InjectModel(Event.name) private eventModel: Model<EventDocument>,
         @InjectModel(Theater.name) private theaterModel: Model<TheaterDocument>,
         private readonly ticketsService: TicketsService,
-        private readonly configService: ConfigService,
-    ) {
-        const cloudName = this.configService.get<string>('CLOUDINARY_CLOUD_NAME')?.trim();
-        const apiKey = this.configService.get<string>('CLOUDINARY_API_KEY')?.trim();
-        const apiSecret = this.configService.get<string>('CLOUDINARY_API_SECRET')?.trim();
-
-        if (cloudName && apiKey && apiSecret) {
-            cloudinary.config({
-                cloud_name: cloudName,
-                api_key: apiKey,
-                api_secret: apiSecret,
-            });
-        }
-    }
+    ) { }
 
     onModuleInit() {
         // Check for expired pending bookings every 60 seconds
@@ -535,7 +520,7 @@ export class BookingsService implements OnModuleInit {
         }
     }
 
-    async findOne(id: string, user: any): Promise<BookingDocument> {
+    async findOne(id: string): Promise<BookingDocument> {
         const booking = await this.bookingModel
             .findById(id)
             .populate({
@@ -549,78 +534,20 @@ export class BookingsService implements OnModuleInit {
         if (!booking) {
             throw new NotFoundException('Booking not found');
         }
-        await this.assertCanAccessBooking(booking, user);
-        this.attachReceiptUrl(booking);
         return booking;
     }
     
-    async findReceipt(id: string, user: any): Promise<string> {
+    async findReceipt(id: string): Promise<string> {
         const booking = await this.bookingModel
             .findById(id)
-            .select('eventId StandardId instapayReceipt instapayReceiptPublicId instapayReceiptFormat instapayReceiptDeliveryType')
+            .select('instapayReceipt')
             .exec();
         
         if (!booking) {
             throw new NotFoundException('Booking not found');
         }
-        await this.assertCanAccessBooking(booking, user);
         
-        return this.getReceiptUrl(booking);
-    }
-
-    private async assertCanAccessBooking(booking: any, user: any): Promise<void> {
-        if (user.role === 'System Admin') {
-            return;
-        }
-
-        if (booking.StandardId?.toString() === user._id?.toString()) {
-            return;
-        }
-
-        const eventId = booking.eventId?._id || booking.eventId;
-        const event = await this.eventModel.findById(eventId).select('organizerId').exec();
-        if (event?.organizerId?.toString() === user._id?.toString()) {
-            return;
-        }
-
-        throw new ForbiddenException('You are not authorised to view this booking');
-    }
-
-    private getReceiptUrl(booking: any): string {
-        if (!booking.instapayReceiptPublicId) {
-            return booking.instapayReceipt;
-        }
-
-        if ((booking.instapayReceiptDeliveryType || 'authenticated') === 'authenticated') {
-            return cloudinary.utils.private_download_url(
-                booking.instapayReceiptPublicId,
-                booking.instapayReceiptFormat || 'jpg',
-                {
-                    resource_type: 'image',
-                    type: 'authenticated',
-                    attachment: false,
-                    expires_at: Math.floor(Date.now() / 1000) + 10 * 60,
-                },
-            );
-        }
-
-        return cloudinary.url(booking.instapayReceiptPublicId, {
-            resource_type: 'image',
-            type: booking.instapayReceiptDeliveryType || 'authenticated',
-            secure: true,
-            sign_url: true,
-            format: booking.instapayReceiptFormat || undefined,
-        });
-    }
-
-    private attachReceiptUrl(booking: any): void {
-        if (booking?.instapayReceiptPublicId) {
-            booking.instapayReceipt = this.getReceiptUrl(booking);
-        }
-    }
-
-    private attachReceiptUrls(bookings: any[]): void {
-        bookings.forEach((booking) => this.attachReceiptUrl(booking));
+        return booking.instapayReceipt;
     }
 
     async findAllForUser(userId: string): Promise<BookingDocument[]> {
@@ -636,7 +563,6 @@ export class BookingsService implements OnModuleInit {
             .sort({ createdAt: -1 })
             .exec();
 
-        this.attachReceiptUrls(bookings);
 
         return bookings;
     }
@@ -647,7 +573,7 @@ export class BookingsService implements OnModuleInit {
             throw new ForbiddenException('Only admins can view other users bookings');
         }
 
-        const bookings = await this.bookingModel
+        return this.bookingModel
             .find({ StandardId: targetUserId } as any)
             .populate({
                 path: 'eventId',
@@ -658,8 +584,6 @@ export class BookingsService implements OnModuleInit {
             })
             .sort({ createdAt: -1 })
             .exec();
-        this.attachReceiptUrls(bookings);
-        return bookings;
     }
 
     async delete(id: string, userId: string): Promise<void> {
@@ -697,18 +621,7 @@ export class BookingsService implements OnModuleInit {
         await this.bookingModel.findByIdAndDelete(id).exec();
     }
 
-    async findAllForEvent(eventId: string, user: any): Promise<BookingDocument[]> {
-        const event = await this.eventModel.findById(eventId).select('organizerId').exec();
-        if (!event) {
-            throw new NotFoundException('Event not found');
-        }
-
-        const isAdmin = user.role === 'System Admin';
-        const isOrganizer = event.organizerId.toString() === user._id.toString();
-        if (!isAdmin && !isOrganizer) {
-            throw new ForbiddenException('Only the event organizer or an admin can view event bookings');
-        }
-
+    async findAllForEvent(eventId: string): Promise<BookingDocument[]> {
         return this.bookingModel
             .find({ eventId } as any)
             .select('-instapayReceipt')
@@ -830,42 +743,12 @@ export class BookingsService implements OnModuleInit {
             throw new BadRequestException('Receipts can only be uploaded for pending bookings');
         }
 
-        const upload = await this.uploadReceiptToCloudinary(receiptBase64, bookingId);
-
-        booking.instapayReceipt = upload.public_id;
-        booking.instapayReceiptPublicId = upload.public_id;
-        booking.instapayReceiptFormat = upload.format;
-        booking.instapayReceiptDeliveryType = 'authenticated';
+        booking.instapayReceipt = receiptBase64;
         booking.isReceiptUploaded = true;
         // Remove expiration time so it won't auto-delete
         booking.pendingExpiresAt = null as any;
 
         return booking.save();
-    }
-
-    private async uploadReceiptToCloudinary(receiptBase64: string, bookingId: string) {
-        const cloudName = this.configService.get<string>('CLOUDINARY_CLOUD_NAME')?.trim();
-        const apiKey = this.configService.get<string>('CLOUDINARY_API_KEY')?.trim();
-        const apiSecret = this.configService.get<string>('CLOUDINARY_API_SECRET')?.trim();
-
-        if (!cloudName || !apiKey || !apiSecret) {
-            throw new BadRequestException('Cloudinary is not configured. Check CLOUDINARY_* environment variables.');
-        }
-
-        if (!receiptBase64.startsWith('data:image/')) {
-            throw new BadRequestException('Receipt must be a base64 image data URL');
-        }
-
-        return cloudinary.uploader.upload(receiptBase64, {
-            folder: 'ticketingReceipts',
-            public_id: `booking-${bookingId}-${Date.now()}`,
-            resource_type: 'image',
-            type: 'authenticated',
-            overwrite: false,
-            transformation: [
-                { quality: 'auto', fetch_format: 'auto' },
-            ],
-        });
     }
 
     async getAvailableSeats(eventId: string): Promise<any> {

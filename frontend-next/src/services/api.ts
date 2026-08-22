@@ -13,9 +13,6 @@ api.interceptors.request.use((config) => {
         const token = localStorage.getItem('token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
-            // Add the JWT Bearer token to the Authorization header in requests headers.
-            // The backend uses it to authenticate the user,
-            // validate the token, and authorize access based on the user's role.
         }
     }
     return config;

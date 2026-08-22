@@ -71,15 +71,15 @@ export class BookingsController {
 
     @Get(':id')
     @UseGuards(JwtAuthGuard)
-    async findOne(@Param('id') id: string, @Req() req: any) {
-        const data = await this.bookingsService.findOne(id, req.user);
+    async findOne(@Param('id') id: string) {
+        const data = await this.bookingsService.findOne(id);
         return { success: true, data };
     }
 
     @Get(':id/receipt')
     @UseGuards(JwtAuthGuard)
-    async getReceipt(@Param('id') id: string, @Req() req: any) {
-        const data = await this.bookingsService.findReceipt(id, req.user);
+    async getReceipt(@Param('id') id: string) {
+        const data = await this.bookingsService.findReceipt(id);
         return { success: true, data };
     }
 
@@ -121,8 +121,8 @@ export class BookingsController {
     // Organizer: get all bookings for their event
     @Get('event/:eventId/bookings')
     @UseGuards(JwtAuthGuard)
-    async getEventBookings(@Param('eventId') eventId: string, @Req() req: any) {
-        const data = await this.bookingsService.findAllForEvent(eventId, req.user);
+    async getEventBookings(@Param('eventId') eventId: string) {
+        const data = await this.bookingsService.findAllForEvent(eventId);
         return { success: true, count: data.length, data };
     }
 

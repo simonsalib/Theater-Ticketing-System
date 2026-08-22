@@ -66,8 +66,5 @@ node_modules/
 # Build output
 dist/
 
-# Local one-off scripts and diagnostic outputs
-backend-nest/local-tools/
-
 # dataconnect generated files
 .dataconnect
