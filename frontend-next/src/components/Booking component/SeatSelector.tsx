@@ -489,6 +489,44 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                             </motion.div>
                         )}
 
+                        {/* Labels Overlay */}
+                        <div className="labels-overlay">
+                            {theaterData?.layout.labels?.filter((label: any) => (label.section || 'main') === activeSection).map((label: any) => {
+                                const isEntry = label.text?.toUpperCase().includes('ENTRY');
+                                const isExit = label.text?.toUpperCase().includes('EXIT');
+
+                                const style: React.CSSProperties = {
+                                    width: label.width || 'auto',
+                                    height: label.height || 'auto'
+                                };
+
+                                if (label.isPixelBased) {
+                                    // Pixel-based: x is offset from center, y is from top
+                                    style.left = `calc(50% + ${label.position?.x || 0}px)`;
+                                    style.top = `${label.position?.y || 0}px`;
+                                } else {
+                                    // Legacy percentage-based positioning
+                                    style.left = `${label.position?.x || 0}%`;
+                                    style.top = `${label.position?.y || 0}%`;
+                                }
+
+                                return (
+                                    <motion.div
+                                        key={label.id}
+                                        className={`theater-label ${isEntry ? 'label-entry' : ''} ${isExit ? 'label-exit' : ''}`}
+                                        style={{
+                                            ...style,
+                                            minWidth: label.width ? undefined : 'auto'
+                                        }}
+                                        initial={{ scale: 0 }}
+                                        animate={{ scale: 1 }}
+                                    >
+                                        {label.icon && <span className="label-icon">{label.icon}</span>}
+                                        <span className="label-text">{label.text}</span>
+                                    </motion.div>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
             </div>
