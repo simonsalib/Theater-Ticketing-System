@@ -293,6 +293,12 @@
     z-index: 1;
 }
 
+.seat-selector .labels-overlay,
+.theater-seat-area .labels-overlay,
+.theater-seat-container .labels-overlay {
+    display: none !important;
+}
+
 .theater-label {
     position: absolute;
     display: flex;
