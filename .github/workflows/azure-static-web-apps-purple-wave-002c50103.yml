@@ -4,10 +4,24 @@ on:
   push:
     branches:
       - master
+    paths:
+      - 'frontend-next/**'
+      - '.github/workflows/azure-static-web-apps-purple-wave-002c50103.yml'
+      - '.node-version'
+      - '.nvmrc'
   pull_request:
     types: [opened, synchronize, reopened, closed]
     branches:
       - master
+    paths:
+      - 'frontend-next/**'
+      - '.github/workflows/azure-static-web-apps-purple-wave-002c50103.yml'
+      - '.node-version'
+      - '.nvmrc'
+
+concurrency:
+  group: static-web-app-production-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build_and_deploy_job:
