@@ -31,3 +31,6 @@ coverage/
 
 # OAuth token generation script (contains credentials)
 generate-token.js
+
+# Local maintenance scripts
+local-tools/
