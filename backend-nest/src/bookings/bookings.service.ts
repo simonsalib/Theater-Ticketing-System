@@ -14,6 +14,8 @@ import { Event, EventDocument } from '../events/schemas/event.schema';
 import { Theater, TheaterDocument } from '../theaters/schemas/theater.schema';
 import { TicketsService } from '../tickets/tickets.service';
 
+const DEFAULT_PAYMENT_DEADLINE_MINUTES = 30;
+
 @Injectable()
 export class BookingsService implements OnModuleInit {
     private readonly logger = new Logger(BookingsService.name);
@@ -291,12 +293,17 @@ export class BookingsService implements OnModuleInit {
             throw new NotFoundException('Event not found');
         }
 
+        const requiresOrganizerApproval = (event as any).requiresOrganizerApproval !== false;
+        const paymentDeadlineMinutes = this.getPaymentDeadlineMinutes(event);
+        const initialStatus = requiresOrganizerApproval ? 'pending' : 'confirmed';
         let totalPrice = 0;
         const bookingData: any = {
             StandardId: userId,
             eventId,
-            status: 'pending',
-            pendingExpiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 minutes
+            status: initialStatus,
+            pendingExpiresAt: requiresOrganizerApproval
+                ? new Date(Date.now() + paymentDeadlineMinutes * 60 * 1000)
+                : null,
         };
 
         if (event.hasTheaterSeating && selectedSeats && selectedSeats.length > 0) {
@@ -495,6 +502,7 @@ export class BookingsService implements OnModuleInit {
                 }
             }
 
+            await this.generateTicketsIfAutoConfirmed(savedBooking);
             return savedBooking;
         } else {
             if (!numberOfTickets || numberOfTickets < 1) {
@@ -516,7 +524,49 @@ export class BookingsService implements OnModuleInit {
             bookingData.hasTheaterSeating = false;
 
             const booking = new this.bookingModel(bookingData);
-            return booking.save();
+            const savedBooking = await booking.save();
+            await this.generateTicketsIfAutoConfirmed(savedBooking);
+            return savedBooking;
+        }
+    }
+
+    private getPaymentDeadlineMinutes(event: EventDocument): number {
+        const configuredMinutes = Number((event as any).paymentDeadlineMinutes);
+        if (!Number.isFinite(configuredMinutes) || configuredMinutes < 1) {
+            return DEFAULT_PAYMENT_DEADLINE_MINUTES;
+        }
+        return Math.floor(configuredMinutes);
+    }
+
+    private async generateTicketsIfAutoConfirmed(booking: BookingDocument): Promise<void> {
+        if (
+            booking.status !== 'confirmed' ||
+            !booking.hasTheaterSeating ||
+            !booking.selectedSeats?.length
+        ) {
+            return;
+        }
+
+        try {
+            await this.ticketsService.generateTicketsForBooking(
+                booking._id.toString(),
+                booking.eventId.toString(),
+                booking.StandardId.toString(),
+                booking.selectedSeats.map((s: any) => ({
+                    row: s.row,
+                    seatNumber: s.seatNumber,
+                    section: s.section || 'main',
+                    seatType: s.seatType || 'standard',
+                    price: s.price || 0,
+                    seatLabel: s.seatLabel,
+                    attendeeFirstName: s.attendeeFirstName || '',
+                    attendeeLastName: s.attendeeLastName || '',
+                    attendeePhone: s.attendeePhone || '',
+                })),
+            );
+            this.logger.log(`Generated ${booking.selectedSeats.length} QR tickets for auto-confirmed booking ${booking._id}`);
+        } catch (error) {
+            this.logger.error(`Failed to generate QR tickets for auto-confirmed booking ${booking._id}:`, error);
         }
     }
 

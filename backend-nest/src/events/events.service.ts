@@ -13,6 +13,9 @@ import { UserRole } from '../users/schemas/user.schema';
 
 const EVENT_STATUSES = ['approved', 'pending', 'declined'];
 const PRICED_SEAT_TYPES = ['standard', 'vip', 'premium', 'wheelchair'];
+const DEFAULT_PAYMENT_DEADLINE_MINUTES = 30;
+const MIN_PAYMENT_DEADLINE_MINUTES = 1;
+const MAX_PAYMENT_DEADLINE_MINUTES = 7 * 24 * 60;
 
 @Injectable()
 export class EventsService {
@@ -41,12 +44,16 @@ export class EventsService {
             image,
             theater,
             hasTheaterSeating,
+            requiresOrganizerApproval,
+            paymentDeadlineMinutes,
             seatPricing,
             seatConfig,
             preBookedSeats,
         } = createDto;
 
         const isTheater = hasTheaterSeating === 'true' || hasTheaterSeating === true;
+        const normalizedRequiresApproval = this.normalizeBoolean(requiresOrganizerApproval, true);
+        const normalizedPaymentDeadline = this.normalizePaymentDeadlineMinutes(paymentDeadlineMinutes);
         const normalizedSeatPricing = this.normalizeSeatPricing(seatPricing);
         const normalizedSeatConfig = this.normalizeSeatConfig(seatConfig);
 
@@ -78,6 +85,8 @@ export class EventsService {
             image: image || 'default-image.jpg',
             theater: isTheater ? theater : null,
             hasTheaterSeating: isTheater,
+            requiresOrganizerApproval: normalizedRequiresApproval,
+            paymentDeadlineMinutes: normalizedPaymentDeadline,
             seatPricing: normalizedSeatPricing,
             seatConfig: normalizedSeatConfig,
             bookedSeats,
@@ -152,6 +161,19 @@ export class EventsService {
             updateDto.hasTheaterSeating =
                 updateDto.hasTheaterSeating === 'true' ||
                 updateDto.hasTheaterSeating === true;
+        }
+
+        if (updateDto.requiresOrganizerApproval !== undefined) {
+            updateDto.requiresOrganizerApproval = this.normalizeBoolean(
+                updateDto.requiresOrganizerApproval,
+                true,
+            );
+        }
+
+        if (updateDto.paymentDeadlineMinutes !== undefined) {
+            updateDto.paymentDeadlineMinutes = this.normalizePaymentDeadlineMinutes(
+                updateDto.paymentDeadlineMinutes,
+            );
         }
 
         if (updateDto.ticketPrice !== undefined) {
@@ -231,6 +253,34 @@ export class EventsService {
             seatType: String(item.seatType || 'standard').toLowerCase(),
             seatLabel: item.seatLabel || '',
         }));
+    }
+
+    private normalizeBoolean(value: any, defaultValue: boolean): boolean {
+        if (value === undefined || value === null || value === '') {
+            return defaultValue;
+        }
+        if (typeof value === 'boolean') {
+            return value;
+        }
+        const normalized = String(value).trim().toLowerCase();
+        if (['true', '1', 'yes', 'on'].includes(normalized)) {
+            return true;
+        }
+        if (['false', '0', 'no', 'off'].includes(normalized)) {
+            return false;
+        }
+        return defaultValue;
+    }
+
+    private normalizePaymentDeadlineMinutes(value: any): number {
+        const minutes = Number(value);
+        if (!Number.isFinite(minutes)) {
+            return DEFAULT_PAYMENT_DEADLINE_MINUTES;
+        }
+        return Math.min(
+            MAX_PAYMENT_DEADLINE_MINUTES,
+            Math.max(MIN_PAYMENT_DEADLINE_MINUTES, Math.floor(minutes)),
+        );
     }
 
     private async saveEvent(event: EventDocument): Promise<EventDocument> {

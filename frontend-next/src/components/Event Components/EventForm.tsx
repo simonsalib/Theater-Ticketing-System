@@ -41,6 +41,8 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
         useImageUrl: false,
         imageUrl: '',
         hasTheaterSeating: initialData?.hasTheaterSeating || false,
+        requiresOrganizerApproval: initialData?.requiresOrganizerApproval ?? true,
+        paymentDeadlineMinutes: initialData?.paymentDeadlineMinutes || 30,
         theaterId: (initialData as any)?.theater?._id || (initialData as any)?.theater || '',
         seatPricing: {} as Record<string, number>
     });
@@ -99,7 +101,9 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
         const checked = (e.target as HTMLInputElement).checked;
         setFormData(prev => ({
             ...prev,
-            [name]: type === 'checkbox' ? checked : (name === 'totalTickets' || name === 'ticketPrice' ? parseFloat(value) || 0 : value)
+            [name]: type === 'checkbox'
+                ? checked
+                : (name === 'totalTickets' || name === 'ticketPrice' || name === 'paymentDeadlineMinutes' ? parseFloat(value) || 0 : value)
         }));
 
         if (name === 'theaterId' && value) {
@@ -227,6 +231,8 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
                 ticketPrice: formData.hasTheaterSeating ? 0 : formData.ticketPrice,
                 totalTickets: formData.totalTickets,
                 hasTheaterSeating: formData.hasTheaterSeating,
+                requiresOrganizerApproval: formData.requiresOrganizerApproval,
+                paymentDeadlineMinutes: formData.paymentDeadlineMinutes,
                 image: imageData
             };
 
@@ -319,6 +325,59 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
                 <div className="form-group">
                     <label htmlFor="location">Location*</label>
                     <input type="text" id="location" name="location" value={formData.location} onChange={handleChange} required placeholder="Enter event location" />
+                </div>
+
+                <div className="ticket-fulfillment-group">
+                    <div className="fulfillment-header">
+                        <label>Ticket Issuing</label>
+                        <p className="help-text">Choose whether users wait for payment approval or receive QR tickets immediately.</p>
+                    </div>
+
+                    <div className="fulfillment-options">
+                        <label className={`fulfillment-option ${formData.requiresOrganizerApproval ? 'active' : ''}`}>
+                            <input
+                                type="radio"
+                                name="requiresOrganizerApproval"
+                                checked={formData.requiresOrganizerApproval}
+                                onChange={() => setFormData(prev => ({ ...prev, requiresOrganizerApproval: true }))}
+                            />
+                            <span>
+                                <strong>Manual payment approval</strong>
+                                <small>User pays by InstaPay, uploads receipt, then organizer confirms tickets.</small>
+                            </span>
+                        </label>
+
+                        <label className={`fulfillment-option ${!formData.requiresOrganizerApproval ? 'active' : ''}`}>
+                            <input
+                                type="radio"
+                                name="requiresOrganizerApproval"
+                                checked={!formData.requiresOrganizerApproval}
+                                onChange={() => setFormData(prev => ({ ...prev, requiresOrganizerApproval: false }))}
+                            />
+                            <span>
+                                <strong>Instant QR tickets</strong>
+                                <small>User gets QR tickets right after filling attendee information.</small>
+                            </span>
+                        </label>
+                    </div>
+
+                    {formData.requiresOrganizerApproval && (
+                        <div className="form-group payment-deadline-field">
+                            <label htmlFor="paymentDeadlineMinutes">Payment Time Limit (minutes)*</label>
+                            <input
+                                type="number"
+                                id="paymentDeadlineMinutes"
+                                name="paymentDeadlineMinutes"
+                                value={formData.paymentDeadlineMinutes}
+                                onChange={handleChange}
+                                min="1"
+                                max="10080"
+                                step="1"
+                                required
+                            />
+                            <p className="help-text">Pending bookings without an uploaded receipt expire after this time.</p>
+                        </div>
+                    )}
                 </div>
 
                 <div className="form-group checkbox-group">

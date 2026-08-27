@@ -33,6 +33,8 @@ export interface Event {
     organizerId?: string | Organizer;
     theaterId?: string;
     hasTheaterSeating: boolean;
+    requiresOrganizerApproval?: boolean;
+    paymentDeadlineMinutes?: number;
     seatPricing?: SeatPricing[];
     seatConfig?: any[];
 }

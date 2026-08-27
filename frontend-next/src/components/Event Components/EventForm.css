@@ -135,6 +135,78 @@
     transform: scale(1.1);
 }
 
+.ticket-fulfillment-group {
+    background: rgba(21, 21, 28, 0.72);
+    border: 1px solid rgba(139, 92, 246, 0.18);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 1.75rem;
+}
+
+.fulfillment-header label {
+    margin-bottom: 0.25rem;
+}
+
+.help-text {
+    color: #94A3B8;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    margin: 0;
+}
+
+.fulfillment-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.fulfillment-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.9rem;
+    min-height: 118px;
+    padding: 1rem;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.fulfillment-option:hover,
+.fulfillment-option.active {
+    border-color: rgba(139, 92, 246, 0.55);
+    background: rgba(139, 92, 246, 0.1);
+    transform: translateY(-1px);
+}
+
+.fulfillment-option input {
+    margin-top: 0.25rem;
+    accent-color: #8B5CF6;
+}
+
+.fulfillment-option span {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.fulfillment-option strong {
+    color: #F8FAFC;
+    font-size: 0.98rem;
+}
+
+.fulfillment-option small {
+    color: #94A3B8;
+    font-size: 0.82rem;
+    line-height: 1.4;
+}
+
+.payment-deadline-field {
+    margin: 1.25rem 0 0;
+}
+
 /* Button Styling */
 .form-actions {
     display: flex;
@@ -562,5 +634,9 @@
     .form-actions {
         flex-direction: column-reverse;
         gap: 1rem;
+    }
+
+    .fulfillment-options {
+        grid-template-columns: 1fr;
     }
 }

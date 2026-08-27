@@ -113,6 +113,12 @@ export class Event {
     @Prop({ default: false })
     hasTheaterSeating: boolean;
 
+    @Prop({ default: true })
+    requiresOrganizerApproval: boolean;
+
+    @Prop({ default: 30, min: 1 })
+    paymentDeadlineMinutes: number;
+
     @Prop({ type: [SeatPricing] })
     seatPricing: SeatPricing[];
 

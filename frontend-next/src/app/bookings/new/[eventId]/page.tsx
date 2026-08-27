@@ -66,6 +66,7 @@ const BookTicketPage = () => {
     const [holdCountdown, setHoldCountdown] = useState<number>(0);
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
     const holdIdRef = useRef<string | null>(null); // for cleanup in useEffect
+    const requiresOrganizerApproval = event?.requiresOrganizerApproval !== false;
 
     // Compress image to reduce payload size (same as UploadReceiptPage)
     const compressImage = (file: File, maxDimension = 1200, quality = 0.7): Promise<string> => {
@@ -488,10 +489,17 @@ const BookTicketPage = () => {
 
 
             if (response.data.success) {
-                setBookingId(response.data.data?._id || '');
+                const savedBooking = response.data.data;
+                const savedBookingId = savedBooking?._id || '';
+                setBookingId(savedBookingId);
                 setHoldId(null);
                 holdIdRef.current = null;
                 setHoldExpiresAt(null);
+                if (savedBooking?.status === 'confirmed' && event.hasTheaterSeating && savedBookingId) {
+                    toast.success('Tickets are ready.');
+                    router.push(`/bookings/${savedBookingId}/tickets`);
+                    return;
+                }
                 setSuccess(true);
             }
         } catch (err: any) {
@@ -967,19 +975,33 @@ const BookTicketPage = () => {
                                             ))}
                                         </div>
 
-                                        {/* InstaPay payment info - shown in attendee form */}
-                                        <div style={{
-                                            marginTop: '24px', padding: '20px', borderRadius: '16px',
-                                            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(109, 40, 217, 0.08))',
-                                            border: '1px solid rgba(139, 92, 246, 0.25)'
-                                        }}>
-                                            <h4 style={{ margin: '0 0 10px', fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '10px', color: '#a78bfa', flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                                                <FiCreditCard size={22} /> {t('payment.instapay')}
-                                            </h4>
-                                            <p style={{ fontSize: '0.95rem', color: '#d1d5db', margin: 0, lineHeight: 1.5, textAlign: isRTL ? 'right' : 'left' }}>
-                                                {t('payment.instapay.desc').replace('{total}', seatTotalPrice.toFixed(2))}
-                                            </p>
-                                        </div>
+                                        {requiresOrganizerApproval ? (
+                                            <div style={{
+                                                marginTop: '24px', padding: '20px', borderRadius: '16px',
+                                                background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(109, 40, 217, 0.08))',
+                                                border: '1px solid rgba(139, 92, 246, 0.25)'
+                                            }}>
+                                                <h4 style={{ margin: '0 0 10px', fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '10px', color: '#a78bfa', flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                                                    <FiCreditCard size={22} /> {t('payment.instapay')}
+                                                </h4>
+                                                <p style={{ fontSize: '0.95rem', color: '#d1d5db', margin: 0, lineHeight: 1.5, textAlign: isRTL ? 'right' : 'left' }}>
+                                                    {t('payment.instapay.desc').replace('{total}', seatTotalPrice.toFixed(2))}
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div style={{
+                                                marginTop: '24px', padding: '20px', borderRadius: '16px',
+                                                background: 'rgba(16, 185, 129, 0.1)',
+                                                border: '1px solid rgba(16, 185, 129, 0.28)'
+                                            }}>
+                                                <h4 style={{ margin: '0 0 10px', fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '10px', color: '#34d399', flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                                                    <FiCheckCircle size={22} /> Instant QR tickets
+                                                </h4>
+                                                <p style={{ fontSize: '0.95rem', color: '#d1d5db', margin: 0, lineHeight: 1.5, textAlign: isRTL ? 'right' : 'left' }}>
+                                                    Your tickets will be issued immediately after confirming attendee information.
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 </motion.div>
                             )}
@@ -1039,8 +1061,10 @@ const BookTicketPage = () => {
                                 >
                                     {isLoading ? (
                                         <><span className="btn-spinner"></span>{t('gen.processing')}</>
-                                    ) : (
+                                    ) : requiresOrganizerApproval ? (
                                         <><FiCreditCard /> {t('gen.confirm')} — {seatTotalPrice.toFixed(2)} EGP</>
+                                    ) : (
+                                        <><FiCheckCircle /> Get QR Tickets</>
                                     )}
                                 </motion.button>
                             )}
