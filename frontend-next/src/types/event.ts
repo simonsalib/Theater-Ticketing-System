@@ -35,6 +35,7 @@ export interface Event {
     hasTheaterSeating: boolean;
     requiresOrganizerApproval?: boolean;
     paymentDeadlineMinutes?: number;
+    seatHoldDeadlineMinutes?: number;
     seatPricing?: SeatPricing[];
     seatConfig?: any[];
 }

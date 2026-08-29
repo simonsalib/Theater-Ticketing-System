@@ -43,6 +43,7 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
         hasTheaterSeating: initialData?.hasTheaterSeating || false,
         requiresOrganizerApproval: initialData?.requiresOrganizerApproval ?? true,
         paymentDeadlineMinutes: initialData?.paymentDeadlineMinutes || 30,
+        seatHoldDeadlineMinutes: initialData?.seatHoldDeadlineMinutes || 3,
         theaterId: (initialData as any)?.theater?._id || (initialData as any)?.theater || '',
         seatPricing: {} as Record<string, number>
     });
@@ -103,7 +104,7 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
             ...prev,
             [name]: type === 'checkbox'
                 ? checked
-                : (name === 'totalTickets' || name === 'ticketPrice' || name === 'paymentDeadlineMinutes' ? parseFloat(value) || 0 : value)
+                : (name === 'totalTickets' || name === 'ticketPrice' || name === 'paymentDeadlineMinutes' || name === 'seatHoldDeadlineMinutes' ? parseFloat(value) || 0 : value)
         }));
 
         if (name === 'theaterId' && value) {
@@ -233,6 +234,7 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
                 hasTheaterSeating: formData.hasTheaterSeating,
                 requiresOrganizerApproval: formData.requiresOrganizerApproval,
                 paymentDeadlineMinutes: formData.paymentDeadlineMinutes,
+                seatHoldDeadlineMinutes: formData.seatHoldDeadlineMinutes,
                 image: imageData
             };
 
@@ -378,6 +380,22 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
                             <p className="help-text">Pending bookings without an uploaded receipt expire after this time.</p>
                         </div>
                     )}
+
+                    <div className="form-group payment-deadline-field">
+                        <label htmlFor="seatHoldDeadlineMinutes">Seat Hold Time Limit (minutes)*</label>
+                        <input
+                            type="number"
+                            id="seatHoldDeadlineMinutes"
+                            name="seatHoldDeadlineMinutes"
+                            value={formData.seatHoldDeadlineMinutes}
+                            onChange={handleChange}
+                            min="1"
+                            max="1440"
+                            step="1"
+                            required
+                        />
+                        <p className="help-text">Selected seats stay locked for this long while the user fills attendee information.</p>
+                    </div>
                 </div>
 
                 <div className="form-group checkbox-group">

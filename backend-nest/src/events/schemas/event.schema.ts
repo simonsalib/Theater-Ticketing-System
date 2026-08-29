@@ -119,6 +119,9 @@ export class Event {
     @Prop({ default: 30, min: 1 })
     paymentDeadlineMinutes: number;
 
+    @Prop({ default: 3, min: 1 })
+    seatHoldDeadlineMinutes: number;
+
     @Prop({ type: [SeatPricing] })
     seatPricing: SeatPricing[];
 

@@ -16,6 +16,8 @@ const PRICED_SEAT_TYPES = ['standard', 'vip', 'premium', 'wheelchair'];
 const DEFAULT_PAYMENT_DEADLINE_MINUTES = 30;
 const MIN_PAYMENT_DEADLINE_MINUTES = 1;
 const MAX_PAYMENT_DEADLINE_MINUTES = 7 * 24 * 60;
+const DEFAULT_SEAT_HOLD_DEADLINE_MINUTES = 3;
+const MAX_SEAT_HOLD_DEADLINE_MINUTES = 24 * 60;
 
 @Injectable()
 export class EventsService {
@@ -46,6 +48,7 @@ export class EventsService {
             hasTheaterSeating,
             requiresOrganizerApproval,
             paymentDeadlineMinutes,
+            seatHoldDeadlineMinutes,
             seatPricing,
             seatConfig,
             preBookedSeats,
@@ -54,6 +57,7 @@ export class EventsService {
         const isTheater = hasTheaterSeating === 'true' || hasTheaterSeating === true;
         const normalizedRequiresApproval = this.normalizeBoolean(requiresOrganizerApproval, true);
         const normalizedPaymentDeadline = this.normalizePaymentDeadlineMinutes(paymentDeadlineMinutes);
+        const normalizedSeatHoldDeadline = this.normalizeSeatHoldDeadlineMinutes(seatHoldDeadlineMinutes);
         const normalizedSeatPricing = this.normalizeSeatPricing(seatPricing);
         const normalizedSeatConfig = this.normalizeSeatConfig(seatConfig);
 
@@ -87,6 +91,7 @@ export class EventsService {
             hasTheaterSeating: isTheater,
             requiresOrganizerApproval: normalizedRequiresApproval,
             paymentDeadlineMinutes: normalizedPaymentDeadline,
+            seatHoldDeadlineMinutes: normalizedSeatHoldDeadline,
             seatPricing: normalizedSeatPricing,
             seatConfig: normalizedSeatConfig,
             bookedSeats,
@@ -173,6 +178,12 @@ export class EventsService {
         if (updateDto.paymentDeadlineMinutes !== undefined) {
             updateDto.paymentDeadlineMinutes = this.normalizePaymentDeadlineMinutes(
                 updateDto.paymentDeadlineMinutes,
+            );
+        }
+
+        if (updateDto.seatHoldDeadlineMinutes !== undefined) {
+            updateDto.seatHoldDeadlineMinutes = this.normalizeSeatHoldDeadlineMinutes(
+                updateDto.seatHoldDeadlineMinutes,
             );
         }
 
@@ -279,6 +290,17 @@ export class EventsService {
         }
         return Math.min(
             MAX_PAYMENT_DEADLINE_MINUTES,
+            Math.max(MIN_PAYMENT_DEADLINE_MINUTES, Math.floor(minutes)),
+        );
+    }
+
+    private normalizeSeatHoldDeadlineMinutes(value: any): number {
+        const minutes = Number(value);
+        if (!Number.isFinite(minutes)) {
+            return DEFAULT_SEAT_HOLD_DEADLINE_MINUTES;
+        }
+        return Math.min(
+            MAX_SEAT_HOLD_DEADLINE_MINUTES,
             Math.max(MIN_PAYMENT_DEADLINE_MINUTES, Math.floor(minutes)),
         );
     }

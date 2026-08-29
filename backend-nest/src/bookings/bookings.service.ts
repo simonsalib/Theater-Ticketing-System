@@ -15,6 +15,7 @@ import { Theater, TheaterDocument } from '../theaters/schemas/theater.schema';
 import { TicketsService } from '../tickets/tickets.service';
 
 const DEFAULT_PAYMENT_DEADLINE_MINUTES = 30;
+const DEFAULT_SEAT_HOLD_DEADLINE_MINUTES = 3;
 
 @Injectable()
 export class BookingsService implements OnModuleInit {
@@ -132,7 +133,7 @@ export class BookingsService implements OnModuleInit {
     // ─── Seat Hold Methods ────────────────────────────────────────────
 
     /**
-     * Hold seats temporarily (5 min) while user fills attendee info.
+     * Hold seats temporarily while user fills attendee info.
      * Uses atomic findOneAndUpdate to prevent race conditions.
      */
     async holdSeats(
@@ -161,7 +162,8 @@ export class BookingsService implements OnModuleInit {
         await this.releaseUserHolds(eventId, userId);
 
         // Create the SeatHold document to get the holdId
-        const holdExpiresAt = new Date(Date.now() + 3 * 60 * 1000); // 3 minutes
+        const seatHoldDeadlineMinutes = this.getSeatHoldDeadlineMinutes(event);
+        const holdExpiresAt = new Date(Date.now() + seatHoldDeadlineMinutes * 60 * 1000);
         const normalizedSeats = seats.map(s => ({
             row: String(s.row),
             seatNumber: Number(s.seatNumber),
@@ -534,6 +536,14 @@ export class BookingsService implements OnModuleInit {
         const configuredMinutes = Number((event as any).paymentDeadlineMinutes);
         if (!Number.isFinite(configuredMinutes) || configuredMinutes < 1) {
             return DEFAULT_PAYMENT_DEADLINE_MINUTES;
+        }
+        return Math.floor(configuredMinutes);
+    }
+
+    private getSeatHoldDeadlineMinutes(event: EventDocument): number {
+        const configuredMinutes = Number((event as any).seatHoldDeadlineMinutes);
+        if (!Number.isFinite(configuredMinutes) || configuredMinutes < 1) {
+            return DEFAULT_SEAT_HOLD_DEADLINE_MINUTES;
         }
         return Math.floor(configuredMinutes);
     }
