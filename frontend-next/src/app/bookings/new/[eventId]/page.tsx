@@ -67,6 +67,17 @@ const BookTicketPage = () => {
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
     const holdIdRef = useRef<string | null>(null); // for cleanup in useEffect
     const requiresOrganizerApproval = event?.requiresOrganizerApproval !== false;
+    const formatHoldCountdown = (totalSeconds: number) => {
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+
+        if (hours > 0) {
+            return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        return `${minutes}:${String(seconds).padStart(2, '0')}`;
+    };
 
     // Compress image to reduce payload size (same as UploadReceiptPage)
     const compressImage = (file: File, maxDimension = 1200, quality = 0.7): Promise<string> => {
@@ -915,7 +926,7 @@ const BookTicketPage = () => {
                                                         animation: holdCountdown <= 30 ? 'pulse 1s infinite' : undefined,
                                                     }}>
                                                         <FiClock size={16} />
-                                                        {Math.floor(holdCountdown / 60)}:{String(holdCountdown % 60).padStart(2, '0')}
+                                                        {formatHoldCountdown(holdCountdown)}
                                                     </div>
                                                 </div>
                                             )}
