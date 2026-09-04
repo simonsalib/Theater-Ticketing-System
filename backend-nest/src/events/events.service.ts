@@ -307,6 +307,7 @@ export class EventsService {
 
     private async saveEvent(event: EventDocument): Promise<EventDocument> {
         try {
+            this.syncTheaterRemainingTickets(event);
             return await event.save();
         } catch (err: any) {
             if (err?.name === 'ValidationError' || err?.name === 'CastError') {
@@ -314,6 +315,19 @@ export class EventsService {
             }
             throw err;
         }
+    }
+
+    private syncTheaterRemainingTickets(event: EventDocument): void {
+        if (!event.hasTheaterSeating) {
+            return;
+        }
+
+        const totalTickets = Number(event.totalTickets || 0);
+        const bookedSeatsCount = Array.isArray(event.bookedSeats)
+            ? event.bookedSeats.length
+            : 0;
+
+        event.remainingTickets = Math.max(0, totalTickets - bookedSeatsCount);
     }
 
     async requestDeletionOTP(id: string, user: any): Promise<void> {
