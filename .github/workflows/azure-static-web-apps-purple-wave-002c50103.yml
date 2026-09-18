@@ -23,13 +23,41 @@ concurrency:
   group: static-web-app-production-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  NODE_VERSION: '24.x'
+
 jobs:
+  frontend_quality:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+    runs-on: ubuntu-latest
+    name: Frontend Quality Gate
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend-next/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend-next
+        run: npm ci
+      - name: Typecheck
+        working-directory: frontend-next
+        run: npm run typecheck
+      - name: Frontend integration tests
+        working-directory: frontend-next
+        run: npm test
+      - name: Production build
+        working-directory: frontend-next
+        run: npm run build
+
   build_and_deploy_job:
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+    needs: frontend_quality
     runs-on: ubuntu-latest
     name: Build and Deploy Job
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
           lfs: false
