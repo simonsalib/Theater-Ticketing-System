@@ -96,8 +96,8 @@ export class EventsController {
     @Post('verify-deletion-otp')
     @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.OK)
-    async verifyDeletionOTP(@Body('eventId') eventId: string, @Body('otp') otp: string) {
-        await this.eventsService.verifyDeletionOTP(eventId, otp);
+    async verifyDeletionOTP(@Body('eventId') eventId: string, @Body('otp') otp: string, @Req() req: any) {
+        await this.eventsService.verifyDeletionOTP(eventId, otp, req.user);
         return { success: true, message: 'Event deleted successfully' };
     }
 

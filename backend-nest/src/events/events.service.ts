@@ -101,7 +101,10 @@ export class EventsService {
     }
 
     async findAllApproved(): Promise<EventDocument[]> {
-        return this.eventModel.find({ status: 'approved' }).exec();
+        return this.eventModel
+            .find({ status: 'approved' })
+            .select('-otp -otpExpires -bookedSeats')
+            .exec();
     }
 
     async findAll(): Promise<EventDocument[]> {
@@ -109,7 +112,11 @@ export class EventsService {
     }
 
     async findOne(id: string): Promise<EventDocument> {
-        const event = await this.eventModel.findById(id).populate('organizerId', 'name instapayNumber instapayQR instapayLink').exec();
+        const event = await this.eventModel
+            .findById(id)
+            .select('-otp -otpExpires -bookedSeats')
+            .populate('organizerId', 'name instapayNumber instapayQR instapayLink')
+            .exec();
         if (!event) {
             throw new NotFoundException('Event not found');
         }
@@ -162,6 +169,27 @@ export class EventsService {
             }
         }
 
+        const isAdmin = user?.role === UserRole.ADMIN;
+        const protectedFields = ['organizerId', 'bookedSeats', 'remainingTickets', 'otp', 'otpExpires'];
+        const attemptedProtectedField = protectedFields.find(field => updateDto[field] !== undefined);
+        if (attemptedProtectedField) {
+            throw new ForbiddenException(`Event field ${attemptedProtectedField} is managed by the server`);
+        }
+        if (updateDto.status !== undefined && !isAdmin) {
+            throw new ForbiddenException('Only admins can change event approval status');
+        }
+
+        const allowedFields = new Set([
+            'title', 'description', 'date', 'startTime', 'endTime', 'cancellationDeadline',
+            'location', 'category', 'ticketPrice', 'totalTickets', 'image', 'theater',
+            'hasTheaterSeating', 'requiresOrganizerApproval', 'paymentDeadlineMinutes',
+            'seatHoldDeadlineMinutes', 'seatPricing', 'seatConfig', 'preBookedSeats', 'status',
+            'venue', 'imageUrl',
+        ]);
+        updateDto = Object.fromEntries(
+            Object.entries(updateDto).filter(([field]) => allowedFields.has(field)),
+        );
+
         if (updateDto.hasTheaterSeating !== undefined) {
             updateDto.hasTheaterSeating =
                 updateDto.hasTheaterSeating === 'true' ||
@@ -204,10 +232,10 @@ export class EventsService {
         }
 
         // Handle preBookedSeats: replace organizer-reserved seats (those without bookingId)
-        if (updateDto.preBookedSeats && Array.isArray(updateDto.preBookedSeats)) {
-            // Keep booking-linked seats, replace organizer-reserved ones
+        if (Array.isArray(updateDto.preBookedSeats)) {
+            // Keep booking/hold-linked seats, replace only organizer reservations.
             const bookingLinkedSeats = (event.bookedSeats || []).filter(
-                (s: any) => s.bookingId,
+                (s: any) => s.bookingId || s.holdId,
             );
             const newOrganizerSeats = updateDto.preBookedSeats.map((s: any) => ({
                 row: s.row,
@@ -357,10 +385,14 @@ export class EventsService {
         await this.mailService.sendVerificationOTP(user.email, otp);
     }
 
-    async verifyDeletionOTP(id: string, otp: string): Promise<void> {
+    async verifyDeletionOTP(id: string, otp: string, user: any): Promise<void> {
         const event = await this.eventModel.findById(id).exec();
         if (!event) {
             throw new NotFoundException('Event not found');
+        }
+
+        if (user?.role !== UserRole.ADMIN) {
+            throw new ForbiddenException('Only admins can verify event deletion OTPs');
         }
 
         if (
@@ -433,26 +465,21 @@ export class EventsService {
             };
         }
 
+        const confirmedBookings = await this.bookingModel.aggregate([
+            { $match: { eventId: { $in: events.map(event => event._id) }, status: 'confirmed' } },
+            { $group: { _id: '$eventId', ticketsSold: { $sum: '$numberOfTickets' }, revenue: { $sum: '$totalPrice' } } },
+        ]).exec();
+        const totalsByEvent = new Map(confirmedBookings.map(total => [String(total._id), total]));
+
         const analytics = events.map((event) => {
-            const ticketsSold = event.totalTickets - event.remainingTickets;
+            const totals = totalsByEvent.get(String(event._id));
+            const ticketsSold = totals?.ticketsSold || 0;
             const percentageSold =
                 event.totalTickets > 0
                     ? (ticketsSold / event.totalTickets) * 100
                     : 0;
 
-            // For theater-seated events, revenue is the sum of prices from booked seats.
-            // For non-seated events, use ticketPrice * ticketsSold.
-            let revenue: number;
-            if (event.hasTheaterSeating && event.bookedSeats && event.seatPricing?.length > 0) {
-                // We can't access selectedSeats here easily, so approximate using
-                // the average seat price across all pricing tiers.
-                const avgPrice =
-                    event.seatPricing.reduce((s: number, p: any) => s + (p.price || 0), 0) /
-                    (event.seatPricing.length || 1);
-                revenue = ticketsSold * avgPrice;
-            } else {
-                revenue = ticketsSold * event.ticketPrice;
-            }
+            const revenue = totals?.revenue || 0;
 
             return {
                 eventId: event._id,
