@@ -59,7 +59,7 @@ export class AuthService {
                 otpExpires,
                 createdAt: new Date(),
             },
-            { upsert: true, new: true },
+            { upsert: true, returnDocument: 'after' },
         );
 
         // Send verification email
@@ -95,6 +95,7 @@ export class AuthService {
             user.isVerified = true;
             user.otp = undefined;
             user.otpExpires = undefined;
+            user.otpPurpose = null;
             await user.save();
 
             return { message: 'Registration completed successfully' };
@@ -178,6 +179,7 @@ export class AuthService {
 
                 user.otp = otp;
                 user.otpExpires = otpExpires;
+                user.otpPurpose = 'verification';
                 await user.save();
 
                 await this.mailService.sendVerificationOTP(user.email, otp);
@@ -190,7 +192,7 @@ export class AuthService {
             }
         }
 
-        const payload = { sub: user._id, role: user.role };
+        const payload = { sub: user._id, role: user.role, tokenVersion: user.tokenVersion ?? 0 };
         const token = this.jwtService.sign(payload);
 
         return {
@@ -222,6 +224,7 @@ export class AuthService {
 
         user.otp = otp;
         user.otpExpires = otpExpires;
+        user.otpPurpose = 'reset';
         await user.save();
 
         await this.mailService.sendPasswordResetOTP(email, otp);
@@ -240,6 +243,7 @@ export class AuthService {
         if (
             !user.otp ||
             user.otp !== otp ||
+            user.otpPurpose !== 'reset' ||
             !user.otpExpires ||
             user.otpExpires < new Date()
         ) {
@@ -249,6 +253,8 @@ export class AuthService {
         user.password = await bcrypt.hash(newPassword, 10);
         user.otp = undefined;
         user.otpExpires = undefined;
+        user.otpPurpose = null;
+        user.tokenVersion = (user.tokenVersion || 0) + 1;
         await user.save();
 
         return { message: 'Password reset successfully' };
@@ -274,6 +280,7 @@ export class AuthService {
 
         user.otp = otp;
         user.otpExpires = otpExpires;
+        user.otpPurpose = 'activation';
         await user.save();
 
         this.mailService.sendVerificationOTP(email, otp).catch(err =>
@@ -302,6 +309,7 @@ export class AuthService {
         if (
             !user.otp ||
             user.otp !== otp ||
+            user.otpPurpose !== 'activation' ||
             !user.otpExpires ||
             user.otpExpires < new Date()
         ) {
@@ -310,11 +318,12 @@ export class AuthService {
 
         user.otp = undefined;
         user.otpExpires = undefined;
+        user.otpPurpose = null;
         user.isVerified = true;
         user.requiresPasswordChange = false;
         await user.save();
 
-        const payload = { sub: user._id, role: user.role };
+        const payload = { sub: user._id, role: user.role, tokenVersion: user.tokenVersion ?? 0 };
         const token = this.jwtService.sign(payload);
 
         return {

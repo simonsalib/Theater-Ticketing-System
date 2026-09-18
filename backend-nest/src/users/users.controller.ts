@@ -30,14 +30,15 @@ export class UsersController {
     @Get('profile')
     @UseGuards(JwtAuthGuard)
     async getProfile(@Req() req: any) {
-        const data = await this.usersService.findById(req.user._id);
+        const data = await this.usersService.findPublicById(req.user._id);
         return { success: true, data };
     }
 
     @Put('profile')
     @UseGuards(JwtAuthGuard)
     async updateProfile(@Req() req: any, @Body() updateDto: any) {
-        const data = await this.usersService.updateProfile(req.user._id, updateDto);
+        const updated = await this.usersService.updateProfile(req.user._id, updateDto);
+        const data = this.usersService.toPublicUser(updated);
         return { success: true, data };
     }
 

@@ -52,6 +52,13 @@ export class User {
     @Prop()
     otpExpires?: Date;
 
+    @Prop({ type: String, enum: ['reset', 'activation', 'verification'], default: null })
+    otpPurpose?: string | null;
+
+    // Bump this whenever credentials change to revoke already-issued JWTs.
+    @Prop({ default: 0 })
+    tokenVersion: number;
+
     @Prop({ default: false })
     isVerified: boolean;
 

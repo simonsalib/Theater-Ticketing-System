@@ -42,13 +42,25 @@ export class UsersService {
         return user;
     }
 
+    toPublicUser(user: UserDocument): Record<string, unknown> {
+        const data = user.toObject();
+        delete data.password;
+        delete data.otp;
+        delete data.otpExpires;
+        return data;
+    }
+
+    async findPublicById(id: string): Promise<Record<string, unknown>> {
+        return this.toPublicUser(await this.findById(id));
+    }
+
     async findAll(): Promise<UserDocument[]> {
-        return this.userModel.find().select('-password').exec();
+        return this.userModel.find().select('-password -otp -otpExpires').exec();
     }
 
     async updateRole(id: string, role: string): Promise<UserDocument> {
         const user = await this.userModel
-            .findByIdAndUpdate(id, { role }, { new: true, runValidators: true })
+            .findByIdAndUpdate(id, { role }, { returnDocument: 'after', runValidators: true })
             .select('-password')
             .exec();
         if (!user) {
@@ -65,7 +77,6 @@ export class UsersService {
     }
 
     async updateProfile(id: string, updateDto: any): Promise<UserDocument> {
-        console.log('Update Profile DTO received:', JSON.stringify(updateDto, null, 2));
         const { name, email, phone, profilePicture, instapayNumber, instapayLink, instapayQR } = updateDto;
 
         const user = await this.userModel.findById(id).exec();
@@ -104,7 +115,7 @@ export class UsersService {
             throw new BadRequestException('Invalid language. Allowed values: en, ar');
         }
         const user = await this.userModel
-            .findByIdAndUpdate(id, { language }, { new: true })
+            .findByIdAndUpdate(id, { language }, { returnDocument: 'after' })
             .select('-password')
             .exec();
         if (!user) throw new NotFoundException('User not found');
@@ -180,7 +191,7 @@ export class UsersService {
 
     async blockUser(id: string, isBlocked: boolean): Promise<UserDocument> {
         const user = await this.userModel
-            .findByIdAndUpdate(id, { isBlocked }, { new: true })
+            .findByIdAndUpdate(id, { isBlocked }, { returnDocument: 'after' })
             .select('-password')
             .exec();
         if (!user) {
