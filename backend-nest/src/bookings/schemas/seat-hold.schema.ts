@@ -33,3 +33,8 @@ export class SeatHold {
 }
 
 export const SeatHoldSchema = SchemaFactory.createForClass(SeatHold);
+
+// These are ordinary indexes, not TTL indexes: the service must release seats
+// before the expired hold document is deleted.
+SeatHoldSchema.index({ eventId: 1, expiresAt: 1 });
+SeatHoldSchema.index({ expiresAt: 1 });

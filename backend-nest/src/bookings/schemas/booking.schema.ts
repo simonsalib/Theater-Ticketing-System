@@ -118,6 +118,10 @@ export class Booking {
 
 export const BookingSchema = SchemaFactory.createForClass(Booking);
 
+// Supports expiry cleanup and the periodic theater-seat reconciliation.
+BookingSchema.index({ eventId: 1, status: 1, hasTheaterSeating: 1 });
+BookingSchema.index({ pendingExpiresAt: 1 });
+
 // NOTE: We intentionally do NOT use a MongoDB TTL index on pendingExpiresAt.
 // A TTL index would delete pending booking documents without releasing the
 // reserved seats back to the event's remainingTickets counter.  Seat release

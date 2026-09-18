@@ -64,5 +64,6 @@ export const TicketSchema = SchemaFactory.createForClass(Ticket);
 
 // Index for fast lookup by QR data
 TicketSchema.index({ qrData: 1 }, { unique: true });
+TicketSchema.index({ bookingId: 1, section: 1, seatRow: 1, seatNumber: 1 }, { unique: true });
 TicketSchema.index({ bookingId: 1 });
 TicketSchema.index({ eventId: 1 });

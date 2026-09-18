@@ -13,6 +13,7 @@ import { SeatHold, SeatHoldDocument } from './schemas/seat-hold.schema';
 import { Event, EventDocument } from '../events/schemas/event.schema';
 import { Theater, TheaterDocument } from '../theaters/schemas/theater.schema';
 import { TicketsService } from '../tickets/tickets.service';
+import { UserRole } from '../users/schemas/user.schema';
 
 const DEFAULT_PAYMENT_DEADLINE_MINUTES = 30;
 const DEFAULT_SEAT_HOLD_DEADLINE_MINUTES = 3;
@@ -44,11 +45,15 @@ export class BookingsService implements OnModuleInit {
             }).exec();
 
             for (const hold of expiredHolds) {
+                const claimedHold = await this.seatHoldModel.findOneAndDelete({
+                    _id: hold._id,
+                    expiresAt: { $lte: new Date() },
+                }).exec();
+                if (!claimedHold) continue;
                 await this.eventModel.findByIdAndUpdate(hold.eventId, {
                     $pull: { bookedSeats: { holdId: hold._id } },
                     $inc: { remainingTickets: hold.seats.length },
                 });
-                await this.seatHoldModel.findByIdAndDelete(hold._id).exec();
                 this.logger.log(`Expired seat hold ${hold._id} cleaned up (${hold.seats.length} seats released)`);
             }
 
@@ -60,18 +65,24 @@ export class BookingsService implements OnModuleInit {
             } as any).exec();
 
             for (const booking of expiredBookings) {
+                const claimedBooking = await this.bookingModel.findOneAndDelete({
+                    _id: booking._id,
+                    status: 'pending',
+                    pendingExpiresAt: { $lte: new Date() },
+                    isReceiptUploaded: { $ne: true },
+                } as any).exec();
+                if (!claimedBooking) continue;
                 // Release seats from the event
-                if (booking.hasTheaterSeating && booking.selectedSeats?.length > 0) {
-                    await this.eventModel.findByIdAndUpdate(booking.eventId, {
-                        $pull: { bookedSeats: { bookingId: booking._id } },
-                        $inc: { remainingTickets: booking.numberOfTickets },
+                if (claimedBooking.hasTheaterSeating && claimedBooking.selectedSeats?.length > 0) {
+                    await this.eventModel.findByIdAndUpdate(claimedBooking.eventId, {
+                        $pull: { bookedSeats: { bookingId: claimedBooking._id } },
+                        $inc: { remainingTickets: claimedBooking.numberOfTickets },
                     });
                 } else {
-                    await this.eventModel.findByIdAndUpdate(booking.eventId, {
-                        $inc: { remainingTickets: booking.numberOfTickets },
+                    await this.eventModel.findByIdAndUpdate(claimedBooking.eventId, {
+                        $inc: { remainingTickets: claimedBooking.numberOfTickets },
                     });
                 }
-                await this.bookingModel.findByIdAndDelete(booking._id).exec();
                 this.logger.log(`Expired pending booking ${booking._id} cleaned up`);
             }
 
@@ -108,7 +119,7 @@ export class BookingsService implements OnModuleInit {
                     const updatedEvent = await this.eventModel.findByIdAndUpdate(
                         event._id,
                         { $pull: { bookedSeats: pullQuery } },
-                        { new: true }
+                        { returnDocument: 'after' }
                     ).exec();
 
                     if (updatedEvent) {
@@ -125,8 +136,99 @@ export class BookingsService implements OnModuleInit {
                     }
                 }
             }
+
+            // Repair an active booking/hold that lost its matching event.bookedSeats entry.
+            // A conflicting existing owner is deliberately not overwritten; the audit must resolve it.
+            await this.repairOrphanedSeatClaims();
         } catch (err) {
             this.logger.error('Error cleaning up expired bookings/holds', err);
+        }
+    }
+
+    private async repairOrphanedSeatClaims(): Promise<void> {
+        const now = new Date();
+        const [bookingEventIds, holdEventIds] = await Promise.all([
+            this.bookingModel.distinct('eventId', {
+                status: { $in: ['pending', 'confirmed'] },
+                hasTheaterSeating: true,
+            } as any).exec(),
+            this.seatHoldModel.distinct('eventId', { expiresAt: { $gt: now } } as any).exec(),
+        ]);
+        const eventIds = [...new Set([...bookingEventIds, ...holdEventIds].map(id => id.toString()))];
+
+        for (const eventId of eventIds) {
+            const eventObjectId = new Types.ObjectId(eventId);
+            const [event, bookings, holds] = await Promise.all([
+                this.eventModel.findById(eventObjectId).select('_id bookedSeats').lean().exec(),
+                this.bookingModel.find({
+                    eventId: eventObjectId,
+                    status: { $in: ['pending', 'confirmed'] },
+                    hasTheaterSeating: true,
+                } as any).select('_id selectedSeats').lean().exec(),
+                this.seatHoldModel.find({ eventId: eventObjectId, expiresAt: { $gt: now } } as any).select('_id seats').lean().exec(),
+            ]);
+            if (!event) continue;
+
+            const occupied = new Map<string, any[]>();
+            for (const entry of event.bookedSeats || []) {
+                const key = `${entry.section || 'main'}-${entry.row}-${entry.seatNumber}`;
+                const entries = occupied.get(key) || [];
+                entries.push(entry);
+                occupied.set(key, entries);
+            }
+
+            const repair = async (seat: any, owner: { bookingId?: any; holdId?: any }) => {
+                const section = seat.section || 'main';
+                const row = String(seat.row);
+                const seatNumber = Number(seat.seatNumber);
+                const key = `${section}-${row}-${seatNumber}`;
+                const currentEntries = occupied.get(key) || [];
+                const ownerId = owner.bookingId || owner.holdId;
+                const ownerField = owner.bookingId ? 'bookingId' : 'holdId';
+                const alreadyLinked = currentEntries.some(entry =>
+                    entry[ownerField] && entry[ownerField].toString() === ownerId.toString(),
+                );
+                if (alreadyLinked) return;
+                if (currentEntries.length > 0) {
+                    this.logger.error(`Seat reconciliation conflict for ${eventId}/${key}; leaving existing owner unchanged`);
+                    return;
+                }
+
+                const entry = {
+                    row,
+                    seatNumber,
+                    section,
+                    seatLabel: seat.seatLabel || '',
+                    ...owner,
+                };
+                const result = await this.eventModel.updateOne(
+                    {
+                        _id: eventObjectId,
+                        bookedSeats: {
+                            $not: { $elemMatch: { row, seatNumber, section } },
+                        },
+                    },
+                    {
+                        $push: { bookedSeats: entry },
+                        $inc: { remainingTickets: -1 },
+                    },
+                ).exec();
+                if (result.modifiedCount === 1) {
+                    occupied.set(key, [entry]);
+                    this.logger.warn(`Repaired orphaned ${ownerField} seat claim for ${eventId}/${key}`);
+                }
+            };
+
+            for (const booking of bookings) {
+                for (const seat of (booking.selectedSeats || [])) {
+                    await repair(seat, { bookingId: booking._id });
+                }
+            }
+            for (const hold of holds) {
+                for (const seat of (hold.seats || [])) {
+                    await repair(seat, { holdId: hold._id });
+                }
+            }
         }
     }
 
@@ -136,6 +238,54 @@ export class BookingsService implements OnModuleInit {
      * Hold seats temporarily while user fills attendee info.
      * Uses atomic findOneAndUpdate to prevent race conditions.
      */
+    private assertBookableEvent(event: EventDocument): void {
+        if (event.status !== 'approved') {
+            throw new BadRequestException('Only approved events can be booked');
+        }
+        if (new Date(event.date).getTime() <= Date.now()) {
+            throw new BadRequestException('This event is no longer available for booking');
+        }
+    }
+
+    private getRowLabels(floor: any): string[] {
+        if (Array.isArray(floor?.rowLabels) && floor.rowLabels.length > 0) {
+            return floor.rowLabels.map((row: unknown) => String(row));
+        }
+        return Array.from({ length: Number(floor?.rows) || 0 }, (_, index) => String.fromCharCode(65 + index));
+    }
+
+    private validateTheaterSeats(theater: TheaterDocument, seats: any[], requireAttendees = false): any[] {
+        if (!Array.isArray(seats) || seats.length === 0 || seats.length > 10) {
+            throw new BadRequestException('Select between 1 and 10 seats');
+        }
+
+        const keys = new Set<string>();
+        return seats.map((seat) => {
+            const section = seat.section === 'balcony' ? 'balcony' : 'main';
+            const floor = section === 'balcony' ? theater.layout.balcony : theater.layout.mainFloor;
+            const row = String(seat.row || '').trim();
+            const seatNumber = Number(seat.seatNumber);
+            const key = `${section}-${row}-${seatNumber}`;
+            if (!row || !Number.isInteger(seatNumber) || seatNumber < 1 || seatNumber > Number(floor?.seatsPerRow || 0)) {
+                throw new BadRequestException(`Invalid seat ${key}`);
+            }
+            if (section === 'balcony' && !theater.layout.hasBalcony) {
+                throw new BadRequestException(`Invalid seat ${key}`);
+            }
+            if (!this.getRowLabels(floor).includes(row) || keys.has(key)) {
+                throw new BadRequestException(`Invalid or duplicate seat ${key}`);
+            }
+            keys.add(key);
+            if ((theater.layout.removedSeats || []).includes(key) || (theater.layout.disabledSeats || []).includes(key)) {
+                throw new BadRequestException(`Seat ${key} is unavailable`);
+            }
+            if (requireAttendees && (!String(seat.attendeeFirstName || '').trim() || !String(seat.attendeeLastName || '').trim() || !/^01\d{9}$/.test(String(seat.attendeePhone || '')))) {
+                throw new BadRequestException(`Attendee information is required for ${key}`);
+            }
+            return { ...seat, row, seatNumber, section };
+        });
+    }
+
     async holdSeats(
         eventId: string,
         seats: { row: string; seatNumber: number; section: string }[],
@@ -145,18 +295,17 @@ export class BookingsService implements OnModuleInit {
         if (!event) {
             throw new NotFoundException('Event not found');
         }
+        this.assertBookableEvent(event);
 
         if (!event.hasTheaterSeating) {
             throw new BadRequestException('This event does not have theater seating');
         }
 
-        if (!seats || seats.length === 0) {
-            throw new BadRequestException('No seats selected');
+        const theater = await this.theaterModel.findById(event.theater).exec();
+        if (!theater) {
+            throw new NotFoundException('Theater not found for this event');
         }
-
-        if (seats.length > 10) {
-            throw new BadRequestException('Cannot hold more than 10 seats at once');
-        }
+        seats = this.validateTheaterSeats(theater, seats);
 
         // Release any existing holds by this user for this event first
         await this.releaseUserHolds(eventId, userId);
@@ -206,7 +355,7 @@ export class BookingsService implements OnModuleInit {
                 $push: { bookedSeats: { $each: holdEntries } },
                 $inc: { remainingTickets: -normalizedSeats.length },
             },
-            { new: true },
+            { returnDocument: 'after' },
         );
 
         if (!result) {
@@ -251,13 +400,9 @@ export class BookingsService implements OnModuleInit {
      * Release a specific seat hold.
      */
     async releaseHold(holdId: string, userId: string): Promise<void> {
-        const hold = await this.seatHoldModel.findById(holdId).exec();
+        const hold = await this.seatHoldModel.findOneAndDelete({ _id: holdId, userId } as any).exec();
         if (!hold) {
             return; // Already released or expired — no-op
-        }
-
-        if (hold.userId.toString() !== userId.toString()) {
-            throw new ForbiddenException('You cannot release this hold');
         }
 
         await this.eventModel.findByIdAndUpdate(hold.eventId, {
@@ -265,7 +410,6 @@ export class BookingsService implements OnModuleInit {
             $inc: { remainingTickets: hold.seats.length },
         });
 
-        await this.seatHoldModel.findByIdAndDelete(hold._id).exec();
     }
 
     /**
@@ -278,22 +422,19 @@ export class BookingsService implements OnModuleInit {
         } as any).exec();
 
         for (const hold of existingHolds) {
-            await this.eventModel.findByIdAndUpdate(hold.eventId, {
-                $pull: { bookedSeats: { holdId: hold._id } },
-                $inc: { remainingTickets: hold.seats.length },
-            });
-            await this.seatHoldModel.findByIdAndDelete(hold._id).exec();
+            await this.releaseHold(hold._id.toString(), userId);
         }
     }
 
 
     async create(createDto: any, userId: string): Promise<BookingDocument> {
-        const { eventId, numberOfTickets, status, selectedSeats, holdId } = createDto;
+        let { eventId, numberOfTickets, status, selectedSeats, holdId } = createDto;
 
         const event = await this.eventModel.findById(eventId).exec();
         if (!event) {
             throw new NotFoundException('Event not found');
         }
+        this.assertBookableEvent(event);
 
         const requiresOrganizerApproval = (event as any).requiresOrganizerApproval !== false;
         const paymentDeadlineMinutes = this.getPaymentDeadlineMinutes(event);
@@ -308,7 +449,10 @@ export class BookingsService implements OnModuleInit {
                 : null,
         };
 
-        if (event.hasTheaterSeating && selectedSeats && selectedSeats.length > 0) {
+        if (event.hasTheaterSeating) {
+            if (!Array.isArray(selectedSeats) || selectedSeats.length === 0) {
+                throw new BadRequestException('Selected seats are required for theater events');
+            }
             // ── Validate hold if provided ───────────────────────────────
             let hold: SeatHoldDocument | null = null;
             if (holdId) {
@@ -343,6 +487,9 @@ export class BookingsService implements OnModuleInit {
                             `Seat ${seat.row}${seat.seatNumber} is not in your hold. Please select seats again.`,
                         );
                     }
+                }
+                if (holdSeatKeys.size !== selectedSeats.length) {
+                    throw new BadRequestException('All held seats must be included in the booking');
                 }
             } else {
                 // No hold — use atomic check to prevent race conditions
@@ -381,6 +528,7 @@ export class BookingsService implements OnModuleInit {
             if (!theater) {
                 throw new NotFoundException('Theater not found for this event');
             }
+            selectedSeats = this.validateTheaterSeats(theater, selectedSeats, true);
 
             const mergedSeatConfig = [...(theater.seatConfig || [])];
             if (event.seatConfig && event.seatConfig.length > 0) {
@@ -443,6 +591,16 @@ export class BookingsService implements OnModuleInit {
             const savedBooking = await booking.save();
 
             if (hold) {
+                const consumedHold = await this.seatHoldModel.findOneAndDelete({
+                    _id: hold._id,
+                    userId,
+                    eventId,
+                    expiresAt: { $gt: new Date() },
+                } as any).exec();
+                if (!consumedHold) {
+                    await this.bookingModel.findByIdAndDelete(savedBooking._id).exec();
+                    throw new BadRequestException('Seat hold was already used or has expired. Please select seats again.');
+                }
                 // Convert hold entries → booking entries in bookedSeats
                 // First pull the hold entries, then push booking entries
                 await this.eventModel.findByIdAndUpdate(eventId, {
@@ -461,8 +619,6 @@ export class BookingsService implements OnModuleInit {
                     $push: { bookedSeats: { $each: seatUpdates } },
                 });
 
-                // Delete the hold
-                await this.seatHoldModel.findByIdAndDelete(hold._id).exec();
             } else {
                 // No hold — atomic push with $nor guard
                 const seatUpdates = seatsWithPrices.map((seat: any) => ({
@@ -492,7 +648,7 @@ export class BookingsService implements OnModuleInit {
                         $push: { bookedSeats: { $each: seatUpdates } },
                         $inc: { remainingTickets: -selectedSeats.length },
                     },
-                    { new: true },
+                    { returnDocument: 'after' },
                 );
 
                 if (!atomicResult) {
@@ -504,30 +660,51 @@ export class BookingsService implements OnModuleInit {
                 }
             }
 
-            await this.generateTicketsIfAutoConfirmed(savedBooking);
+            try {
+                await this.generateTicketsIfAutoConfirmed(savedBooking);
+            } catch {
+                await this.rollbackAutoConfirmedBooking(savedBooking);
+                throw new BadRequestException('Unable to issue QR tickets. The booking was not completed.');
+            }
             return savedBooking;
         } else {
-            if (!numberOfTickets || numberOfTickets < 1) {
-                throw new BadRequestException('Number of tickets is required');
-            }
-
-            if (event.remainingTickets < numberOfTickets) {
-                throw new BadRequestException('Not enough tickets available');
+            if (!Number.isInteger(numberOfTickets) || numberOfTickets < 1) {
+                throw new BadRequestException('Number of tickets must be a positive integer');
             }
 
             totalPrice = numberOfTickets * event.ticketPrice;
 
-            await this.eventModel.findByIdAndUpdate(eventId, {
+            const reserved = await this.eventModel.findOneAndUpdate({
+                _id: eventId,
+                remainingTickets: { $gte: numberOfTickets },
+            }, {
                 $inc: { remainingTickets: -numberOfTickets },
-            });
+            }, { returnDocument: 'after' }).exec();
+            if (!reserved) {
+                throw new BadRequestException('Not enough tickets available');
+            }
 
             bookingData.numberOfTickets = numberOfTickets;
             bookingData.totalPrice = totalPrice;
             bookingData.hasTheaterSeating = false;
 
             const booking = new this.bookingModel(bookingData);
-            const savedBooking = await booking.save();
-            await this.generateTicketsIfAutoConfirmed(savedBooking);
+            let savedBooking: BookingDocument;
+            try {
+                savedBooking = await booking.save();
+            } catch (error) {
+                await this.eventModel.updateOne(
+                    { _id: eventId },
+                    { $inc: { remainingTickets: numberOfTickets } },
+                ).exec();
+                throw error;
+            }
+            try {
+                await this.generateTicketsIfAutoConfirmed(savedBooking);
+            } catch {
+                await this.rollbackAutoConfirmedBooking(savedBooking);
+                throw new BadRequestException('Unable to issue QR tickets. The booking was not completed.');
+            }
             return savedBooking;
         }
     }
@@ -549,20 +726,12 @@ export class BookingsService implements OnModuleInit {
     }
 
     private async generateTicketsIfAutoConfirmed(booking: BookingDocument): Promise<void> {
-        if (
-            booking.status !== 'confirmed' ||
-            !booking.hasTheaterSeating ||
-            !booking.selectedSeats?.length
-        ) {
+        if (booking.status !== 'confirmed') {
             return;
         }
 
-        try {
-            await this.ticketsService.generateTicketsForBooking(
-                booking._id.toString(),
-                booking.eventId.toString(),
-                booking.StandardId.toString(),
-                booking.selectedSeats.map((s: any) => ({
+        const ticketSeats = booking.hasTheaterSeating
+            ? (booking.selectedSeats || []).map((s: any) => ({
                     row: s.row,
                     seatNumber: s.seatNumber,
                     section: s.section || 'main',
@@ -572,15 +741,51 @@ export class BookingsService implements OnModuleInit {
                     attendeeFirstName: s.attendeeFirstName || '',
                     attendeeLastName: s.attendeeLastName || '',
                     attendeePhone: s.attendeePhone || '',
-                })),
-            );
-            this.logger.log(`Generated ${booking.selectedSeats.length} QR tickets for auto-confirmed booking ${booking._id}`);
-        } catch (error) {
-            this.logger.error(`Failed to generate QR tickets for auto-confirmed booking ${booking._id}:`, error);
-        }
+                }))
+            : Array.from({ length: booking.numberOfTickets }, (_, index) => ({
+                row: 'General', seatNumber: index + 1, section: 'general', seatType: 'standard',
+                price: booking.totalPrice / booking.numberOfTickets, attendeeFirstName: '', attendeeLastName: '',
+                attendeePhone: '', seatLabel: `General admission ${index + 1}`,
+            }));
+
+        await this.ticketsService.generateTicketsForBooking(
+            booking._id.toString(), booking.eventId.toString(), booking.StandardId.toString(), ticketSeats,
+        );
+        this.logger.log(`Generated ${ticketSeats.length} QR tickets for auto-confirmed booking ${booking._id}`);
     }
 
-    async findOne(id: string): Promise<BookingDocument> {
+    private async rollbackAutoConfirmedBooking(booking: BookingDocument): Promise<void> {
+        await this.ticketsService.deleteTicketsForBooking(booking._id.toString());
+        const releaseUpdate = booking.hasTheaterSeating && booking.selectedSeats?.length > 0
+            ? { $pull: { bookedSeats: { bookingId: booking._id } }, $inc: { remainingTickets: booking.numberOfTickets } }
+            : { $inc: { remainingTickets: booking.numberOfTickets } };
+        await this.eventModel.findByIdAndUpdate(booking.eventId, releaseUpdate).exec();
+        await this.bookingModel.findByIdAndDelete(booking._id).exec();
+    }
+
+    private isAdmin(user: any): boolean {
+        return user?.role === UserRole.ADMIN;
+    }
+
+    private async assertEventManager(eventId: any, user: any): Promise<EventDocument> {
+        const event = await this.eventModel.findById(eventId).exec();
+        if (!event) {
+            throw new NotFoundException('Event not found');
+        }
+        if (!this.isAdmin(user) && event.organizerId.toString() !== user?._id?.toString()) {
+            throw new ForbiddenException('Only the event organizer or an admin can access these bookings');
+        }
+        return event;
+    }
+
+    private async assertBookingAccess(booking: BookingDocument, user: any): Promise<void> {
+        if (this.isAdmin(user) || booking.StandardId.toString() === user?._id?.toString()) {
+            return;
+        }
+        await this.assertEventManager(booking.eventId, user);
+    }
+
+    async findOne(id: string, user: any): Promise<BookingDocument> {
         const booking = await this.bookingModel
             .findById(id)
             .populate({
@@ -594,18 +799,19 @@ export class BookingsService implements OnModuleInit {
         if (!booking) {
             throw new NotFoundException('Booking not found');
         }
+        await this.assertBookingAccess(booking, user);
         return booking;
     }
     
-    async findReceipt(id: string): Promise<string> {
+    async findReceipt(id: string, user: any): Promise<string> {
         const booking = await this.bookingModel
             .findById(id)
-            .select('instapayReceipt')
             .exec();
         
         if (!booking) {
             throw new NotFoundException('Booking not found');
         }
+        await this.assertBookingAccess(booking, user);
         
         return booking.instapayReceipt;
     }
@@ -657,9 +863,8 @@ export class BookingsService implements OnModuleInit {
             throw new ForbiddenException('You are not authorised to cancel this booking');
         }
 
-        // Cannot cancel a confirmed booking
-        if (booking.status === 'confirmed') {
-            throw new BadRequestException('Cannot cancel a confirmed booking');
+        if (booking.status !== 'pending') {
+            throw new BadRequestException(`Cannot cancel a ${booking.status} booking`);
         }
 
         const event = await this.eventModel.findById(booking.eventId).exec();
@@ -681,7 +886,8 @@ export class BookingsService implements OnModuleInit {
         await this.bookingModel.findByIdAndDelete(id).exec();
     }
 
-    async findAllForEvent(eventId: string): Promise<BookingDocument[]> {
+    async findAllForEvent(eventId: string, user: any): Promise<BookingDocument[]> {
+        await this.assertEventManager(eventId, user);
         return this.bookingModel
             .find({ eventId } as any)
             .select('-instapayReceipt')
@@ -699,6 +905,9 @@ export class BookingsService implements OnModuleInit {
         if (!['confirmed', 'rejected'].includes(status)) {
             throw new BadRequestException('Status must be confirmed or rejected');
         }
+        if (booking.status !== 'pending') {
+            throw new BadRequestException(`Cannot transition a ${booking.status} booking`);
+        }
 
         // Only the event organizer or an admin can update booking status
         const event = await this.eventModel.findById(booking.eventId).exec();
@@ -712,11 +921,11 @@ export class BookingsService implements OnModuleInit {
         }
 
         // If rejecting a previously pending booking that had seats, release the seats
-        if (status === 'rejected' && booking.hasTheaterSeating && booking.selectedSeats?.length > 0) {
-            await this.eventModel.findByIdAndUpdate(booking.eventId, {
-                $pull: { bookedSeats: { bookingId: booking._id } },
-                $inc: { remainingTickets: booking.numberOfTickets },
-            });
+        if (status === 'rejected') {
+            const releaseUpdate = booking.hasTheaterSeating && booking.selectedSeats?.length > 0
+                ? { $pull: { bookedSeats: { bookingId: booking._id } }, $inc: { remainingTickets: booking.numberOfTickets } }
+                : { $inc: { remainingTickets: booking.numberOfTickets } };
+            await this.eventModel.findByIdAndUpdate(booking.eventId, releaseUpdate).exec();
         }
 
         // If confirming, clear the TTL so it doesn't auto-delete
@@ -758,32 +967,17 @@ export class BookingsService implements OnModuleInit {
             }
         }
 
-        const savedBooking = await booking.save();
-
-        // Generate QR code tickets when booking is confirmed
-        if (status === 'confirmed' && booking.hasTheaterSeating && booking.selectedSeats?.length > 0) {
+        // Do not persist a confirmed state unless every QR was issued successfully.
+        if (status === 'confirmed') {
             try {
-                await this.ticketsService.generateTicketsForBooking(
-                    bookingId,
-                    booking.eventId.toString(),
-                    booking.StandardId.toString(),
-                    booking.selectedSeats.map((s: any) => ({
-                        row: s.row,
-                        seatNumber: s.seatNumber,
-                        section: s.section || 'main',
-                        seatType: s.seatType || 'standard',
-                        price: s.price || 0,
-                        seatLabel: s.seatLabel,
-                        attendeeFirstName: s.attendeeFirstName || '',
-                        attendeeLastName: s.attendeeLastName || '',
-                        attendeePhone: s.attendeePhone || '',
-                    })),
-                );
-                this.logger.log(`Generated ${booking.selectedSeats.length} QR tickets for booking ${bookingId}`);
-            } catch (error) {
-                this.logger.error(`Failed to generate QR tickets for booking ${bookingId}:`, error);
+                await this.generateTicketsIfAutoConfirmed(booking);
+            } catch {
+                await this.ticketsService.deleteTicketsForBooking(bookingId);
+                throw new BadRequestException('Unable to issue QR tickets. The booking remains pending.');
             }
         }
+
+        const savedBooking = await booking.save();
 
         return savedBooking;
     }
@@ -801,6 +995,12 @@ export class BookingsService implements OnModuleInit {
 
         if (booking.status !== 'pending') {
             throw new BadRequestException('Receipts can only be uploaded for pending bookings');
+        }
+        if (booking.pendingExpiresAt && booking.pendingExpiresAt <= new Date()) {
+            throw new BadRequestException('This booking has expired');
+        }
+        if (!/^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/]+={0,2}$/i.test(receiptBase64 || '')) {
+            throw new BadRequestException('Receipt must be a valid PNG, JPEG, or WebP image');
         }
 
         booking.instapayReceipt = receiptBase64;
@@ -1027,19 +1227,21 @@ export class BookingsService implements OnModuleInit {
             return { message: 'Booking cancelled successfully' };
         }
 
-        if (cancelAll || seatKeys.length >= booking.selectedSeats.length) {
-            // Cancel entire booking
-            await this.delete(bookingId, userId);
-            return { message: 'All seats cancelled. Booking removed.' };
-        }
-
         // Partial cancel: remove only selected seats
-        const seatsToRemove = booking.selectedSeats.filter((s: any) =>
-            seatKeys.includes(`${s.section}-${s.row}-${s.seatNumber}`),
-        );
+        const requestedKeys = new Set(seatKeys);
+        const seatsToRemove = cancelAll
+            ? booking.selectedSeats
+            : booking.selectedSeats.filter((s: any) =>
+                requestedKeys.has(`${s.section}-${s.row}-${s.seatNumber}`),
+            );
 
         if (seatsToRemove.length === 0) {
             throw new BadRequestException('No matching seats found to cancel');
+        }
+
+        if (seatsToRemove.length === booking.selectedSeats.length) {
+            await this.delete(bookingId, userId);
+            return { message: 'All seats cancelled. Booking removed.' };
         }
 
         const seatKeysToRemove = new Set(
@@ -1104,13 +1306,21 @@ export class BookingsService implements OnModuleInit {
             throw new BadRequestException('Can only request cancellation for confirmed bookings or pending bookings with receipt uploaded');
         }
 
+        const event = await this.eventModel.findById(booking.eventId).exec();
+        if (!event) {
+            throw new NotFoundException('Event not found');
+        }
+        if (event.cancellationDeadline && event.cancellationDeadline <= new Date()) {
+            throw new BadRequestException('The cancellation deadline has passed');
+        }
+
         // Filter out already-scanned seats
         const scannedTickets = await this.ticketsService.getScannedSeatsForBooking(bookingId);
         const scannedKeys = new Set(
             scannedTickets.map((t: any) => `${t.section}-${t.seatRow}-${t.seatNumber}`),
         );
 
-        const newSeatsToCancel = (cancelAll
+        const candidates = cancelAll
             ? booking.selectedSeats.map((s: any) => ({
                 row: s.row,
                 seatNumber: s.seatNumber,
@@ -1120,21 +1330,19 @@ export class BookingsService implements OnModuleInit {
                 const matchingSeat = (booking.selectedSeats as any[]).find(
                     (s: any) => `${s.section || 'main'}-${s.row}-${s.seatNumber}` === key,
                 );
-                if (matchingSeat) {
-                    return {
-                        section: matchingSeat.section || 'main',
-                        row: matchingSeat.row,
-                        seatNumber: matchingSeat.seatNumber,
-                    };
-                }
-                // Fallback: split from right to handle potential hyphens in section/row
-                const parts = key.split('-');
-                const seatNumber = parseInt(parts.pop() || '0', 10);
-                const rowLabel = parts.pop() || '';
-                const sectionName = parts.join('-') || 'main';
-                return { section: sectionName, row: rowLabel, seatNumber };
-            })
-        ).filter((s: any) => !scannedKeys.has(`${s.section}-${s.row}-${s.seatNumber}`));
+                return matchingSeat && {
+                    section: matchingSeat.section || 'main',
+                    row: matchingSeat.row,
+                    seatNumber: matchingSeat.seatNumber,
+                };
+            });
+        const uniqueSeats = new Map<string, any>();
+        for (const candidate of candidates) {
+            if (candidate) uniqueSeats.set(`${candidate.section}-${candidate.row}-${candidate.seatNumber}`, candidate);
+        }
+        const newSeatsToCancel = [...uniqueSeats.values()].filter(
+            (s: any) => !scannedKeys.has(`${s.section}-${s.row}-${s.seatNumber}`),
+        );
 
         if (newSeatsToCancel.length === 0) {
             throw new BadRequestException('All selected seats have already been scanned and cannot be cancelled');
@@ -1155,7 +1363,7 @@ export class BookingsService implements OnModuleInit {
                     existingKeys.add(key);
                 }
             }
-            const isCancelAll = cancelAll || merged.length >= booking.selectedSeats.length;
+            const isCancelAll = merged.length === booking.selectedSeats.length;
             booking.cancellationRequest = {
                 status: 'pending',
                 requestedAt: booking.cancellationRequest.requestedAt,
@@ -1171,7 +1379,7 @@ export class BookingsService implements OnModuleInit {
             requestedAt: new Date(),
             reason: reason || '',
             seatsToCancel: newSeatsToCancel as any,
-            cancelAll,
+            cancelAll: newSeatsToCancel.length === booking.selectedSeats.length,
         } as any;
 
         return booking.save();
@@ -1180,7 +1388,8 @@ export class BookingsService implements OnModuleInit {
     /**
      * Get all cancellation requests for an event (organizer side).
      */
-    async getCancellationRequests(eventId: string): Promise<BookingDocument[]> {
+    async getCancellationRequests(eventId: string, user: any): Promise<BookingDocument[]> {
+        await this.assertEventManager(eventId, user);
         return this.bookingModel
             .find({
                 eventId,
@@ -1219,10 +1428,17 @@ export class BookingsService implements OnModuleInit {
             throw new BadRequestException('No pending cancellation request found');
         }
 
-        const cancelAll = booking.cancellationRequest.cancelAll;
-        const seatsToCancel = booking.cancellationRequest.seatsToCancel || [];
+        const requestedSeats = booking.cancellationRequest.seatsToCancel || [];
+        const requestedKeys = new Set(requestedSeats.map((s: any) => `${s.section}-${s.row}-${s.seatNumber}`));
+        const seatsToCancel = booking.selectedSeats.filter(
+            (seat: any) => requestedKeys.has(`${seat.section || 'main'}-${seat.row}-${seat.seatNumber}`),
+        );
+        if (seatsToCancel.length === 0) {
+            throw new BadRequestException('No valid seats found in the cancellation request');
+        }
+        const cancelAll = seatsToCancel.length === booking.selectedSeats.length;
 
-        if (cancelAll || seatsToCancel.length >= booking.selectedSeats.length) {
+        if (cancelAll) {
             // Cancel entire booking: free all seats
             if (booking.hasTheaterSeating && booking.selectedSeats?.length > 0) {
                 await this.eventModel.findByIdAndUpdate(booking.eventId, {

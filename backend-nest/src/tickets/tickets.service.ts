@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -10,6 +11,8 @@ import * as QRCode from 'qrcode';
 import { Ticket, TicketDocument } from './schemas/ticket.schema';
 import { Booking, BookingDocument } from '../bookings/schemas/booking.schema';
 import { Event, EventDocument } from '../events/schemas/event.schema';
+import { UserRole } from '../users/schemas/user.schema';
+import { randomUUID } from 'node:crypto';
 
 @Injectable()
 export class TicketsService {
@@ -44,19 +47,22 @@ export class TicketsService {
       seatLabel?: string;
     }>,
   ): Promise<TicketDocument[]> {
-    // Check if tickets already exist for this booking
-    const existing = await this.ticketModel
-      .find({ bookingId: new Types.ObjectId(bookingId) })
-      .exec();
-    if (existing.length > 0) {
-      return existing;
-    }
-
     const tickets: TicketDocument[] = [];
 
     for (const seat of selectedSeats) {
-      // Generate a unique QR data string
-      const qrData = `TICKET-${bookingId}-${seat.section}-${seat.row}-${seat.seatNumber}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+      const seatFilter = {
+        bookingId: new Types.ObjectId(bookingId),
+        section: seat.section,
+        seatRow: seat.row,
+        seatNumber: seat.seatNumber,
+      };
+      const existing = await this.ticketModel.findOne(seatFilter).exec();
+      if (existing) {
+        tickets.push(existing);
+        continue;
+      }
+
+      const qrData = `TICKET-${bookingId}-${randomUUID()}`;
 
       // Generate QR code as base64 data URL
       const qrCodeImage = await QRCode.toDataURL(qrData, {
@@ -89,8 +95,14 @@ export class TicketsService {
         scannedBy: null,
       });
 
-      const savedTicket = await ticket.save();
-      tickets.push(savedTicket);
+      try {
+        tickets.push(await ticket.save());
+      } catch (error: any) {
+        if (error?.code !== 11000) throw error;
+        const concurrentTicket = await this.ticketModel.findOne(seatFilter).exec();
+        if (!concurrentTicket) throw error;
+        tickets.push(concurrentTicket);
+      }
     }
 
     return tickets;
@@ -100,50 +112,66 @@ export class TicketsService {
    * Get all tickets for a specific booking (for user to download).
    * Auto-generates tickets if the booking is confirmed but tickets don't exist yet.
    */
-  async getTicketsByBooking(bookingId: string): Promise<TicketDocument[]> {
+  private isAdmin(user: any): boolean {
+    return user?.role === UserRole.ADMIN;
+  }
+
+  private async assertBookingAccess(bookingId: string, user?: any): Promise<BookingDocument> {
+    const booking = await this.bookingModel.findById(bookingId).exec();
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (!user || this.isAdmin(user) || booking.StandardId.toString() === user._id?.toString()) {
+      return booking;
+    }
+    const event = await this.eventModel.findById(booking.eventId).exec();
+    if (!event || event.organizerId.toString() !== user._id?.toString()) {
+      throw new ForbiddenException('You are not authorised to access these tickets');
+    }
+    return booking;
+  }
+
+  private async assertEventAccess(eventId: any, user?: any): Promise<EventDocument> {
+    const event = await this.eventModel.findById(eventId).exec();
+    if (!event) throw new NotFoundException('Event not found');
+    if (!user || this.isAdmin(user) || user.role === UserRole.SCANNER || event.organizerId.toString() === user._id?.toString()) {
+      return event;
+    }
+    throw new ForbiddenException('You are not authorised to access this event tickets');
+  }
+
+  async getTicketsByBooking(bookingId: string, user?: any): Promise<TicketDocument[]> {
+    const booking = await this.assertBookingAccess(bookingId, user);
     let tickets = await this.ticketModel
       .find({ bookingId: new Types.ObjectId(bookingId) })
       .populate('eventId', 'title date location')
       .populate('userId', 'name email phone')
       .exec();
 
-    // If no tickets exist, check if booking is confirmed and auto-generate
-    if (tickets.length === 0) {
-      const booking = await this.bookingModel.findById(bookingId).exec();
-      if (!booking) {
-        throw new NotFoundException('Booking not found');
-      }
+    if (booking.status === 'confirmed') {
+      const ticketSeats = booking.hasTheaterSeating
+        ? (booking.selectedSeats || []).map((s: any) => ({
+          row: s.row,
+          seatNumber: s.seatNumber,
+          section: s.section || 'main',
+          seatType: s.seatType || 'standard',
+          price: s.price || 0,
+          attendeeFirstName: s.attendeeFirstName || '',
+          attendeeLastName: s.attendeeLastName || '',
+          attendeePhone: s.attendeePhone || '',
+          seatLabel: s.seatLabel || '',
+        }))
+        : Array.from({ length: booking.numberOfTickets }, (_, index) => ({
+          row: 'General', seatNumber: index + 1, section: 'general',
+          seatType: 'standard', price: booking.totalPrice / booking.numberOfTickets,
+          attendeeFirstName: '', attendeeLastName: '', attendeePhone: '', seatLabel: `General admission ${index + 1}`,
+        }));
 
-      if (booking.status !== 'confirmed') {
-        return []; // Only generate for confirmed bookings
-      }
-
-      if (booking.hasTheaterSeating && booking.selectedSeats?.length > 0) {
-        this.logger.log(`Auto-generating QR tickets for confirmed booking ${bookingId}`);
-        await this.generateTicketsForBooking(
-          bookingId,
-          booking.eventId.toString(),
-          booking.StandardId.toString(),
-          booking.selectedSeats.map((s: any) => ({
-            row: s.row,
-            seatNumber: s.seatNumber,
-            section: s.section || 'main',
-            seatType: s.seatType || 'standard',
-            price: s.price || 0,
-            attendeeFirstName: s.attendeeFirstName || '',
-            attendeeLastName: s.attendeeLastName || '',
-            attendeePhone: s.attendeePhone || '',
-            seatLabel: s.seatLabel || '',
-          })),
-        );
-
-        // Re-fetch with populated fields
-        tickets = await this.ticketModel
-          .find({ bookingId: new Types.ObjectId(bookingId) })
-          .populate('eventId', 'title date location')
-          .populate('userId', 'name email phone')
-          .exec();
-      }
+      // This is idempotent per seat. It repairs missing QR tickets without changing existing QR data.
+      await this.generateTicketsForBooking(bookingId, booking.eventId.toString(), booking.StandardId.toString(), ticketSeats);
+      tickets = await this.ticketModel
+        .find({ bookingId: new Types.ObjectId(bookingId) })
+        .populate('eventId', 'title date location')
+        .populate('userId', 'name email phone')
+        .exec();
     }
 
     return tickets;
@@ -152,7 +180,8 @@ export class TicketsService {
   /**
    * Get all tickets for an event (for organizer).
    */
-  async getTicketsByEvent(eventId: string): Promise<TicketDocument[]> {
+  async getTicketsByEvent(eventId: string, user?: any): Promise<TicketDocument[]> {
+    await this.assertEventAccess(eventId, user);
     return this.ticketModel
       .find({ eventId: new Types.ObjectId(eventId) })
       .populate('userId', 'name email phone')
@@ -168,6 +197,7 @@ export class TicketsService {
     qrData: string,
     scannedByUserId: string,
     expectedEventId?: string,
+    requestingUser?: any,
   ): Promise<{
     ticket: TicketDocument;
     userEmail: string;
@@ -202,6 +232,7 @@ export class TicketsService {
     }
 
     const eventData = ticket.eventId as any;
+    await this.assertEventAccess(eventData?._id ?? ticket.eventId, requestingUser);
 
     // Check that the ticket belongs to the expected event
     if (expectedEventId) {
@@ -226,7 +257,7 @@ export class TicketsService {
 
     // Check if booking is confirmed
     const booking = ticket.bookingId as any;
-    if (booking && booking.status !== 'confirmed') {
+    if (!booking || booking.status !== 'confirmed') {
       throw new BadRequestException(
         `This ticket belongs to a ${booking.status} booking`,
       );
@@ -265,10 +296,19 @@ export class TicketsService {
     }
 
     // First scan - mark as scanned
-    ticket.isScanned = true;
-    ticket.scannedAt = new Date();
-    ticket.scannedBy = new Types.ObjectId(scannedByUserId);
-    await ticket.save();
+    const scannedAt = new Date();
+    const claimedTicket = await this.ticketModel.findOneAndUpdate(
+      { _id: ticket._id, isScanned: false },
+      { $set: { isScanned: true, scannedAt, scannedBy: new Types.ObjectId(scannedByUserId) } },
+      { returnDocument: 'after' },
+    ).exec();
+    if (!claimedTicket) {
+      return {
+        ...baseResponse,
+        isFree: false,
+        message: 'This ticket was already scanned. This seat is NOT free.',
+      };
+    }
 
     // Remove this seat from any pending cancellation request on the booking
     try {
@@ -353,7 +393,7 @@ export class TicketsService {
   /**
    * Get a single ticket by ID.
    */
-  async getTicketById(ticketId: string): Promise<TicketDocument> {
+  async getTicketById(ticketId: string, user?: any): Promise<TicketDocument> {
     const ticket = await this.ticketModel
       .findById(ticketId)
       .populate('eventId', 'title date location')
@@ -363,6 +403,8 @@ export class TicketsService {
     if (!ticket) {
       throw new NotFoundException('Ticket not found');
     }
+
+    await this.assertBookingAccess(ticket.bookingId.toString(), user);
 
     return ticket;
   }

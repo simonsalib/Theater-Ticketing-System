@@ -27,7 +27,7 @@ export class TicketsController {
     @Param('bookingId') bookingId: string,
     @Req() req: any,
   ) {
-    const tickets = await this.ticketsService.getTicketsByBooking(bookingId);
+    const tickets = await this.ticketsService.getTicketsByBooking(bookingId, req.user);
     return { tickets };
   }
 
@@ -38,8 +38,8 @@ export class TicketsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ORGANIZER, UserRole.SCANNER)
   @Get('event/:eventId')
-  async getTicketsByEvent(@Param('eventId') eventId: string) {
-    const tickets = await this.ticketsService.getTicketsByEvent(eventId);
+  async getTicketsByEvent(@Param('eventId') eventId: string, @Req() req: any) {
+    const tickets = await this.ticketsService.getTicketsByEvent(eventId, req.user);
     return { tickets };
   }
 
@@ -52,7 +52,7 @@ export class TicketsController {
   @Roles(UserRole.ORGANIZER, UserRole.SCANNER)
   @Post('scan')
   async scanTicket(@Body() body: { qrData: string; eventId?: string }, @Req() req: any) {
-    const result = await this.ticketsService.scanTicket(body.qrData, req.user._id, body.eventId);
+    const result = await this.ticketsService.scanTicket(body.qrData, req.user._id, body.eventId, req.user);
     return result;
   }
 
@@ -85,8 +85,8 @@ export class TicketsController {
    */
   @UseGuards(JwtAuthGuard)
   @Get(':ticketId')
-  async getTicketById(@Param('ticketId') ticketId: string) {
-    const ticket = await this.ticketsService.getTicketById(ticketId);
+  async getTicketById(@Param('ticketId') ticketId: string, @Req() req: any) {
+    const ticket = await this.ticketsService.getTicketById(ticketId, req.user);
     return { ticket };
   }
 }
