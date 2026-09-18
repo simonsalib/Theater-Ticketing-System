@@ -46,10 +46,19 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
     const [activeSection, setActiveSection] = useState<'main' | 'balcony'>('main');
     const containerRef = React.useRef<HTMLDivElement>(null);
 
+    // Seed from the page's eager request, then keep polling server authority.
+    // An initial snapshot must never disable live availability updates.
+    useEffect(() => {
+        if (!initialSeatsData) return;
+        setTheaterData(initialSeatsData.theater || null);
+        setSeats(initialSeatsData.seats || []);
+        setSeatPricing(initialSeatsData.seatPricing || []);
+        setLoading(false);
+        setError(null);
+    }, [eventId, initialSeatsData]);
+
     // Fetch seat availability
     useEffect(() => {
-        if (initialSeatsData && !loading) return; // For initial load only if provided
-
         const fetchSeats = async (isPoll = false) => {
             try {
                 if (!isPoll) setLoading(true);
@@ -60,11 +69,17 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                     setTheaterData(data.theater);
                     
                     // Atomic update to prevent jerky UI
-                    setSeats(prevSeats => {
-                        // If it's a poll, only update if data changed (optional optimization)
-                        return data.seats;
-                    });
+                    setSeats(data.seats);
                     setSeatPricing(data.seatPricing);
+                    // Do not leave a stale, newly unavailable seat selected in the UI.
+                    setSelectedSeats((previous) => previous.filter((selected) => {
+                        const current = data.seats.find((seat: Seat) =>
+                            seat.section === selected.section &&
+                            seat.row === selected.row &&
+                            seat.seatNumber === selected.seatNumber,
+                        );
+                        return current && !current.isBooked && !current.isPending && current.isActive;
+                    }));
                 }
             } catch (err: any) {
                 console.error('Error fetching seats:', err);
@@ -74,7 +89,9 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
             }
         };
 
-        fetchSeats();
+        if (!initialSeatsData) {
+            fetchSeats();
+        }
 
         // Implement Polling to prevent "Ghost" seats
         const pollInterval = setInterval(() => {
@@ -84,7 +101,7 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
         }, 10000); // 10 seconds
 
         return () => clearInterval(pollInterval);
-    }, [eventId, readOnly]);
+    }, [eventId, initialSeatsData, readOnly]);
 
     // Group seats by SECTION and ROW for easy lookup
     const seatMap = useMemo(() => {
@@ -116,8 +133,11 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
         const floor = section === 'balcony' ? theaterData.layout.balcony : theaterData.layout.mainFloor;
         if (!floor) return [];
 
-        const prefix = section === 'balcony' ? 'BALC-' : '';
-        const labels = generateRowLabels(floor.rows, prefix);
+        // The backend validates against the configured labels. Re-generating labels here
+        // caused valid custom layouts (and some balconies) to render as empty seats.
+        const labels = Array.isArray(floor.rowLabels) && floor.rowLabels.length > 0
+            ? floor.rowLabels.map(String)
+            : generateRowLabels(floor.rows);
         const stagePos = theaterData.layout.stage?.position || 'top';
 
         return stagePos === 'bottom' ? [...labels].reverse() : labels;

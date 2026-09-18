@@ -1,6 +1,5 @@
 'use client';
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import api from '@/services/api';
 
 export type Language = 'en' | 'ar';
 
@@ -762,24 +761,24 @@ const translations: Record<Language, Record<string, string>> = {
 // ─── Context ─────────────────────────────────────────────────────────────────
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
+const applyLanguageToDOM = (lang: Language) => {
+    document.documentElement.lang = lang;
+    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    localStorage.setItem('language', lang);
+};
+
 export const LanguageProvider = ({ children }: { children: ReactNode }) => {
     const [language, setLangState] = useState<Language>('en');
 
     useEffect(() => {
         const saved = (localStorage.getItem('language') ?? 'en') as Language;
         const lang: Language = saved === 'ar' ? 'ar' : 'en';
-        applyToDOM(lang);
+        applyLanguageToDOM(lang);
         setLangState(lang);
     }, []);
 
-    const applyToDOM = (lang: Language) => {
-        document.documentElement.lang = lang;
-        document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
-        localStorage.setItem('language', lang);
-    };
-
     const setLanguage = async (lang: Language) => {
-        applyToDOM(lang);
+        applyLanguageToDOM(lang);
         setLangState(lang);
     };
 

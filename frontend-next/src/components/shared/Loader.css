@@ -44,7 +44,7 @@
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
-    letter-spacing: 0.02em;
+    letter-spacing: 0;
 }
 
 @keyframes spin {
@@ -71,4 +71,4 @@
         font-size: 0.85rem;
         margin-top: 1rem;
     }
-}
+}

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { FiCheck, FiX, FiDollarSign } from 'react-icons/fi';
 import { TheaterLayout } from '@/types/theater';
 import TheaterDesigner from '../Theater/TheaterDesigner';
+import { createSeatKey, parseSeatKey } from '@/utils/seatKey';
 import './EventSeatConfigurator.css';
 
 const SEAT_TYPES = {
@@ -58,13 +59,13 @@ const EventSeatConfigurator: React.FC<EventSeatConfiguratorProps> = ({
         }
         if (initialSeatConfig && initialSeatConfig.length > 0) {
             initialSeatConfig.forEach(cfg => {
-                const key = `${cfg.section || 'main'}-${cfg.row}-${cfg.seatNumber}`;
+                const key = createSeatKey(cfg.section || 'main', cfg.row, cfg.seatNumber);
                 initialMap[key] = cfg.seatType;
             });
         }
         if (initialPreBookedSeats && initialPreBookedSeats.length > 0) {
             initialPreBookedSeats.forEach(s => {
-                const key = `${s.section || 'main'}-${s.row}-${s.seatNumber}`;
+                const key = createSeatKey(s.section || 'main', s.row, s.seatNumber);
                 initialMap[key] = 'booked';
             });
         }
@@ -72,18 +73,18 @@ const EventSeatConfigurator: React.FC<EventSeatConfiguratorProps> = ({
     }, [theaterLayout, initialSeatConfig, initialPreBookedSeats]);
 
     const isSeatRemoved = (section: string, row: string, seatNum: number) => {
-        const key = `${section}-${row}-${seatNum}`;
+        const key = createSeatKey(section, row, seatNum);
         return theaterLayout?.removedSeats?.includes(key) || false;
     };
 
     const isSeatDisabled = (section: string, row: string, seatNum: number) => {
-        const key = `${section}-${row}-${seatNum}`;
+        const key = createSeatKey(section, row, seatNum);
         return theaterLayout?.disabledSeats?.includes(key) || false;
     };
 
     const handleSeatClick = (section: string, rowLabel: string, seatNum: number) => {
         if (isSeatRemoved(section, rowLabel, seatNum) || isSeatDisabled(section, rowLabel, seatNum)) return;
-        const key = `${section}-${rowLabel}-${seatNum}`;
+        const key = createSeatKey(section, rowLabel, seatNum);
         setSeatMap(prev => {
             const newMap = { ...prev };
             if (newMap[key] === currentCategory) delete newMap[key];
@@ -98,13 +99,13 @@ const EventSeatConfigurator: React.FC<EventSeatConfiguratorProps> = ({
             let allHaveCategory = true;
             for (let i = 1; i <= seatsPerRow; i++) {
                 if (isSeatRemoved(section, rowLabel, i) || isSeatDisabled(section, rowLabel, i)) continue;
-                if (newMap[`${section}-${rowLabel}-${i}`] !== currentCategory) {
+                if (newMap[createSeatKey(section, rowLabel, i)] !== currentCategory) {
                     allHaveCategory = false;
                     break;
                 }
             }
             for (let i = 1; i <= seatsPerRow; i++) {
-                const key = `${section}-${rowLabel}-${i}`;
+                const key = createSeatKey(section, rowLabel, i);
                 if (isSeatRemoved(section, rowLabel, i) || isSeatDisabled(section, rowLabel, i)) continue;
                 if (allHaveCategory) delete newMap[key];
                 else newMap[key] = currentCategory;
@@ -122,8 +123,8 @@ const EventSeatConfigurator: React.FC<EventSeatConfiguratorProps> = ({
         const preBookedArray: PreBookedSeat[] = [];
 
         Object.entries(seatMap).forEach(([key, type]) => {
-            const parts = key.split('-');
-            const seat = { section: parts[0], row: parts[1], seatNumber: parseInt(parts[2]) };
+            const seat = parseSeatKey(key);
+            if (!seat) return;
             if (type === 'booked') {
                 preBookedArray.push(seat);
             } else {
@@ -145,13 +146,15 @@ const EventSeatConfigurator: React.FC<EventSeatConfiguratorProps> = ({
         mainFloor: {
             rows: theaterLayout?.mainFloor?.rows || 10,
             seatsPerRow: theaterLayout?.mainFloor?.seatsPerRow || 12,
-            aislePositions: theaterLayout?.mainFloor?.aislePositions || []
+            aislePositions: theaterLayout?.mainFloor?.aislePositions || [],
+            rowLabels: theaterLayout?.mainFloor?.rowLabels || []
         },
         hasBalcony: theaterLayout?.hasBalcony || false,
         balcony: {
             rows: theaterLayout?.balcony?.rows || 0,
             seatsPerRow: theaterLayout?.balcony?.seatsPerRow || 0,
-            aislePositions: theaterLayout?.balcony?.aislePositions || []
+            aislePositions: theaterLayout?.balcony?.aislePositions || [],
+            rowLabels: theaterLayout?.balcony?.rowLabels || []
         },
         removedSeats: theaterLayout?.removedSeats || [],
         disabledSeats: theaterLayout?.disabledSeats || [],

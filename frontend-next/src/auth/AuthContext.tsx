@@ -1,7 +1,7 @@
 "use client";
 import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { toast } from "react-toastify";
-import api from "../services/api";
+import api, { AUTH_EXPIRED_EVENT, clearStoredAuth } from "../services/api";
 import { User, ApiResponse, AuthResponse } from "../types/auth";
 
 interface LoginResult {
@@ -34,30 +34,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        let active = true;
+        const resetAuth = () => {
+            if (!active) return;
+            setUser(null);
+            setAuthenticated(false);
+            setLoading(false);
+        };
         const fetchUser = async () => {
             try {
                 const res = await api.get<ApiResponse<User>>("/user/profile");
+                if (!active) return;
                 if (res.data.success) {
                     setUser(res.data.data);
                     setAuthenticated(true);
                 } else {
-                    setUser(null);
-                    setAuthenticated(false);
+                    resetAuth();
                 }
-            } catch (e) {
-                setUser(null);
-                setAuthenticated(false);
+            } catch {
+                clearStoredAuth();
+                resetAuth();
             } finally {
-                setLoading(false);
+                if (active) setLoading(false);
             }
         };
 
-        const isStoredAuth = typeof window !== 'undefined' && localStorage.getItem('isAuthenticated') === 'true';
-        if (isStoredAuth) {
+        const hasStoredToken = typeof window !== 'undefined' && Boolean(localStorage.getItem('token'));
+        window.addEventListener(AUTH_EXPIRED_EVENT, resetAuth);
+        if (hasStoredToken) {
             fetchUser();
         } else {
             setLoading(false);
         }
+        return () => {
+            active = false;
+            window.removeEventListener(AUTH_EXPIRED_EVENT, resetAuth);
+        };
     }, []);
 
     const login = async (credentials: { email: string; password: string }): Promise<LoginResult> => {
@@ -110,15 +122,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const logout = async () => {
         try {
             await api.post('/auth/logout');
-            setUser(null);
-            setAuthenticated(false);
-            localStorage.removeItem('isAuthenticated');
-            localStorage.removeItem('token');
             toast.success("Logged out successfully");
             return { success: true };
         } catch (error: any) {
-            toast.error("Logout failed. Please try again.");
+            // A local logout must still succeed when the server is offline or the token has expired.
+            toast.info("Signed out on this device.");
             return { success: false, error: error.response?.data?.message || "Error logging out" };
+        } finally {
+            clearStoredAuth();
+            setUser(null);
+            setAuthenticated(false);
         }
     };
 

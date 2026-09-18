@@ -40,7 +40,6 @@ const BookTicketPage = () => {
     // Seat selection state
     const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
     const [seatTotalPrice, setSeatTotalPrice] = useState(0);
-    const [existingSeats, setExistingSeats] = useState<{ row: string; seatNumber: number; section: string }[]>([]);
     const [initialSeatsData, setInitialSeatsData] = useState<any>(null);
 
     // Attendee form state
@@ -119,9 +118,7 @@ const BookTicketPage = () => {
                 // Fetch event details
                 const eventPromise = api.get<any>(`/event/${eventId}`);
 
-                // Fetch user bookings (optional)
                 const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-                const bookingsPromise = token ? api.get('/user/bookings').catch(e => null) : Promise.resolve(null);
 
                 // Fetch theater seats eagerly
                 const seatsPromise = api.get<any>(`/booking/event/${eventId}/seats`).catch(e => null);
@@ -130,8 +127,8 @@ const BookTicketPage = () => {
                 const holdPromise = token ? api.get(`/booking/active-hold/${eventId}`).catch(e => null) : Promise.resolve(null);
 
                 // Wait for all
-                const [eventResponse, bookingsResponse, seatsResponse, holdResponse] = await Promise.all([
-                    eventPromise, bookingsPromise, seatsPromise, holdPromise
+                const [eventResponse, seatsResponse, holdResponse] = await Promise.all([
+                    eventPromise, seatsPromise, holdPromise
                 ]);
 
                 // Process event
@@ -141,27 +138,6 @@ const BookTicketPage = () => {
                     setOrganizerInstapay(eventData.organizerId.instapayNumber || '');
                     setOrganizerInstapayQR(eventData.organizerId.instapayQR || '');
                     setOrganizerInstapayLink(eventData.organizerId.instapayLink || '');
-                }
-
-                // Process bookings (if logged in and successful)
-                if (bookingsResponse && bookingsResponse.data) {
-                    let bookingsData: any[] = [];
-                    if (bookingsResponse.data.success !== undefined) {
-                        bookingsData = bookingsResponse.data.data;
-                    } else if (Array.isArray(bookingsResponse.data)) {
-                        bookingsData = bookingsResponse.data;
-                    }
-
-                    const bookedSeats: { row: string; seatNumber: number; section: string }[] = [];
-                    bookingsData.forEach(booking => {
-                        const bEventId = typeof booking.eventId === 'object' ? booking.eventId._id : booking.eventId;
-                        if (bEventId === eventId && booking.status !== 'canceled' && booking.status !== 'rejected') {
-                            if (booking.selectedSeats && Array.isArray(booking.selectedSeats)) {
-                                bookedSeats.push(...booking.selectedSeats);
-                            }
-                        }
-                    });
-                    setExistingSeats(bookedSeats);
                 }
 
                 // Process eager seats data
@@ -429,6 +405,11 @@ const BookTicketPage = () => {
             toast.error("Please select at least one seat");
             return;
         }
+        if (event.hasTheaterSeating && !holdId) {
+            toast.error('Your seat hold has expired. Please select your seats again.');
+            setShowAttendeeForm(false);
+            return;
+        }
 
         // Validate attendee info for theater events
         if (event.hasTheaterSeating) {
@@ -466,9 +447,6 @@ const BookTicketPage = () => {
                     return;
                 }
 
-                attendeeInfo[i].attendeeFirstName = fName;
-                attendeeInfo[i].attendeeLastName = lName;
-                attendeeInfo[i].attendeePhone = phoneField;
             }
         }
 
@@ -478,7 +456,6 @@ const BookTicketPage = () => {
         try {
             const payload: any = {
                 eventId: event._id,
-                status: 'confirmed',
                 holdId: holdId || undefined,
             };
 
@@ -488,9 +465,9 @@ const BookTicketPage = () => {
                     seatNumber: seat.seatNumber,
                     section: seat.section,
                     seatLabel: seat.seatLabel,
-                    attendeeFirstName: attendeeInfo[index]?.attendeeFirstName || '',
-                    attendeeLastName: attendeeInfo[index]?.attendeeLastName || '',
-                    attendeePhone: attendeeInfo[index]?.attendeePhone || '',
+                    attendeeFirstName: attendeeInfo[index]?.attendeeFirstName?.trim() || '',
+                    attendeeLastName: attendeeInfo[index]?.attendeeLastName?.trim() || '',
+                    attendeePhone: attendeeInfo[index]?.attendeePhone?.trim() || '',
                 }));
             } else {
                 payload.numberOfTickets = numberOfTickets;
@@ -506,7 +483,7 @@ const BookTicketPage = () => {
                 setHoldId(null);
                 holdIdRef.current = null;
                 setHoldExpiresAt(null);
-                if (savedBooking?.status === 'confirmed' && event.hasTheaterSeating && savedBookingId) {
+                if (savedBooking?.status === 'confirmed' && savedBookingId) {
                     toast.success('Tickets are ready.');
                     router.push(`/bookings/${savedBookingId}/tickets`);
                     return;
@@ -859,7 +836,7 @@ const BookTicketPage = () => {
                                     animate={{ opacity: 1, x: 0 }}
                                     exit={{ opacity: 0, x: -20 }}
                                 >
-                                    <SeatSelector eventId={event._id} onSeatsSelected={handleSeatsSelected} maxSeats={10} highlightedSeats={existingSeats} initialSeatsData={initialSeatsData} />
+                                    <SeatSelector eventId={event._id} onSeatsSelected={handleSeatsSelected} maxSeats={10} initialSeatsData={initialSeatsData} />
                                 </motion.div>
                             ) : (
                                 <motion.div

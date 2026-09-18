@@ -22,6 +22,7 @@ interface FloorConfig {
     rows: number;
     seatsPerRow: number;
     aislePositions: number[];
+    rowLabels?: string[];
 }
 
 interface TheaterLayout {
@@ -421,16 +422,20 @@ const TheaterDesigner = ({
     // If Stage is TOP: Rows are rendered A, B, C... (A is at index 0, at top)
     // If Stage is BOTTOM: Rows are rendered P, O, N... (A is at the bottom, closest to stage)
     const mainRowLabels = useMemo(() => {
-        const labels = generateRowLabels(layout.mainFloor.rows);
+        const labels = layout.mainFloor.rowLabels?.length
+            ? layout.mainFloor.rowLabels.map(String)
+            : generateRowLabels(layout.mainFloor.rows);
         const isStageAtBottom = layout.stage.position?.toLowerCase() === 'bottom';
         return isStageAtBottom ? [...labels].reverse() : labels;
-    }, [layout.mainFloor.rows, layout.stage.position, generateRowLabels]);
+    }, [layout.mainFloor.rows, layout.mainFloor.rowLabels, layout.stage.position, generateRowLabels]);
 
     const balconyRowLabels = useMemo(() => {
-        const labels = generateRowLabels(layout.balcony.rows, 'BALC-');
+        const labels = layout.balcony.rowLabels?.length
+            ? layout.balcony.rowLabels.map(String)
+            : generateRowLabels(layout.balcony.rows, 'BALC-');
         const isStageAtBottom = layout.stage.position?.toLowerCase() === 'bottom';
         return isStageAtBottom ? [...labels].reverse() : labels;
-    }, [layout.balcony.rows, layout.stage.position, generateRowLabels]);
+    }, [layout.balcony.rows, layout.balcony.rowLabels, layout.stage.position, generateRowLabels]);
 
     // Handle seat click based on current tool
     const handleSeatClick = useCallback((row: string, seatNum: number, section: string, e: React.MouseEvent) => {

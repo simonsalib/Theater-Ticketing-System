@@ -7,6 +7,7 @@ import {
     FiZap, FiCheck, FiChevronsUp, FiChevronsDown, FiInfo
 } from 'react-icons/fi';
 import api from '@/services/api';
+import { parseSeatKey } from '@/utils/seatKey';
 import './EventSeatTypeEditor.css';
 
 interface SeatTypeInfo {
@@ -224,15 +225,14 @@ const EventSeatTypeEditor = ({
     useEffect(() => {
         if (!onPricingChange) return;
 
-        const seatPricing: SeatPricingItem[] = Array.from(seatAssignments.entries()).map(([key, info]) => {
-            const [section, row, seatNumber] = key.split('-');
-            return {
-                section,
-                row,
-                seatNumber: parseInt(seatNumber),
+        const seatPricing: SeatPricingItem[] = Array.from(seatAssignments.entries()).flatMap(([key, info]) => {
+            const seat = parseSeatKey(key);
+            if (!seat) return [];
+            return [{
+                ...seat,
                 seatType: info.seatType,
                 price: info.price
-            };
+            }];
         });
 
         onPricingChange({

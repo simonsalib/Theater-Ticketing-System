@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '@/services/api';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/auth/AuthContext';
@@ -66,6 +66,7 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showFullImage, setShowFullImage] = useState(false);
+    const imageObjectUrlRef = useRef<string | null>(null);
 
     useEffect(() => {
         const fetchTheaters = async () => {
@@ -89,11 +90,13 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
         }
 
         if (formData.theaterId) {
-            handleTheaterChange(formData.theaterId);
+            handleTheaterChange(formData.theaterId, false);
         }
 
         return () => {
-            if (formData.imagePreview) URL.revokeObjectURL(formData.imagePreview);
+            if (imageObjectUrlRef.current) {
+                URL.revokeObjectURL(imageObjectUrlRef.current);
+            }
         };
     }, []);
 
@@ -107,13 +110,25 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
                 : (name === 'totalTickets' || name === 'ticketPrice' || name === 'paymentDeadlineMinutes' || name === 'seatHoldDeadlineMinutes' ? parseFloat(value) || 0 : value)
         }));
 
-        if (name === 'theaterId' && value) {
-            handleTheaterChange(value);
+        if (name === 'theaterId') {
+            if (value) {
+                handleTheaterChange(value, true);
+            } else {
+                setSelectedTheaterLayout(null);
+                setEventSeatConfig([]);
+                setPreBookedSeats([]);
+            }
         }
     };
 
-    const handleTheaterChange = async (theaterId: string) => {
+    const handleTheaterChange = async (theaterId: string, resetSeatConfiguration: boolean) => {
         try {
+            if (resetSeatConfiguration) {
+                // Seat keys are scoped to a theater. Never carry a previous theater's
+                // custom configuration or reserved seats into a newly selected theater.
+                setEventSeatConfig([]);
+                setPreBookedSeats([]);
+            }
             const response = await api.get<any>(`/theater/${theaterId}`);
             if (response.data.success) {
                 const theater = response.data.data;
@@ -172,6 +187,23 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
         }));
     };
 
+    const clearObjectImagePreview = () => {
+        if (imageObjectUrlRef.current) {
+            URL.revokeObjectURL(imageObjectUrlRef.current);
+            imageObjectUrlRef.current = null;
+        }
+    };
+
+    const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        clearObjectImagePreview();
+        const imagePreview = URL.createObjectURL(file);
+        imageObjectUrlRef.current = imagePreview;
+        setFormData(prev => ({ ...prev, imageFile: file, imagePreview }));
+    };
+
     // Helper function to compress image before converting to base64
     const compressImage = (file: File): Promise<string> => {
         return new Promise((resolve, reject) => {
@@ -209,6 +241,12 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (formData.hasTheaterSeating && (!formData.theaterId || !selectedTheaterLayout)) {
+            const message = 'Choose a valid theater before saving a theater-seating event.';
+            setError(message);
+            toast.error(message);
+            return;
+        }
         try {
             setLoading(true);
 
@@ -435,7 +473,7 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
                                         <div key={type} className={`pricing-item type-${type}`}>
                                             <span className="type-label">{type.toUpperCase()}</span>
                                             <div className="price-input-wrapper">
-                                                <span className="currency">$</span>
+                                                <span className="currency">EGP</span>
                                                 <input
                                                     type="number"
                                                     value={formData.seatPricing[type]}
@@ -461,7 +499,7 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
                     </div>
                     {!formData.hasTheaterSeating && (
                         <div className="form-group">
-                            <label htmlFor="ticketPrice">Base Ticket Price ($)*</label>
+                            <label htmlFor="ticketPrice">Base Ticket Price (EGP)*</label>
                             <input type="number" id="ticketPrice" name="ticketPrice" value={formData.ticketPrice} onChange={handleChange} required={!formData.hasTheaterSeating} step="0.01" min="0" />
                         </div>
                     )}
@@ -479,19 +517,17 @@ const EventForm: React.FC<EventFormProps> = ({ initialData, isEdit, eventId }) =
 
                     <div className="image-source-buttons">
                         <button type="button" className={`source-select-btn ${!formData.useImageUrl ? 'active' : ''}`} onClick={() => setFormData(prev => ({ ...prev, useImageUrl: false }))}>Upload</button>
-                        <button type="button" className={`source-select-btn ${formData.useImageUrl ? 'active' : ''}`} onClick={() => setFormData(prev => ({ ...prev, useImageUrl: true }))}>URL</button>
+                        <button type="button" className={`source-select-btn ${formData.useImageUrl ? 'active' : ''}`} onClick={() => {
+                            clearObjectImagePreview();
+                            setFormData(prev => ({ ...prev, useImageUrl: true, imageFile: null, imagePreview: null }));
+                        }}>URL</button>
                     </div>
 
                     <div className="image-input-container">
                         {formData.useImageUrl ? (
                             <input type="url" name="imageUrl" value={formData.imageUrl} onChange={(e) => setFormData(prev => ({ ...prev, imageUrl: e.target.value, image: e.target.value }))} placeholder="Enter image URL" className="form-input" />
                         ) : (
-                            <input type="file" accept="image/*" onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                    setFormData(prev => ({ ...prev, imageFile: file, imagePreview: URL.createObjectURL(file) }));
-                                }
-                            }} className="form-input" />
+                            <input type="file" accept="image/*" onChange={handleImageFileChange} className="form-input" />
                         )}
                     </div>
                 </div>
