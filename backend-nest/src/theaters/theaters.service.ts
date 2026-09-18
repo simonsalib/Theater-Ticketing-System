@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Error as MongooseError, Model } from 'mongoose';
 import { Theater, TheaterDocument } from './schemas/theater.schema';
+import { UserRole } from '../users/schemas/user.schema';
 
 @Injectable()
 export class TheatersService {
@@ -88,7 +89,7 @@ export class TheatersService {
 
             return await theater.save();
         } catch (error) {
-            if (error.name === 'ValidationError') {
+            if (error instanceof MongooseError.ValidationError) {
                 throw new BadRequestException(
                     Object.values(error.errors).map((e: any) => e.message).join('; ')
                 );
@@ -120,11 +121,20 @@ export class TheatersService {
         return theater;
     }
 
-    async update(id: string, updateDto: any): Promise<TheaterDocument> {
+    private assertTheaterManager(theater: TheaterDocument, user: any): void {
+        const isAdmin = user?.role === UserRole.ADMIN;
+        const isCreator = theater.createdBy?.toString() === user?._id?.toString();
+        if (!isAdmin && !isCreator) {
+            throw new ForbiddenException('Only the theater creator or an admin can modify this theater');
+        }
+    }
+
+    async update(id: string, updateDto: any, user: any): Promise<TheaterDocument> {
         const theater = await this.theaterModel.findById(id).exec();
         if (!theater) {
             throw new NotFoundException('Theater not found');
         }
+        this.assertTheaterManager(theater, user);
 
         const { name, description, layout, seatConfig, isActive, image } = updateDto;
 
@@ -191,7 +201,7 @@ export class TheatersService {
             const updatedTheater = await theater.save();
             return updatedTheater;
         } catch (error) {
-            if (error.name === 'ValidationError') {
+            if (error instanceof MongooseError.ValidationError) {
                 throw new BadRequestException(
                     Object.values(error.errors).map((e: any) => e.message).join('; ')
                 );
@@ -200,11 +210,12 @@ export class TheatersService {
         }
     }
 
-    async hardDelete(id: string): Promise<void> {
+    async hardDelete(id: string, user: any): Promise<void> {
         const theater = await this.theaterModel.findById(id).exec();
         if (!theater) {
             throw new NotFoundException('Theater not found');
         }
+        this.assertTheaterManager(theater, user);
 
         // Check if any events are using this theater
         const eventsUsingTheater = await this.eventModel.countDocuments({ theater: id }).exec();
@@ -219,11 +230,12 @@ export class TheatersService {
         await this.theaterModel.findByIdAndDelete(id).exec();
     }
 
-    async updateSeatConfig(id: string, seatConfig: any[]): Promise<TheaterDocument> {
+    async updateSeatConfig(id: string, seatConfig: any[], user: any): Promise<TheaterDocument> {
         const theater = await this.theaterModel.findById(id).exec();
         if (!theater) {
             throw new NotFoundException('Theater not found');
         }
+        this.assertTheaterManager(theater, user);
 
         seatConfig.forEach((newSeat) => {
             const existingIndex = theater.seatConfig.findIndex(

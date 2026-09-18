@@ -12,13 +12,17 @@ import {
 } from '@nestjs/common';
 import { TheatersService } from './theaters.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { UserRole } from '../users/schemas/user.schema';
 
 @Controller('api/v1/theater')
 export class TheatersController {
     constructor(private readonly theatersService: TheatersService) { }
 
     @Post()
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN, UserRole.ORGANIZER)
     async create(@Body() createTheaterDto: any, @Req() req: any) {
         const data = await this.theatersService.create(createTheaterDto, req.user._id);
         return { success: true, data };
@@ -37,26 +41,30 @@ export class TheatersController {
     }
 
     @Put(':id')
-    @UseGuards(JwtAuthGuard)
-    async update(@Param('id') id: string, @Body() updateTheaterDto: any) {
-        const data = await this.theatersService.update(id, updateTheaterDto);
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN, UserRole.ORGANIZER)
+    async update(@Param('id') id: string, @Body() updateTheaterDto: any, @Req() req: any) {
+        const data = await this.theatersService.update(id, updateTheaterDto, req.user);
         return { success: true, data };
     }
 
     @Delete(':id')
-    @UseGuards(JwtAuthGuard)
-    async remove(@Param('id') id: string) {
-        await this.theatersService.hardDelete(id);
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN, UserRole.ORGANIZER)
+    async remove(@Param('id') id: string, @Req() req: any) {
+        await this.theatersService.hardDelete(id, req.user);
         return { success: true, message: 'Theater deleted successfully' };
     }
 
     @Put(':id/seat-config')
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN, UserRole.ORGANIZER)
     async updateSeatConfig(
         @Param('id') id: string,
         @Body('seatConfig') seatConfig: any[],
+        @Req() req: any,
     ) {
-        const data = await this.theatersService.updateSeatConfig(id, seatConfig);
+        const data = await this.theatersService.updateSeatConfig(id, seatConfig, req.user);
         return { success: true, data };
     }
 
