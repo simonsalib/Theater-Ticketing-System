@@ -80,7 +80,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const { user, token } = response.data.data;
                 setUser(user);
                 setAuthenticated(true);
-                localStorage.setItem('isAuthenticated', 'true');
                 if (token) {
                     localStorage.setItem('token', token);
                 }
@@ -89,8 +88,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             return { success: false, error: "Login failed" };
         } catch (err: any) {
-            console.log("Login error caught in AuthContext:", err.response?.status, err.response?.data);
-
             const errorData = err.response?.data;
             const messageData = typeof errorData?.message === 'object' ? errorData.message : errorData;
             const errorMsg = typeof errorData?.message === 'string' ? errorData.message : messageData?.message;

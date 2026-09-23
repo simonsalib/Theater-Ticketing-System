@@ -146,10 +146,24 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 20px;
+    --label-safe-top: 88px;
+    --label-safe-inline: 110px;
+    --label-safe-bottom: 32px;
+    padding: var(--label-safe-top) var(--label-safe-inline) var(--label-safe-bottom);
     transform-origin: top center;
     position: relative;
     min-width: max-content;
+}
+
+/* Labels are positioned relative to the seat map, while the canvas keeps a
+   protected ring around it so ENTRY/EXIT labels never need to overlap seats. */
+.theater-map-content {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: max-content;
 }
 
 .section {
@@ -291,6 +305,7 @@
     height: 100%;
     pointer-events: none;
     z-index: 1;
+    overflow: visible;
 }
 
 .theater-label {
@@ -743,13 +758,17 @@
         width: 100% !important;
         max-width: 100vw !important;
         margin: 0 !important;
-        overflow: hidden !important;
+        overflow-x: hidden !important;
+        overflow-y: visible !important;
         display: block !important;
         background: transparent !important;
     }
 
     .theater-canvas {
-        padding: 0 !important;
+        --label-safe-top: 64px;
+        --label-safe-inline: 68px;
+        --label-safe-bottom: 20px;
+        padding: var(--label-safe-top) var(--label-safe-inline) var(--label-safe-bottom) !important;
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
@@ -853,8 +872,8 @@
 /* Fix for Booking page redundant scrollbars */
 .theater-seat-area .theater-canvas-container,
 .theater-seat-container .theater-canvas-container {
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
     padding: 0 !important;
     margin: 0 !important;
     width: 100% !important;

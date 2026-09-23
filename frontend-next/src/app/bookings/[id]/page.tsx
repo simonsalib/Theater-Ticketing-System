@@ -35,7 +35,7 @@ const BookingDetailsPage = () => {
 
             if (distance < 0) {
                 setTimeLeft('Expired');
-                setBooking({ ...booking, status: 'Cancelled' });
+                setBooking(current => current ? { ...current, status: 'Cancelled' } : current);
                 return;
             }
 

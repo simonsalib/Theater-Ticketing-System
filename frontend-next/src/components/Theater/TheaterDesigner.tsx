@@ -234,7 +234,9 @@ const TheaterDesigner = ({
             }));
             // We don't saveToHistory here to avoid immediate undo stack pollution on load
         }
-    }, [labels.length, zoomLevel]); // Only trigger when labels are added/loaded or zoom changes (for initial rect)
+    // Pixel-based labels do not need reconversion while they are being dragged.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [labels.length, zoomLevel]);
 
     const saveToHistory = useCallback(() => {
         setHistory(prev => [...prev.slice(-49), createSnapshot()]); // Keep last 50 actions
@@ -495,7 +497,7 @@ const TheaterDesigner = ({
                 }
                 break;
         }
-    }, [isPreviewMode, currentTool]);
+    }, [isPreviewMode, currentTool, disabledSeats, removedSeats, saveToHistory]);
 
     // Bulk remove selected seats
     const removeSelectedSeats = useCallback(() => {
@@ -560,7 +562,7 @@ const TheaterDesigner = ({
             }
             return next;
         });
-    }, [currentTool]);
+    }, [currentTool, saveToHistory]);
 
     // Check if row has a horizontal corridor after it
     const hasHCorridorAfter = useCallback((section: string, rowIndex: number): boolean => {
@@ -642,8 +644,8 @@ const TheaterDesigner = ({
 
     // Calculate total active seats
     const totalSeats = useMemo(() => {
-        let mainSeats = layout.mainFloor.rows * layout.mainFloor.seatsPerRow;
-        let balconySeats = layout.hasBalcony
+        const mainSeats = layout.mainFloor.rows * layout.mainFloor.seatsPerRow;
+        const balconySeats = layout.hasBalcony
             ? layout.balcony.rows * layout.balcony.seatsPerRow
             : 0;
         const totalPossible = mainSeats + balconySeats;

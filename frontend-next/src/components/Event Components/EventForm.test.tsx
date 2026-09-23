@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const routerMocks = vi.hoisted(() => ({ push: vi.fn() }));
 const apiMocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
@@ -22,11 +22,16 @@ vi.mock('react-toastify', () => ({ toast: { success: vi.fn(), error: vi.fn() } }
 import EventForm from './EventForm';
 
 describe('EventForm integration', () => {
-    it('sends organizer-selected approval and payment hold settings when creating an event', async () => {
-        const user = userEvent.setup();
+    beforeEach(() => {
+        apiMocks.get.mockReset();
+        apiMocks.post.mockReset();
+        routerMocks.push.mockReset();
         apiMocks.get.mockResolvedValue({ data: { success: true, data: [] } });
         apiMocks.post.mockResolvedValue({ data: { success: true, data: { _id: 'event-1' } } });
+    });
 
+    it('sends organizer-selected approval and payment hold settings when creating an event', async () => {
+        const user = userEvent.setup();
         render(<EventForm />);
 
         await user.type(screen.getByLabelText('Event Title*'), 'Frontend integration event');
@@ -53,5 +58,31 @@ describe('EventForm integration', () => {
             }));
         });
         expect(routerMocks.push).toHaveBeenCalledWith('/my-events');
+    });
+
+    it('creates an instant-QR event without organizer confirmation', async () => {
+        const user = userEvent.setup();
+        render(<EventForm initialData={{
+            title: 'Instant QR event',
+            description: 'Tickets are issued immediately.',
+            date: '2027-02-20',
+            cancellationDeadline: '2027-02-19',
+            startTime: '18:00',
+            endTime: '20:00',
+            location: 'Cairo',
+            totalTickets: 25,
+            ticketPrice: 175,
+        }} />);
+
+        await user.click(screen.getByRole('radio', { name: /Instant QR tickets/i }));
+        await user.click(screen.getByRole('button', { name: 'Create Event' }));
+
+        await waitFor(() => {
+            expect(apiMocks.post).toHaveBeenCalledWith('/event', expect.objectContaining({
+                requiresOrganizerApproval: false,
+                totalTickets: 25,
+                ticketPrice: 175,
+            }));
+        });
     });
 });

@@ -268,7 +268,9 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
             clearTimeout(resizeTimer);
             window.removeEventListener('resize', handleResize);
         };
-    }, [theaterData]);
+    // Main floor and balcony can have different dimensions. Recalculate both
+    // scale and reserved height whenever the user switches sections.
+    }, [theaterData, activeSection]);
 
     // Render single seat
     const renderSeatSlot = (section: string, rowLabel: string, seatNum: number) => {
@@ -479,73 +481,75 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                         transform: `scale(${scale})`,
                         transformOrigin: scale < 1 ? 'top left' : 'top center'
                     }}>
-                        {/* Stage at top */}
-                        {(theaterData?.layout.stage?.position || 'top') === 'top' && (
-                            <motion.div
-                                className="stage stage-top"
-                                style={{ width: `${theaterData?.layout.stage?.width || 60}%` }}
-                                initial={{ opacity: 0, y: -20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                            >
-                                <FiChevronsUp className="stage-icon" />
-                                <span>STAGE</span>
-                            </motion.div>
-                        )}
+                        <div className="theater-map-content">
+                            {/* Stage at top */}
+                            {(theaterData?.layout.stage?.position || 'top') === 'top' && (
+                                <motion.div
+                                    className="stage stage-top"
+                                    style={{ width: `${theaterData?.layout.stage?.width || 60}%` }}
+                                    initial={{ opacity: 0, y: -20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                >
+                                    <FiChevronsUp className="stage-icon" />
+                                    <span>STAGE</span>
+                                </motion.div>
+                            )}
 
-                        {/* Render only the active section */}
-                        {activeSection === 'main' && renderSection('main')}
-                        {activeSection === 'balcony' && theaterData?.layout.hasBalcony && renderSection('balcony')}
+                            {/* Render only the active section */}
+                            {activeSection === 'main' && renderSection('main')}
+                            {activeSection === 'balcony' && theaterData?.layout.hasBalcony && renderSection('balcony')}
 
-                        {/* Stage at bottom */}
-                        {theaterData?.layout.stage?.position === 'bottom' && (
-                            <motion.div
-                                className="stage stage-bottom"
-                                style={{ width: `${theaterData?.layout.stage?.width || 60}%` }}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                            >
-                                <span>STAGE</span>
-                                <FiChevronsDown className="stage-icon" />
-                            </motion.div>
-                        )}
+                            {/* Stage at bottom */}
+                            {theaterData?.layout.stage?.position === 'bottom' && (
+                                <motion.div
+                                    className="stage stage-bottom"
+                                    style={{ width: `${theaterData?.layout.stage?.width || 60}%` }}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                >
+                                    <span>STAGE</span>
+                                    <FiChevronsDown className="stage-icon" />
+                                </motion.div>
+                            )}
 
-                        {/* Labels Overlay */}
-                        <div className="labels-overlay">
-                            {theaterData?.layout.labels?.filter((label: any) => (label.section || 'main') === activeSection).map((label: any) => {
-                                const isEntry = label.text?.toUpperCase().includes('ENTRY');
-                                const isExit = label.text?.toUpperCase().includes('EXIT');
+                            {/* Labels Overlay */}
+                            <div className="labels-overlay">
+                                {theaterData?.layout.labels?.filter((label: any) => (label.section || 'main') === activeSection).map((label: any) => {
+                                    const isEntry = label.text?.toUpperCase().includes('ENTRY');
+                                    const isExit = label.text?.toUpperCase().includes('EXIT');
 
-                                const style: React.CSSProperties = {
-                                    width: label.width || 'auto',
-                                    height: label.height || 'auto'
-                                };
+                                    const style: React.CSSProperties = {
+                                        width: label.width || 'auto',
+                                        height: label.height || 'auto'
+                                    };
 
-                                if (label.isPixelBased) {
-                                    // Pixel-based: x is offset from center, y is from top
-                                    style.left = `calc(50% + ${label.position?.x || 0}px)`;
-                                    style.top = `${label.position?.y || 0}px`;
-                                } else {
-                                    // Legacy percentage-based positioning
-                                    style.left = `${label.position?.x || 0}%`;
-                                    style.top = `${label.position?.y || 0}%`;
-                                }
+                                    if (label.isPixelBased) {
+                                        // Pixel-based: x is offset from center, y is from top
+                                        style.left = `calc(50% + ${label.position?.x || 0}px)`;
+                                        style.top = `${label.position?.y || 0}px`;
+                                    } else {
+                                        // Legacy percentage-based positioning
+                                        style.left = `${label.position?.x || 0}%`;
+                                        style.top = `${label.position?.y || 0}%`;
+                                    }
 
-                                return (
-                                    <motion.div
-                                        key={label.id}
-                                        className={`theater-label ${isEntry ? 'label-entry' : ''} ${isExit ? 'label-exit' : ''}`}
-                                        style={{
-                                            ...style,
-                                            minWidth: label.width ? undefined : 'auto'
-                                        }}
-                                        initial={{ scale: 0 }}
-                                        animate={{ scale: 1 }}
-                                    >
-                                        {label.icon && <span className="label-icon">{label.icon}</span>}
-                                        <span className="label-text">{label.text}</span>
-                                    </motion.div>
-                                );
-                            })}
+                                    return (
+                                        <motion.div
+                                            key={label.id}
+                                            className={`theater-label ${isEntry ? 'label-entry' : ''} ${isExit ? 'label-exit' : ''}`}
+                                            style={{
+                                                ...style,
+                                                minWidth: label.width ? undefined : 'auto'
+                                            }}
+                                            initial={{ scale: 0 }}
+                                            animate={{ scale: 1 }}
+                                        >
+                                            {label.icon && <span className="label-icon">{label.icon}</span>}
+                                            <span className="label-text">{label.text}</span>
+                                        </motion.div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                 </div>

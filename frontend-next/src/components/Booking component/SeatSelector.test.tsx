@@ -1,4 +1,5 @@
 import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const apiMocks = vi.hoisted(() => ({ get: vi.fn() }));
@@ -15,7 +16,8 @@ const theater = {
     active: true,
     layout: {
         mainFloor: { rows: 1, seatsPerRow: 1, rowLabels: ['Orchestra'] },
-        hasBalcony: false,
+        hasBalcony: true,
+        balcony: { rows: 1, seatsPerRow: 1, rowLabels: ['Gallery'] },
         stage: { position: 'top' as const },
     },
 };
@@ -54,5 +56,29 @@ describe('SeatSelector integration', () => {
 
         expect(apiMocks.get).toHaveBeenCalledWith('/booking/event/event-1/seats');
         expect(seatButton()).toBeDisabled();
+    });
+
+    it('renders the configured balcony when the user switches sections', async () => {
+        const user = userEvent.setup();
+        render(
+            <SeatSelector
+                eventId="event-1"
+                initialSeatsData={{
+                    theater,
+                    seatPricing: [{ seatType: 'standard', price: 100 }],
+                    seats: [availableSeat, {
+                        ...availableSeat,
+                        _id: 'seat-2',
+                        section: 'balcony',
+                        row: 'Gallery',
+                    }],
+                }}
+            />,
+        );
+
+        await user.click(screen.getByRole('button', { name: /balcony/i }));
+
+        expect(screen.getByText('Gallery Left')).toBeInTheDocument();
+        expect(screen.getByText('Gallery Right')).toBeInTheDocument();
     });
 });

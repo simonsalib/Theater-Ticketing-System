@@ -62,7 +62,6 @@ const TheaterFormPage = () => {
                 seatConfig: designerData.seatConfig
             };
 
-            console.log('Saving theater with payload:', payload);
 
             if (isEditMode) await api.put(`/theater/${id}`, payload);
             else await api.post('/theater', payload);

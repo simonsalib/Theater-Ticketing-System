@@ -6,6 +6,7 @@ import api from '@/services/api';
 import ConfirmationDialog from '../AdminComponent/ConfirmationDialog';
 import CancelSeatsModal from './CancelSeatsModal';
 import RequestCancellationModal from './RequestCancellationModal';
+import { getSafeExternalUrl } from '@/utils/url';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiCalendar, FiMapPin, FiClock, FiTrash2, FiEye, FiAlertCircle, FiCheckCircle, FiUploadCloud, FiGrid, FiCopy, FiRotateCcw, FiExternalLink } from 'react-icons/fi';
 import { toast } from 'react-toastify';
@@ -84,6 +85,8 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
 
     useEffect(() => {
         fetchBookings();
+        // Both current and previous booking routes mount separate component instances.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -190,7 +193,6 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
 
             setEventDetails(events);
             setBookings(relevantBookings);
-            console.log('DEBUG: eventDetails populated:', events);
         } catch (err: any) {
             console.error("Error fetching bookings:", err);
             setError(err.response?.data?.message || "Failed to load bookings");
@@ -414,7 +416,7 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                             const timeLeft = timers[booking._id];
                             const instapayQR = event?.organizerId?.instapayQR;
                             const instapayNumber = event?.organizerId?.instapayNumber ?? '';
-                            const instapayLink = event?.organizerId?.instapayLink ?? '';
+                            const instapayLink = getSafeExternalUrl(event?.organizerId?.instapayLink);
 
                             return (
                                 <div key={booking._id} style={{

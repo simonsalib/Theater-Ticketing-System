@@ -145,7 +145,6 @@ Reading order: deployment/bootstrap -> auth/users -> theater/events -> booking/h
 | frontend-next/.env | 2 | tracked environment file; values not reproduced | - |
 | frontend-next/.gitignore | 42 | configuration/docs/artifact | - |
 | frontend-next/README.md | 37 | configuration/docs/artifact | - |
-| frontend-next/dummy_receipt.png | - | asset | - |
 | frontend-next/eslint.config.mjs | 19 | configuration/docs/artifact | - |
 | frontend-next/next.config.ts | 38 | configuration/docs/artifact | headers |
 | frontend-next/package-lock.json | 7239 | dependency lock | - |
@@ -295,11 +294,8 @@ Reading order: deployment/bootstrap -> auth/users -> theater/events -> booking/h
 | frontend-next/src/types/event.ts | 87 | source | - |
 | frontend-next/src/types/theater.ts | 46 | source | - |
 | frontend-next/src/utils/imageHelper.ts | 22 | source | getImageUrl |
-| frontend-next/ts_errors.txt | - | asset | - |
-| frontend-next/tsc-errors.txt | 48 | configuration/docs/artifact | - |
-| frontend-next/tsc-errors2.txt | 21 | configuration/docs/artifact | - |
-| frontend-next/tsc-errors3.txt | 19 | configuration/docs/artifact | - |
-| frontend-next/tsc-errors4.txt | - | configuration/docs/artifact | - |
+| frontend-next/src/utils/url.test.ts | 17 | test | - |
+| frontend-next/src/utils/url.ts | 11 | source | getSafeExternalUrl |
 | frontend-next/tsconfig.json | 43 | configuration/docs/artifact | - |
 | package-lock.json | 572 | dependency lock | - |
 | package.json | 14 | configuration/docs/artifact | - |

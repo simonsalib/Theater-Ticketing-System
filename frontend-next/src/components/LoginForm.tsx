@@ -64,7 +64,6 @@ export default function LoginForm() {
                 ...formData,
                 email: formData.email.toLowerCase(),
             }) as any;
-            console.log("Login result in LoginForm:", result);
 
             if (result.success) {
                 toast.success("Login successful!");
@@ -78,7 +77,6 @@ export default function LoginForm() {
                 toast.info("Please set your own password");
                 router.push(`/set-password?email=${encodeURIComponent(result.email)}`);
             } else if (result.requiresVerification) {
-                console.log("Switching to OTP form...");
                 toast.info("Please verify your account");
                 setShowOtpForm(true);
             } else {
@@ -89,7 +87,6 @@ export default function LoginForm() {
             console.error("LoginForm handleSubmit try/catch/at:", err);
             toast.error("An unexpected error occurred");
         } finally {
-            console.log("Setting loading to false");
             setLoading(false);
         }
     };

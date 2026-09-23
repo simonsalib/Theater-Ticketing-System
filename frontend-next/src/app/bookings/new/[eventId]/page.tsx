@@ -17,6 +17,7 @@ import CancelSeatsModal from '@/components/Booking component/CancelSeatsModal';
 import { toast } from 'react-toastify';
 import { API_BASE_URL } from '../../../../config';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getSafeExternalUrl } from '@/utils/url';
 import '@/components/Booking component/BookingTicketForm.css';
 
 interface AttendeeInfo {
@@ -66,6 +67,7 @@ const BookTicketPage = () => {
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
     const holdIdRef = useRef<string | null>(null); // for cleanup in useEffect
     const requiresOrganizerApproval = event?.requiresOrganizerApproval !== false;
+    const safeOrganizerInstapayLink = getSafeExternalUrl(organizerInstapayLink);
     const formatHoldCountdown = (totalSeconds: number) => {
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -302,10 +304,15 @@ const BookTicketPage = () => {
 
     const handleCancelSeatsConfirm = async (seatKeys: string[], cancelAll: boolean) => {
         setIsLoading(true);
+        let releasedExistingHold = false;
         try {
             // 1. Release the current hold
             if (holdId) {
                 await api.delete(`/booking/hold-seats/${holdId}`);
+                releasedExistingHold = true;
+                setHoldId(null);
+                holdIdRef.current = null;
+                setHoldExpiresAt(null);
             }
 
             if (cancelAll) {
@@ -364,6 +371,17 @@ const BookTicketPage = () => {
             }
         } catch (err: any) {
             console.error("Cancellation error:", err);
+            // If the old hold was released but creating the reduced hold failed,
+            // discard the stale client selection and fetch availability again.
+            if (releasedExistingHold) {
+                setHoldId(null);
+                holdIdRef.current = null;
+                setHoldExpiresAt(null);
+                setShowAttendeeForm(false);
+                setSelectedSeats([]);
+                setAttendeeInfo([]);
+                setSeatTotalPrice(0);
+            }
             toast.error(err.response?.data?.message || "Failed to cancel seats. Please try again.");
         } finally {
             setIsLoading(false);
@@ -622,18 +640,18 @@ const BookTicketPage = () => {
                                     <FiCopy size={14} /> {hasCopied ? t('gen.copied') : t('gen.copy')}
                                 </button>
                             </div>
-                        ) : !organizerInstapayQR && !organizerInstapayLink ? (
+                        ) : !organizerInstapayQR && !safeOrganizerInstapayLink ? (
                             <p className="instapay-fallback">{t('payment.fallback')}</p>
                         ) : null}
 
-                        {organizerInstapayLink && (
+                        {safeOrganizerInstapayLink && (
                             <div style={{
                                 marginTop: '16px',
                                 display: 'flex',
                                 justifyContent: 'center'
                             }}>
                                 <a
-                                    href={organizerInstapayLink}
+                                    href={safeOrganizerInstapayLink}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     style={{
