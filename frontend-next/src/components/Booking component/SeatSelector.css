@@ -99,11 +99,10 @@
     border-top: none;
 }
 
-.stage-bottom {
+.seat-selector .stage-bottom {
     border-top-left-radius: 30px;
     border-top-right-radius: 30px;
     border-bottom: none;
-    margin-top: 20px;
 }
 
 .stage-icon {
@@ -142,7 +141,7 @@
     align-items: center;
 }
 
-.theater-canvas {
+.seat-selector .theater-canvas {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -155,14 +154,13 @@
     min-width: max-content;
 }
 
-/* Labels are positioned relative to the seat map, while the canvas keeps a
-   protected ring around it so ENTRY/EXIT labels never need to overlap seats. */
-.theater-map-content {
+/* Keep the editor's canvas spacing so its saved label coordinates line up with seats. */
+.seat-selector .theater-map-content {
     position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: 30px;
     width: max-content;
 }
 
@@ -297,12 +295,13 @@
     opacity: 0.6;
 }
 
-.labels-overlay {
+.seat-selector .labels-overlay {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    /* The editor canvas has 20px padding on every side; labels use that canvas as origin. */
+    top: -20px;
+    left: -20px;
+    width: calc(100% + 40px);
+    height: calc(100% + 40px);
     pointer-events: none;
     z-index: 1;
     overflow: visible;
@@ -729,9 +728,9 @@
         overflow: hidden;
     }
 
-    .section,
-    .main-section,
-    .balcony-section {
+    .seat-selector .section,
+    .seat-selector .main-section,
+    .seat-selector .balcony-section {
         padding: 0 !important;
         max-width: 100% !important;
         margin: 0 !important;
@@ -764,8 +763,14 @@
         background: transparent !important;
     }
 
-    .theater-canvas {
-        --label-safe-top: 64px;
+    .seat-selector .labels-overlay {
+        /* Mobile removes the section's 20px padding as well. */
+        top: -40px;
+        height: calc(100% + 80px);
+    }
+
+    .seat-selector .theater-canvas {
+        --label-safe-top: 104px;
         --label-safe-inline: 68px;
         --label-safe-bottom: 20px;
         padding: var(--label-safe-top) var(--label-safe-inline) var(--label-safe-bottom) !important;
@@ -775,9 +780,9 @@
         margin: 0 !important;
     }
 
-    .stage {
-        padding: 5px 10px;
-        font-size: 0.8rem;
+    .seat-selector .stage {
+        padding: 20px 40px;
+        font-size: 1.1rem;
     }
 
     .h-corridor-space {
