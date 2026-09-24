@@ -81,4 +81,36 @@ describe('SeatSelector integration', () => {
         expect(screen.getByText('Gallery Left')).toBeInTheDocument();
         expect(screen.getByText('Gallery Right')).toBeInTheDocument();
     });
+
+    it('uses BALC-prefixed fallback rows when balcony row labels are empty', async () => {
+        const user = userEvent.setup();
+        const fallbackTheater = {
+            ...theater,
+            layout: {
+                ...theater.layout,
+                balcony: { rows: 1, seatsPerRow: 1, rowLabels: [] },
+            },
+        };
+        const { container } = render(
+            <SeatSelector
+                eventId="event-1"
+                initialSeatsData={{
+                    theater: fallbackTheater,
+                    seatPricing: [{ seatType: 'standard', price: 100 }],
+                    seats: [{
+                        ...availableSeat,
+                        _id: 'balcony-seat-1',
+                        section: 'balcony',
+                        row: 'BALC-A',
+                    }],
+                }}
+            />,
+        );
+
+        await user.click(screen.getByRole('button', { name: /balcony/i }));
+
+        expect(screen.getByText('BALC-A Left')).toBeInTheDocument();
+        expect(screen.getByText('BALC-A Right')).toBeInTheDocument();
+        expect(container.querySelector('.seat-btn .seat-num')).toHaveTextContent('1');
+    });
 });

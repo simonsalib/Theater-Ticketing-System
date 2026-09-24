@@ -11,7 +11,7 @@
 | Command | Result |
 | --- | --- |
 | `tsc --noEmit` under Node 22 | Passed |
-| `vitest run` under Node 22 | Passed: 9 files, 17 tests |
+| `vitest run` under Node 22 | Passed: 9 files, 18 tests |
 | `next build` under Node 22 | Passed; all 29 app routes generated |
 | Local route smoke test | Passed: HTTP 200 from `/events/6a89d5a6cb4651200e13dc26` |
 | Repository-wide ESLint | Existing baseline failure; tracked in `FRONTEND-AUDIT.md`, not used as a deploy gate yet |
@@ -32,6 +32,7 @@
 12. Accepts only `http`/`https` organizer payment links and rejects executable or malformed schemes.
 13. Creates an instant-QR event with organizer confirmation disabled.
 14. Redirects anonymous and wrong-role users while rendering protected content for the allowed role.
+15. Maps empty balcony row configuration to `BALC-*` inventory rows so real seat buttons render instead of placeholders.
 
 ## CI gate
 

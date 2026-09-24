@@ -137,7 +137,7 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
         // caused valid custom layouts (and some balconies) to render as empty seats.
         const labels = Array.isArray(floor.rowLabels) && floor.rowLabels.length > 0
             ? floor.rowLabels.map(String)
-            : generateRowLabels(floor.rows);
+            : generateRowLabels(floor.rows, section === 'balcony' ? 'BALC-' : '');
         const stagePos = theaterData.layout.stage?.position || 'top';
 
         return stagePos === 'bottom' ? [...labels].reverse() : labels;
