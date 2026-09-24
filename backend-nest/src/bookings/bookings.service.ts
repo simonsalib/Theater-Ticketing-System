@@ -247,11 +247,15 @@ export class BookingsService implements OnModuleInit {
         }
     }
 
-    private getRowLabels(floor: any): string[] {
+    private getRowLabels(floor: any, section: 'main' | 'balcony'): string[] {
         if (Array.isArray(floor?.rowLabels) && floor.rowLabels.length > 0) {
             return floor.rowLabels.map((row: unknown) => String(row));
         }
-        return Array.from({ length: Number(floor?.rows) || 0 }, (_, index) => String.fromCharCode(65 + index));
+        const prefix = section === 'balcony' ? 'BALC-' : '';
+        return Array.from(
+            { length: Number(floor?.rows) || 0 },
+            (_, index) => `${prefix}${String.fromCharCode(65 + index)}`,
+        );
     }
 
     private validateTheaterSeats(theater: TheaterDocument, seats: any[], requireAttendees = false): any[] {
@@ -272,7 +276,7 @@ export class BookingsService implements OnModuleInit {
             if (section === 'balcony' && !theater.layout.hasBalcony) {
                 throw new BadRequestException(`Invalid seat ${key}`);
             }
-            if (!this.getRowLabels(floor).includes(row) || keys.has(key)) {
+            if (!this.getRowLabels(floor, section).includes(row) || keys.has(key)) {
                 throw new BadRequestException(`Invalid or duplicate seat ${key}`);
             }
             keys.add(key);

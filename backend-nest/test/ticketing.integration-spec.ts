@@ -241,6 +241,39 @@ describe('Ticketing integration audit', () => {
         p50Ms: samples[Math.floor(samples.length * 0.5)], p95Ms: samples[Math.floor(samples.length * 0.95)],
       }, null, 2));
     });
+
+    test('FLOW-21 balcony fallback row returned by availability can be held', async () => {
+      await h.model('Theater').updateOne(
+        { _id: f.theater._id },
+        { 'layout.balcony.rowLabels': [] },
+      );
+
+      const availability = await h.http()
+        .get(`/api/v1/booking/event/${f.eventId}/seats`)
+        .expect(200);
+      const balconySeat = availability.body.data.seats.find(
+        (candidate: any) => candidate.section === 'balcony' && candidate.isActive && !candidate.isBooked,
+      );
+
+      expect(balconySeat).toMatchObject({ section: 'balcony', row: 'BALC-A' });
+      const hold = await h.http()
+        .post('/api/v1/booking/hold-seats')
+        .set('Authorization', auth(f.buyer))
+        .send({
+          eventId: f.eventId,
+          seats: [{
+            row: balconySeat.row,
+            seatNumber: balconySeat.seatNumber,
+            section: balconySeat.section,
+          }],
+        })
+        .expect(201);
+
+      expect(hold.body.data.seats).toEqual([
+        expect.objectContaining({ section: 'balcony', row: 'BALC-A' }),
+      ]);
+      await h.assertIntegrity(f.eventId);
+    });
   });
 
   describe('Authorization and data exposure contracts', () => {
