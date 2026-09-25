@@ -417,6 +417,18 @@ export class BookingsService implements OnModuleInit {
     }
 
     /**
+     * Release every unconverted seat hold owned by a user.
+     * Pending and confirmed bookings are intentionally left untouched.
+     */
+    async releaseAllUserHolds(userId: string): Promise<void> {
+        const holds = await this.seatHoldModel.find({ userId } as any).select('_id').lean().exec();
+
+        for (const hold of holds) {
+            await this.releaseHold(hold._id.toString(), userId);
+        }
+    }
+
+    /**
      * Release all holds by a user for a specific event.
      */
     private async releaseUserHolds(eventId: string, userId: string): Promise<void> {

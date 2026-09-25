@@ -128,6 +128,22 @@ describe('Ticketing integration audit', () => {
       await h.assertIntegrity(f.eventId);
     });
 
+    test('FLOW-08B logout releases only the current user seat holds', async () => {
+      await h.bookings.holdSeats(f.eventId, [seat(1)], f.buyer._id.toString());
+      await h.bookings.holdSeats(f.eventId, [seat(2)], f.stranger._id.toString());
+      const pendingBooking = await h.book(f, [seat(3)]);
+
+      await h.http()
+        .post('/api/v1/auth/logout')
+        .set('Authorization', auth(f.buyer))
+        .expect(200);
+
+      expect(await h.model('SeatHold').countDocuments({ userId: f.buyer._id })).toBe(0);
+      expect(await h.model('SeatHold').countDocuments({ userId: f.stranger._id })).toBe(1);
+      expect(await h.model('Booking').countDocuments({ _id: pendingBooking._id, status: 'pending' })).toBe(1);
+      await h.assertIntegrity(f.eventId);
+    });
+
     test('FLOW-09 expired holds and pending bookings release seats on cleanup', async () => {
       const hold = await h.bookings.holdSeats(f.eventId, [seat()], f.buyer._id.toString());
       await h.model('SeatHold').updateOne({ _id: hold.holdId }, { expiresAt: new Date(0) });

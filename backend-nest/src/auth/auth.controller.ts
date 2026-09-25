@@ -1,5 +1,7 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Res } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { JwtAuthGuard } from './jwt-auth.guard';
+import { BookingsService } from '../bookings/bookings.service';
 import type { Response } from 'express';
 
 const isProduction = process.env.NODE_ENV === 'production';
@@ -13,7 +15,10 @@ const getCookieOptions = () => ({
 
 @Controller('api/v1/auth')
 export class AuthController {
-    constructor(private authService: AuthService) { }
+    constructor(
+        private authService: AuthService,
+        private bookingsService: BookingsService,
+    ) { }
 
     @Post('register')
     async register(@Body() registerDto: any) {
@@ -41,13 +46,18 @@ export class AuthController {
 
     @Post('logout')
     @HttpCode(HttpStatus.OK)
-    async logout(@Res({ passthrough: true }) res: Response) {
+    @UseGuards(JwtAuthGuard)
+    async logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
         const opts = getCookieOptions();
-        res.clearCookie('token', {
-            httpOnly: opts.httpOnly,
-            secure: opts.secure,
-            sameSite: opts.sameSite,
-        });
+        try {
+            await this.bookingsService.releaseAllUserHolds(req.user._id.toString());
+        } finally {
+            res.clearCookie('token', {
+                httpOnly: opts.httpOnly,
+                secure: opts.secure,
+                sameSite: opts.sameSite,
+            });
+        }
         return { success: true, message: 'Logged out successfully' };
     }
 

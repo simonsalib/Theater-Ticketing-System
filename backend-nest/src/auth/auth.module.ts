@@ -9,11 +9,13 @@ import { UsersModule } from '../users/users.module';
 import { MailModule } from '../mail/mail.module';
 import { JwtStrategy } from './jwt.strategy';
 import { PendingRegistration, PendingRegistrationSchema } from './schemas/pending-registration.schema';
+import { BookingsModule } from '../bookings/bookings.module';
 
 @Module({
   imports: [
     UsersModule,
     MailModule,
+    BookingsModule,
     PassportModule,
     ConfigModule,
     MongooseModule.forFeature([
