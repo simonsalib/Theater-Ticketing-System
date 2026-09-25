@@ -316,7 +316,7 @@
 }
 
 /* Responsive styles */
-@media (max-width: 768px) {
+@media (max-width: 640px) {
     .navbar {
         position: sticky;
         top: 0;
