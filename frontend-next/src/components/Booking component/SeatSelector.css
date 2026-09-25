@@ -877,8 +877,9 @@
 /* Fix for Booking page redundant scrollbars */
 .theater-seat-area .theater-canvas-container,
 .theater-seat-container .theater-canvas-container {
-    overflow-x: hidden !important;
-    overflow-y: visible !important;
+    /* The page owns vertical scrolling; the scaled seat map must not create a second scroller. */
+    overflow: visible !important;
+    max-height: none !important;
     padding: 0 !important;
     margin: 0 !important;
     width: 100% !important;

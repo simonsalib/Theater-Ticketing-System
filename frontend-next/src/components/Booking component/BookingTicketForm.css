@@ -789,6 +789,8 @@
     .booking-page.fullpage-theater {
         padding: 0 !important;
         background: #0d0d12 !important;
+        min-height: calc(100dvh - 68px);
+        overflow: visible;
     }
 
     .booking-container {
@@ -810,6 +812,8 @@
     .theater-fullpage-container {
         padding: 0 !important;
         background: transparent !important;
+        min-height: calc(100dvh - 68px);
+        overflow: visible;
     }
 
     .theater-header-bar {
@@ -836,6 +840,7 @@
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
+        overflow: visible !important;
     }
 
     .theater-seat-area .seat-selector {
