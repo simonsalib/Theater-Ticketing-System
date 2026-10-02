@@ -57,6 +57,20 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+## Seat integrity monitoring
+
+The production backend audits every approved seated event at startup and every two hours. It verifies seat ownership, hold and booking links, counters, users, and exactly one QR ticket for each confirmed seat. Persistent problems are emailed without attendee data or QR payloads.
+
+```bash
+# Full isolated multi-user lifecycle and contention test
+npm run test:load
+
+# Read-only audit for one event (run npm run build first)
+npm run audit:seats -- <eventId>
+```
+
+Set `SEAT_AUDIT_ALERT_EMAIL` to choose the recipient (defaults to `bebonageh68@gmail.com`). Set `SEAT_AUDIT_ENABLED=false` only to disable the scheduled job. Azure App Service must have **Always On** enabled for exact two-hour execution; an app that is allowed to sleep runs the audit when it next starts.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.

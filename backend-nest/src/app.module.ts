@@ -13,6 +13,7 @@ import { BookingsModule } from './bookings/bookings.module';
 import { AuthModule } from './auth/auth.module';
 import { MailModule } from './mail/mail.module';
 import { TicketsModule } from './tickets/tickets.module';
+import { SeatAuditModule } from './seat-audit/seat-audit.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { TicketsModule } from './tickets/tickets.module';
     AuthModule,
     MailModule,
     TicketsModule,
+    SeatAuditModule,
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'uploads'),
       serveRoot: '/uploads',

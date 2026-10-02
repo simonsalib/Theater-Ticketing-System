@@ -183,6 +183,25 @@ export class MailService {
     await this.sendMail(to, subject, html, text);
   }
 
+  async sendSeatIntegrityAlert(
+    to: string,
+    failures: Array<{ title: string; report: { eventId: string; checkedAt: string; counts: Record<string, number>; issues: Array<{ code: string; seat?: string; reference?: string }> } }>,
+  ): Promise<void> {
+    const escape = (value: unknown) => String(value).replace(/[&<>"']/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    })[char]!);
+    const total = failures.reduce((sum, failure) => sum + failure.report.issues.length, 0);
+    const lines = failures.flatMap(({ title, report }) => [
+      `${title} (${report.eventId})`,
+      `Counts: ${Object.entries(report.counts).map(([key, value]) => `${key}=${value}`).join(', ')}`,
+      ...report.issues.slice(0, 100).map(issue => `- ${issue.code}${issue.seat ? ` | ${issue.seat}` : ''}${issue.reference ? ` | ref=${issue.reference}` : ''}`),
+      '',
+    ]);
+    const text = `EventTix seat integrity alert\nChecked: ${new Date().toISOString()}\nIssues: ${total}\n\n${lines.join('\n')}`;
+    const html = `<div style="font-family:Arial,sans-serif;color:#111827"><h2>EventTix seat integrity alert</h2><p><strong>${total}</strong> persistent issue(s) found.</p><pre style="white-space:pre-wrap;background:#f3f4f6;padding:16px;border-radius:6px">${escape(lines.join('\n'))}</pre><p>No attendee details or QR payloads are included in this alert.</p></div>`;
+    await this.sendMail(to, `[EventTix] ${total} seat integrity issue(s)`, html, text);
+  }
+
   private async sendMail(to: string, subject: string, html: string, text: string): Promise<void> {
     if (!this.isConfigured || !this.gmail) {
       const errorMsg = 'Email service not configured (check GOOGLE_* and EMAIL_USER env vars).';

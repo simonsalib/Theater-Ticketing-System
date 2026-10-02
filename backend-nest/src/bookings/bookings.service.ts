@@ -4,6 +4,7 @@ import {
     BadRequestException,
     ForbiddenException,
     OnModuleInit,
+    OnModuleDestroy,
     Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -19,8 +20,9 @@ const DEFAULT_PAYMENT_DEADLINE_MINUTES = 30;
 const DEFAULT_SEAT_HOLD_DEADLINE_MINUTES = 3;
 
 @Injectable()
-export class BookingsService implements OnModuleInit {
+export class BookingsService implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(BookingsService.name);
+    private cleanupTimer?: NodeJS.Timeout;
 
     constructor(
         @InjectModel(Booking.name) private bookingModel: Model<BookingDocument>,
@@ -32,9 +34,14 @@ export class BookingsService implements OnModuleInit {
 
     onModuleInit() {
         // Check for expired pending bookings every 60 seconds
-        setInterval(() => this.cleanupExpiredBookings(), 60 * 1000);
+        this.cleanupTimer = setInterval(() => void this.cleanupExpiredBookings(), 60 * 1000);
+        this.cleanupTimer.unref();
         // Also run immediately on startup
-        this.cleanupExpiredBookings();
+        void this.cleanupExpiredBookings();
+    }
+
+    onModuleDestroy() {
+        if (this.cleanupTimer) clearInterval(this.cleanupTimer);
     }
 
     private async cleanupExpiredBookings() {
@@ -618,22 +625,26 @@ export class BookingsService implements OnModuleInit {
                     throw new BadRequestException('Seat hold was already used or has expired. Please select seats again.');
                 }
                 // Convert hold entries → booking entries in bookedSeats
-                // First pull the hold entries, then push booking entries
-                await this.eventModel.findByIdAndUpdate(eventId, {
-                    $pull: { bookedSeats: { holdId: hold._id } },
-                });
-
-                const seatUpdates = seatsWithPrices.map((seat: any) => ({
-                    row: seat.row,
-                    seatNumber: seat.seatNumber,
-                    section: seat.section,
-                    seatLabel: seat.seatLabel,
-                    bookingId: savedBooking._id,
-                }));
-
-                await this.eventModel.findByIdAndUpdate(eventId, {
-                    $push: { bookedSeats: { $each: seatUpdates } },
-                });
+                // Convert the existing event entries atomically so the seats are never briefly available.
+                const converted = await this.eventModel.updateOne(
+                    { _id: eventId, 'bookedSeats.holdId': hold._id } as any,
+                    {
+                        $set: { 'bookedSeats.$[held].bookingId': savedBooking._id },
+                        $unset: { 'bookedSeats.$[held].holdId': '' },
+                    },
+                    { arrayFilters: [{ 'held.holdId': hold._id }] },
+                ).exec();
+                if (converted.modifiedCount !== 1) {
+                    await this.bookingModel.findByIdAndDelete(savedBooking._id).exec();
+                    await this.eventModel.updateOne(
+                        { _id: eventId },
+                        {
+                            $pull: { bookedSeats: { holdId: hold._id } },
+                            $inc: { remainingTickets: consumedHold.seats.length },
+                        },
+                    ).exec();
+                    throw new BadRequestException('Seat hold could not be converted. Please select seats again.');
+                }
 
             } else {
                 // No hold — atomic push with $nor guard

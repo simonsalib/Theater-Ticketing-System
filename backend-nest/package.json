@@ -21,7 +21,9 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "test:integration": "jest --config ./test/jest-integration.json --runInBand"
+    "test:integration": "jest --config ./test/jest-integration.json --runInBand",
+    "test:load": "jest --config ./test/jest-load.json --runInBand",
+    "audit:seats": "node dist/seat-audit/seat-audit.cli.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -36,6 +38,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
     "cookie-parser": "^1.4.7",
+    "dotenv": "16.4.7",
     "form-data": "^4.0.5",
     "googleapis": "^171.4.0",
     "mailgun.js": "^12.4.1",

@@ -69,11 +69,13 @@ export class TicketingHarness {
 
   async start() {
     // Never load AppModule or .env: all models use only this disposable server.
-    this.mongo = await MongoMemoryReplSet.create({
+    this.mongo = new MongoMemoryReplSet({
       binary: { version: '7.0.14' },
       replSet: { count: 1, storageEngine: 'wiredTiger' },
+      instanceOpts: [{ launchTimeout: 60_000 }],
     });
     try {
+      await this.mongo.start();
       const fixture = await Test.createTestingModule({
         imports: [
           MongooseModule.forRoot(this.mongo.getUri('ticketing_integration')),
