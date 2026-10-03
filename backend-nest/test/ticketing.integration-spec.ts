@@ -197,7 +197,12 @@ describe('Ticketing integration audit', () => {
       const pending = await h.http().get('/api/v1/booking/my-bookings?unpaidOnly=true').set('Authorization', auth(f.buyer)).expect(200);
       expect(pending.body.data).toHaveLength(1);
       expect(pending.body.data[0]._id).toBe(b._id.toString());
+      expect(pending.body.data[0].status).toBe('pending');
+      expect(pending.body.data[0].isReceiptUploaded).toBe(false);
       expect(pending.body.data[0].numberOfTickets).toBe(1);
+      const awaitingPayment = (await h.http().get(`/api/v1/booking/event/${f.eventId}/seats`).expect(200)).body.data;
+      expect(awaitingPayment.seats.find((s: any) => s.section === 'main' && s.row === 'A' && s.seatNumber === 1))
+        .toMatchObject({ isPending: true, isPaymentSubmitted: false });
       await h.http().post('/api/v1/booking/hold-seats').set('Authorization', auth(f.buyer))
         .send({ eventId: f.eventId, seats: [seat(2)] }).expect(409);
       await h.http().post('/api/v1/booking').set('Authorization', auth(f.buyer))
@@ -206,9 +211,44 @@ describe('Ticketing integration audit', () => {
       expect((await h.http().get('/api/v1/booking/my-bookings?unpaidOnly=true').set('Authorization', auth(f.buyer)).expect(200)).body.data).toEqual([]);
       const availability = await h.bookings.getAvailableSeats(f.eventId);
       expect(availability.seats.find((s: any) => s.section === 'main' && s.row === 'A' && s.seatNumber === 1)).toMatchObject({ isPending: true, isPaymentSubmitted: true });
+      const submittedPayment = (await h.http().get(`/api/v1/booking/event/${f.eventId}/seats`).expect(200)).body.data;
+      expect(submittedPayment.seats.find((s: any) => s.section === 'main' && s.row === 'A' && s.seatNumber === 1))
+        .toMatchObject({ isPending: true, isPaymentSubmitted: true });
       const hold = await h.bookings.holdSeats(f.eventId, [seat(2)], f.buyer._id.toString());
       expect(hold.holdId).toBeTruthy();
       await h.assertIntegrity(f.eventId);
+    });
+
+    test('FLOW-12D unpaid booking blocks only its own event', async () => {
+      const firstBooking = await h.book(f, [seat(1)]);
+      const { _id, __v, ...eventData } = f.event.toObject();
+      const secondEvent = await h.model('Event').create({ ...eventData, title: 'Second integration event' });
+      const secondEventId = secondEvent._id.toString();
+      const bearer = auth(f.buyer);
+
+      await h.http().post('/api/v1/booking/hold-seats').set('Authorization', bearer)
+        .send({ eventId: f.eventId, seats: [seat(2)] }).expect(409);
+      const hold = await h.http().post('/api/v1/booking/hold-seats').set('Authorization', bearer)
+        .send({ eventId: secondEventId, seats: [seat(1)] }).expect(201);
+      const secondBooking = await h.http().post('/api/v1/booking').set('Authorization', bearer)
+        .send({ eventId: secondEventId, selectedSeats: [seat(1)], holdId: hold.body.data.holdId }).expect(201);
+
+      const unpaid = await h.http().get('/api/v1/booking/my-bookings?unpaidOnly=true')
+        .set('Authorization', bearer).expect(200);
+      expect(unpaid.body.data).toHaveLength(2);
+      expect(unpaid.body.data.map((booking: any) => String(booking.eventId)).sort())
+        .toEqual([f.eventId, secondEventId].sort());
+      await h.http().post('/api/v1/booking').set('Authorization', bearer)
+        .send({ eventId: secondEventId, selectedSeats: [seat(2)] }).expect(409);
+
+      await h.bookings.uploadReceipt(firstBooking._id.toString(), f.buyer._id.toString(), 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC0lEQVR42mP8/x8AAwMCAO+a9XkAAAAASUVORK5CYII=');
+      const remaining = await h.http().get('/api/v1/booking/my-bookings?unpaidOnly=true')
+        .set('Authorization', bearer).expect(200);
+      expect(remaining.body.data.map((booking: any) => String(booking._id))).toEqual([secondBooking.body.data._id]);
+      await h.http().post('/api/v1/booking/hold-seats').set('Authorization', bearer)
+        .send({ eventId: f.eventId, seats: [seat(2)] }).expect(201);
+      await h.assertIntegrity(f.eventId);
+      await h.assertIntegrity(secondEventId);
     });
 
     test('FLOW-13 partial pending cancellation preserves the remaining seat and price', async () => {

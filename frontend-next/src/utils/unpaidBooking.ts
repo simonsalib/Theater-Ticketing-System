@@ -7,15 +7,22 @@ export interface UnpaidBooking {
     numberOfTickets?: number;
 }
 
-export function findActiveUnpaidBooking(value: unknown, now = Date.now()): UnpaidBooking | null {
-    if (!Array.isArray(value)) return null;
+export function getUnpaidBookingEventId(booking: UnpaidBooking): string | undefined {
+    return typeof booking.eventId === 'string' ? booking.eventId : booking.eventId?._id;
+}
 
+export function findActiveUnpaidBookings(value: unknown, now = Date.now()): UnpaidBooking[] {
+    if (!Array.isArray(value)) return [];
+
+    const active: UnpaidBooking[] = [];
     for (const item of value) {
         if (!item || typeof item !== 'object') continue;
         const booking = item as Partial<UnpaidBooking>;
-        if (typeof booking._id !== 'string' || booking.status !== 'pending' || booking.isReceiptUploaded) continue;
+        // Older versions of the unpaid-only endpoint omitted status from their projection.
+        if (typeof booking._id !== 'string' || (booking.status !== undefined && booking.status !== 'pending') || booking.isReceiptUploaded) continue;
         if (typeof booking.pendingExpiresAt !== 'string') continue;
-        if (new Date(booking.pendingExpiresAt).getTime() > now) return booking as UnpaidBooking;
+        if (new Date(booking.pendingExpiresAt).getTime() <= now) continue;
+        active.push({ ...booking, status: 'pending' } as UnpaidBooking);
     }
-    return null;
+    return active;
 }

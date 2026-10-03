@@ -9,7 +9,7 @@ import { useAuth } from '@/auth/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import EventCard from '@/components/Event Components/EventCard';
 import { Event } from '@/types/event';
-import { findActiveUnpaidBooking, UnpaidBooking } from '@/utils/unpaidBooking';
+import { findActiveUnpaidBookings, getUnpaidBookingEventId, UnpaidBooking } from '@/utils/unpaidBooking';
 import '@/components/Event Components/EventList.css';
 
 const EventListPage = () => {
@@ -20,7 +20,7 @@ const EventListPage = () => {
     const [myEvents, setMyEvents] = useState<Event[]>([]);
     const [scanDropdownOpen, setScanDropdownOpen] = useState(false);
     const [scanEventsLoading, setScanEventsLoading] = useState(false);
-    const [unpaidBooking, setUnpaidBooking] = useState<UnpaidBooking | null>(null);
+    const [unpaidBookings, setUnpaidBookings] = useState<UnpaidBooking[]>([]);
     const [paymentCheckLoading, setPaymentCheckLoading] = useState(true);
     const [paymentCheckError, setPaymentCheckError] = useState(false);
     const [now, setNow] = useState(() => Date.now());
@@ -33,7 +33,7 @@ const EventListPage = () => {
     const refreshUnpaidBooking = useCallback(async () => {
         const requestId = ++paymentRequestId.current;
         if (user?.role !== 'Standard User') {
-            setUnpaidBooking(null);
+            setUnpaidBookings([]);
             setPaymentCheckLoading(false);
             setPaymentCheckError(false);
             return;
@@ -42,7 +42,7 @@ const EventListPage = () => {
         try {
             const response = await api.get('/booking/my-bookings?unpaidOnly=true');
             if (requestId !== paymentRequestId.current) return;
-            setUnpaidBooking(findActiveUnpaidBooking(response.data?.data));
+            setUnpaidBookings(findActiveUnpaidBookings(response.data?.data));
             setPaymentCheckError(false);
         } catch {
             if (requestId === paymentRequestId.current) setPaymentCheckError(true);
@@ -67,18 +67,7 @@ const EventListPage = () => {
         };
     }, [refreshUnpaidBooking]);
 
-    const paymentSecondsLeft = unpaidBooking
-        ? Math.max(0, Math.ceil((new Date(unpaidBooking.pendingExpiresAt).getTime() - now) / 1000))
-        : 0;
-    const activeUnpaidBooking = paymentSecondsLeft > 0 ? unpaidBooking : null;
-    const bookingBlocked = authLoading || (user?.role === 'Standard User' && (paymentCheckLoading || paymentCheckError || !!activeUnpaidBooking));
-    const bookingBlockedReason = activeUnpaidBooking ? 'Complete payment first' : paymentCheckError ? 'Booking unavailable' : 'Checking bookings';
-    const pendingEventId = typeof activeUnpaidBooking?.eventId === 'object' ? activeUnpaidBooking.eventId._id : activeUnpaidBooking?.eventId;
-    const pendingEventTitle = (typeof activeUnpaidBooking?.eventId === 'object' && activeUnpaidBooking.eventId.title)
-        || events.find(event => event._id === pendingEventId)?.title || 'your tickets';
-    const paymentTimeLeft = paymentSecondsLeft >= 3600
-        ? `${Math.floor(paymentSecondsLeft / 3600)}:${String(Math.floor((paymentSecondsLeft % 3600) / 60)).padStart(2, '0')}:${String(paymentSecondsLeft % 60).padStart(2, '0')}`
-        : `${Math.floor(paymentSecondsLeft / 60)}:${String(paymentSecondsLeft % 60).padStart(2, '0')}`;
+    const activeUnpaidBookings = unpaidBookings.filter(booking => new Date(booking.pendingExpiresAt).getTime() > now);
 
     // Fetch events immediately — no dependency on auth state
     useEffect(() => {
@@ -205,24 +194,31 @@ const EventListPage = () => {
                         </motion.div>
                     )}
 
-                    {user?.role === 'Standard User' && activeUnpaidBooking && (
-                        <div className="pending-payment-notice" role="status">
+                    {user?.role === 'Standard User' && activeUnpaidBookings.map(booking => {
+                        const pendingEventId = getUnpaidBookingEventId(booking);
+                        const pendingEventTitle = (typeof booking.eventId === 'object' && booking.eventId.title)
+                            || events.find(event => event._id === pendingEventId)?.title || t('events.paymentTickets');
+                        const paymentSecondsLeft = Math.max(0, Math.ceil((new Date(booking.pendingExpiresAt).getTime() - now) / 1000));
+                        const paymentTimeLeft = paymentSecondsLeft >= 3600
+                            ? `${Math.floor(paymentSecondsLeft / 3600)}:${String(Math.floor((paymentSecondsLeft % 3600) / 60)).padStart(2, '0')}:${String(paymentSecondsLeft % 60).padStart(2, '0')}`
+                            : `${Math.floor(paymentSecondsLeft / 60)}:${String(paymentSecondsLeft % 60).padStart(2, '0')}`;
+                        return <div key={booking._id} className="pending-payment-notice" role="status">
                             <div className="pending-payment-icon"><FiCreditCard size={22} /></div>
                             <div className="pending-payment-copy">
-                                <strong>Complete your ticket payment</strong>
-                                <span>{pendingEventTitle}{activeUnpaidBooking.numberOfTickets ? ` - ${activeUnpaidBooking.numberOfTickets} ${activeUnpaidBooking.numberOfTickets === 1 ? 'ticket' : 'tickets'}` : ''}. Upload your receipt before the timer ends to keep your reservation.</span>
+                                <strong>{t('events.paymentTitle')}</strong>
+                                <span>{pendingEventTitle}. {t('events.paymentDescription')}</span>
                             </div>
                             <div className="pending-payment-actions">
-                                <span className="pending-payment-timer" aria-label="Payment time remaining"><FiClock size={16} /> {paymentTimeLeft}</span>
-                                <Link href={`/bookings?payment=${activeUnpaidBooking._id}`} className="pending-payment-link">Complete payment <FiArrowRight size={17} /></Link>
+                                <span className="pending-payment-timer" aria-label={t('events.paymentTimeRemaining')}><FiClock size={16} /> {paymentTimeLeft}</span>
+                                <Link href={`/bookings?payment=${booking._id}`} className="pending-payment-link">{t('events.paymentAction')} <FiArrowRight size={17} /></Link>
                             </div>
-                        </div>
-                    )}
+                        </div>;
+                    })}
 
-                    {user?.role === 'Standard User' && paymentCheckError && !activeUnpaidBooking && (
+                    {user?.role === 'Standard User' && paymentCheckError && activeUnpaidBookings.length === 0 && (
                         <div className="pending-payment-notice pending-payment-error" role="alert">
-                            <span>Booking status is unavailable. Try again before booking new tickets.</span>
-                            <button type="button" onClick={() => void refreshUnpaidBooking()}><FiRefreshCw size={16} /> Retry</button>
+                            <span>{t('events.paymentError')}</span>
+                            <button type="button" onClick={() => void refreshUnpaidBooking()}><FiRefreshCw size={16} /> {t('events.paymentRetry')}</button>
                         </div>
                     )}
 
@@ -321,11 +317,14 @@ const EventListPage = () => {
                 {!loading && !error && (
                     <motion.div className="events-grid" variants={containerVariants} initial="hidden" animate="visible">
                         {filteredEvents.length > 0 ? (
-                            filteredEvents.map((event, index) => (
-                                <motion.div key={event._id} className="event-card-wrapper" variants={itemVariants}>
+                            filteredEvents.map((event, index) => {
+                                const unpaidForEvent = activeUnpaidBookings.some(booking => getUnpaidBookingEventId(booking) === event._id);
+                                const bookingBlocked = authLoading || (user?.role === 'Standard User' && (paymentCheckLoading || paymentCheckError || unpaidForEvent));
+                                const bookingBlockedReason = unpaidForEvent ? t('events.paymentBlocked') : paymentCheckError ? t('events.paymentUnavailable') : t('events.paymentCheck');
+                                return <motion.div key={event._id} className="event-card-wrapper" variants={itemVariants}>
                                     <EventCard event={event} index={index} bookingBlocked={bookingBlocked} bookingBlockedReason={bookingBlockedReason} />
-                                </motion.div>
-                            ))
+                                </motion.div>;
+                            })
                         ) : (
                             <motion.div className="no-events" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><span className="no-events-icon">🎭</span><h3>{t('events.noEventsFound')}</h3><p>{searchTerm ? `${t('events.noMatch')} "${searchTerm}"` : t('events.checkLater')}</p></motion.div>
                         )}

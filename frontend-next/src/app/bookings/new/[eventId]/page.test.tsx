@@ -74,8 +74,9 @@ describe('new booking page integration', () => {
         mocks.get.mockImplementation((url: string) => {
             if (url === '/booking/my-bookings?unpaidOnly=true') {
                 return Promise.resolve({ data: { success: true, data: [
-                    { _id: 'paid-1', status: 'pending', isReceiptUploaded: true },
-                    { _id: 'unpaid-1', status: 'pending', isReceiptUploaded: false, pendingExpiresAt: '2030-01-01T20:00:00.000Z' },
+                    { _id: 'other-1', eventId: 'event-2', status: 'pending', pendingExpiresAt: '2030-01-01T20:00:00.000Z' },
+                    { _id: 'paid-1', eventId: 'event-1', status: 'pending', isReceiptUploaded: true },
+                    { _id: 'unpaid-1', eventId: 'event-1', pendingExpiresAt: '2030-01-01T20:00:00.000Z' },
                 ] } });
             }
             return Promise.resolve({ data: { success: true, data: mocks.event } });
@@ -85,6 +86,20 @@ describe('new booking page integration', () => {
 
         await waitFor(() => expect(mocks.replace).toHaveBeenCalledWith('/bookings?payment=unpaid-1'));
         expect(mocks.get).toHaveBeenCalledWith('/booking/my-bookings?unpaidOnly=true');
+    });
+
+    it('allows booking this event when an unpaid booking belongs to another event', async () => {
+        localStorage.setItem('token', 'test-token');
+        mocks.get.mockImplementation((url: string) => Promise.resolve({ data: { success: true, data:
+            url === '/booking/my-bookings?unpaidOnly=true'
+                ? [{ _id: 'other-1', eventId: 'event-2', status: 'pending', pendingExpiresAt: '2030-01-01T20:00:00.000Z' }]
+                : mocks.event,
+        } }));
+
+        render(<BookTicketPage />);
+
+        expect(await screen.findByText('Instant General Admission')).toBeInTheDocument();
+        expect(mocks.replace).not.toHaveBeenCalled();
     });
 
     it('opens QR tickets after an instant general-admission booking', async () => {

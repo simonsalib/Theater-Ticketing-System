@@ -305,7 +305,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
         userId: string,
     ): Promise<{ holdId: string; expiresAt: Date; seats: any[] }> {
         return this.withUserBookingLock(userId, async () => {
-            await this.assertNoUnpaidBooking(userId);
+            await this.assertNoUnpaidBooking(userId, eventId);
             return this.holdSeatsUnlocked(eventId, seats, userId);
         });
     }
@@ -463,17 +463,24 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     }
 
 
-    async findUnpaidBooking(userId: string) {
-        return this.bookingModel.findOne({
+    async findUnpaidBookings(userId: string) {
+        return this.bookingModel.find({
             StandardId: userId,
             status: 'pending',
             isReceiptUploaded: { $ne: true },
             pendingExpiresAt: { $gt: new Date() },
-        } as any).select('_id eventId pendingExpiresAt numberOfTickets').lean().exec();
+        } as any).select('_id eventId status isReceiptUploaded pendingExpiresAt numberOfTickets').lean().exec();
     }
 
-    private async assertNoUnpaidBooking(userId: string): Promise<void> {
-        if (await this.findUnpaidBooking(userId)) {
+    private async assertNoUnpaidBooking(userId: string, eventId: string): Promise<void> {
+        const unpaidBooking = await this.bookingModel.exists({
+            StandardId: userId,
+            eventId,
+            status: 'pending',
+            isReceiptUploaded: { $ne: true },
+            pendingExpiresAt: { $gt: new Date() },
+        } as any);
+        if (unpaidBooking) {
             throw new ConflictException('Finish payment and upload the receipt for your pending booking before booking more seats.');
         }
     }
@@ -503,7 +510,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
 
     async create(createDto: any, userId: string): Promise<BookingDocument> {
         return this.withUserBookingLock(userId, async () => {
-            await this.assertNoUnpaidBooking(userId);
+            await this.assertNoUnpaidBooking(userId, createDto.eventId);
             return this.createUnlocked(createDto, userId);
         });
     }

@@ -58,7 +58,7 @@ export class BookingsController {
     @UseGuards(JwtAuthGuard)
     async findAllForUser(@Req() req: any, @Query('unpaidOnly') unpaidOnly?: string) {
         const data = unpaidOnly === 'true'
-            ? [await this.bookingsService.findUnpaidBooking(req.user._id)].filter(Boolean)
+            ? await this.bookingsService.findUnpaidBookings(req.user._id)
             : await this.bookingsService.findAllForUser(req.user._id);
         return { success: true, count: data.length, data };
     }

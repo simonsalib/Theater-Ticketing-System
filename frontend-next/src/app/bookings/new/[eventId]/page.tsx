@@ -18,7 +18,7 @@ import { toast } from 'react-toastify';
 import { API_BASE_URL } from '../../../../config';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getSafeExternalUrl } from '@/utils/url';
-import { findActiveUnpaidBooking } from '@/utils/unpaidBooking';
+import { findActiveUnpaidBookings, getUnpaidBookingEventId } from '@/utils/unpaidBooking';
 import '@/components/Booking component/BookingTicketForm.css';
 
 interface AttendeeInfo {
@@ -125,9 +125,10 @@ const BookTicketPage = () => {
 
                 if (token) {
                     const pendingResponse = await api.get('/booking/my-bookings?unpaidOnly=true');
-                    const unpaidBooking = findActiveUnpaidBooking(pendingResponse.data?.data);
+                    const unpaidBooking = findActiveUnpaidBookings(pendingResponse.data?.data)
+                        .find(booking => getUnpaidBookingEventId(booking) === eventId);
                     if (unpaidBooking) {
-                        toast.info('Finish payment and upload your receipt before booking more seats.');
+                        toast.info(t('events.paymentRedirect'));
                         router.replace(`/bookings?payment=${unpaidBooking._id}`);
                         return;
                     }
