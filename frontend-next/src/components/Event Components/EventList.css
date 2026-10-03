@@ -86,6 +86,92 @@
     margin-bottom: 32px;
 }
 
+.pending-payment-notice {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding: 16px 20px;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    border-left: 4px solid #f59e0b;
+    border-radius: 6px;
+    background: #1b1b20;
+    color: #f8fafc;
+}
+
+.pending-payment-icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    border-radius: 6px;
+    background: rgba(245, 158, 11, 0.14);
+    color: #fbbf24;
+}
+
+.pending-payment-copy {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    gap: 4px;
+    line-height: 1.4;
+}
+
+.pending-payment-copy strong { font-size: 0.98rem; }
+.pending-payment-copy span { color: #b6bbc7; font-size: 0.85rem; overflow-wrap: anywhere; }
+
+.pending-payment-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.pending-payment-timer {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    color: #fbbf24;
+    white-space: nowrap;
+}
+
+.pending-payment-link,
+.pending-payment-error button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 8px 14px;
+    border: 1px solid #e2a327;
+    border-radius: 6px;
+    background: #eab12b;
+    color: #17150d;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.pending-payment-link:hover,
+.pending-payment-error button:hover { background: #f5c44a; }
+.pending-payment-error { justify-content: space-between; }
+
+.card-action-btn.primary.booking-blocked,
+.card-action-btn.primary.booking-blocked:hover {
+    background: #292930;
+    border-color: #4b4b58;
+    color: #a7a7b3;
+    box-shadow: none;
+    filter: none;
+    transform: none;
+    cursor: not-allowed;
+}
+
 /* User Welcome Banner */
 .user-welcome-banner {
     display: flex;
@@ -506,6 +592,10 @@
         gap: 16px;
         text-align: center;
     }
+
+    .pending-payment-notice { align-items: flex-start; flex-wrap: wrap; }
+    .pending-payment-actions { width: 100%; justify-content: space-between; }
+    .pending-payment-link { flex: 1; }
 
     .welcome-content {
         flex-direction: column;

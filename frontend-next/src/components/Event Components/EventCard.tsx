@@ -15,9 +15,11 @@ import api from '@/services/api';
 interface EventCardProps {
     event: Event;
     index?: number;
+    bookingBlocked?: boolean;
+    bookingBlockedReason?: string;
 }
 
-const EventCard: React.FC<EventCardProps> = ({ event, index = 0 }) => {
+const EventCard: React.FC<EventCardProps> = ({ event, index = 0, bookingBlocked = false, bookingBlockedReason }) => {
     const [showFullImage, setShowFullImage] = useState(false);
     const [imageLoaded, setImageLoaded] = useState(false);
     const router = useRouter();
@@ -284,13 +286,16 @@ const EventCard: React.FC<EventCardProps> = ({ event, index = 0 }) => {
 
                         {(user?.role === "Standard User" || !user) && !isSoldOut && !isExpired && (
                             <button
-                                className="card-action-btn primary"
+                                className={`card-action-btn primary ${bookingBlocked ? 'booking-blocked' : ''}`}
+                                disabled={bookingBlocked}
+                                title={bookingBlocked ? bookingBlockedReason : undefined}
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     router.push(`/bookings/new/${eventId}`);
                                 }}
                             >
-                                <FiShoppingCart /> <span>{t('card.bookNow')}</span>
+                                {bookingBlocked ? <FiClock /> : <FiShoppingCart />}
+                                <span>{bookingBlocked ? bookingBlockedReason : t('card.bookNow')}</span>
                             </button>
                         )}
 

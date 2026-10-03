@@ -59,6 +59,12 @@ export class User {
     @Prop({ default: 0 })
     tokenVersion: number;
 
+    @Prop({ select: false })
+    bookingCreationLockUntil?: Date;
+
+    @Prop({ select: false })
+    bookingCreationLockToken?: string;
+
     @Prop({ default: false })
     isVerified: boolean;
 

@@ -8,6 +8,7 @@ import {
     Param,
     UseGuards,
     Req,
+    Query,
     HttpCode,
     HttpStatus,
 } from '@nestjs/common';
@@ -55,8 +56,10 @@ export class BookingsController {
 
     @Get('my-bookings')
     @UseGuards(JwtAuthGuard)
-    async findAllForUser(@Req() req: any) {
-        const data = await this.bookingsService.findAllForUser(req.user._id);
+    async findAllForUser(@Req() req: any, @Query('unpaidOnly') unpaidOnly?: string) {
+        const data = unpaidOnly === 'true'
+            ? [await this.bookingsService.findUnpaidBooking(req.user._id)].filter(Boolean)
+            : await this.bookingsService.findAllForUser(req.user._id);
         return { success: true, count: data.length, data };
     }
 

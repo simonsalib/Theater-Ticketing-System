@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
     post: vi.fn(),
     delete: vi.fn(),
     push: vi.fn(),
+    replace: vi.fn(),
     back: vi.fn(),
     event: null as Record<string, unknown> | null,
 }));
@@ -14,7 +15,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/services/api', () => ({ default: { get: mocks.get, post: mocks.post, delete: mocks.delete } }));
 vi.mock('next/navigation', () => ({
     useParams: () => ({ eventId: 'event-1' }),
-    useRouter: () => ({ push: mocks.push, back: mocks.back }),
+    useRouter: () => ({ push: mocks.push, replace: mocks.replace, back: mocks.back }),
 }));
 vi.mock('@/auth/ProtectedRoute', () => ({ ProtectedRoute: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 vi.mock('@/contexts/LanguageContext', () => ({
@@ -40,11 +41,13 @@ import BookTicketPage from './page';
 
 describe('new booking page integration', () => {
     beforeEach(() => {
+        localStorage.clear();
         mocks.get.mockReset();
         mocks.post.mockReset();
         mocks.delete.mockReset();
         mocks.delete.mockResolvedValue({ data: { success: true } });
         mocks.push.mockReset();
+        mocks.replace.mockReset();
         mocks.back.mockReset();
         mocks.event = {
             _id: 'event-1', title: 'Instant General Admission', description: 'Test event',
@@ -64,6 +67,24 @@ describe('new booking page integration', () => {
             return Promise.resolve({ data: { success: true, data: { seats: [] } } });
         });
         mocks.post.mockResolvedValue({ data: { success: true, data: { _id: 'booking-1', status: 'confirmed' } } });
+    });
+
+    it('redirects to an active unpaid booking using the existing bookings endpoint', async () => {
+        localStorage.setItem('token', 'test-token');
+        mocks.get.mockImplementation((url: string) => {
+            if (url === '/booking/my-bookings?unpaidOnly=true') {
+                return Promise.resolve({ data: { success: true, data: [
+                    { _id: 'paid-1', status: 'pending', isReceiptUploaded: true },
+                    { _id: 'unpaid-1', status: 'pending', isReceiptUploaded: false, pendingExpiresAt: '2030-01-01T20:00:00.000Z' },
+                ] } });
+            }
+            return Promise.resolve({ data: { success: true, data: mocks.event } });
+        });
+
+        render(<BookTicketPage />);
+
+        await waitFor(() => expect(mocks.replace).toHaveBeenCalledWith('/bookings?payment=unpaid-1'));
+        expect(mocks.get).toHaveBeenCalledWith('/booking/my-bookings?unpaidOnly=true');
     });
 
     it('opens QR tickets after an instant general-admission booking', async () => {

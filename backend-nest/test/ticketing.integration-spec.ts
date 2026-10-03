@@ -62,7 +62,7 @@ describe('Ticketing integration audit', () => {
       expect(result.body.tickets).toHaveLength(2);
       expect(result.body.tickets[0].qrCodeImage).toMatch(/^data:image\/png;base64,/);
       await h.assertIntegrity(f.eventId);
-      const scanned = await h.http().post('/api/v1/tickets/scan').set('Authorization', auth(f.scanner)).send({ qrData: result.body.tickets[0].qrData, eventId: f.eventId }).expect(201);
+      const scanned = await h.http().post('/api/v1/tickets/scan').set('Authorization', auth(f.scanner)).send({ qrData: result.body.tickets[0].qrData, eventId: f.eventId, section: 'main' }).expect(201);
       expect(scanned.body.isFree).toBe(true);
       const other = result.body.tickets[1];
       await h.http().post(`/api/v1/booking/${id}/request-cancellation`).set('Authorization', bearer).send({ seatKeys: [`${other.section}-${other.seatRow}-${other.seatNumber}`], cancelAll: false }).expect(201);
@@ -167,14 +167,48 @@ describe('Ticketing integration audit', () => {
     test('FLOW-11 sequential repeat scan admits once', async () => {
       const b = await confirm(await h.book(f));
       const [ticket] = await h.tickets.getTicketsByBooking(b._id.toString());
-      expect((await h.tickets.scanTicket(ticket.qrData, f.scanner._id.toString(), f.eventId)).isFree).toBe(true);
-      expect((await h.tickets.scanTicket(ticket.qrData, f.scanner._id.toString(), f.eventId)).isFree).toBe(false);
+      expect((await h.tickets.scanTicket(ticket.qrData, f.scanner._id.toString(), f.eventId, 'main')).isFree).toBe(true);
+      expect((await h.tickets.scanTicket(ticket.qrData, f.scanner._id.toString(), f.eventId, 'main')).isFree).toBe(false);
     });
 
     test('FLOW-12 supplied wrong event rejects scanning', async () => {
       const b = await confirm(await h.book(f));
       const [ticket] = await h.tickets.getTicketsByBooking(b._id.toString());
-      await expect(h.tickets.scanTicket(ticket.qrData, f.scanner._id.toString(), new Types.ObjectId().toString())).rejects.toThrow('not this event');
+      await expect(h.tickets.scanTicket(ticket.qrData, f.scanner._id.toString(), new Types.ObjectId().toString(), 'main')).rejects.toThrow('not this event');
+    });
+
+    test('FLOW-12B entrance section is enforced without consuming the QR across scanner roles', async () => {
+      const b = await confirm(await h.book(f, [seat(1, 'balcony')]));
+      const [ticket] = await h.tickets.getTicketsByBooking(b._id.toString());
+      const scan = (user: any, section: string) => h.http().post('/api/v1/tickets/scan')
+        .set('Authorization', auth(user)).send({ qrData: ticket.qrData, eventId: f.eventId, section });
+      await scan(f.scanner, 'main').expect(400);
+      expect((await h.model('Ticket').findById(ticket._id)).isScanned).toBe(false);
+      expect((await scan(f.scanner, 'balcony').expect(201)).body.isFree).toBe(true);
+      const duplicate = await scan(f.owner, 'balcony').expect(201);
+      expect(duplicate.body.isFree).toBe(false);
+      expect(duplicate.body.message).toMatch(/already scanned/i);
+      await scan(f.owner, 'invalid').expect(400);
+      await scan(f.owner, undefined as any).expect(400);
+    });
+
+    test('FLOW-12C unpaid booking blocks new holds and bookings until receipt upload', async () => {
+      const b = await h.book(f, [seat(1)]);
+      const pending = await h.http().get('/api/v1/booking/my-bookings?unpaidOnly=true').set('Authorization', auth(f.buyer)).expect(200);
+      expect(pending.body.data).toHaveLength(1);
+      expect(pending.body.data[0]._id).toBe(b._id.toString());
+      expect(pending.body.data[0].numberOfTickets).toBe(1);
+      await h.http().post('/api/v1/booking/hold-seats').set('Authorization', auth(f.buyer))
+        .send({ eventId: f.eventId, seats: [seat(2)] }).expect(409);
+      await h.http().post('/api/v1/booking').set('Authorization', auth(f.buyer))
+        .send({ eventId: f.eventId, selectedSeats: [seat(2)] }).expect(409);
+      await h.bookings.uploadReceipt(b._id.toString(), f.buyer._id.toString(), 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC0lEQVR42mP8/x8AAwMCAO+a9XkAAAAASUVORK5CYII=');
+      expect((await h.http().get('/api/v1/booking/my-bookings?unpaidOnly=true').set('Authorization', auth(f.buyer)).expect(200)).body.data).toEqual([]);
+      const availability = await h.bookings.getAvailableSeats(f.eventId);
+      expect(availability.seats.find((s: any) => s.section === 'main' && s.row === 'A' && s.seatNumber === 1)).toMatchObject({ isPending: true, isPaymentSubmitted: true });
+      const hold = await h.bookings.holdSeats(f.eventId, [seat(2)], f.buyer._id.toString());
+      expect(hold.holdId).toBeTruthy();
+      await h.assertIntegrity(f.eventId);
     });
 
     test('FLOW-13 partial pending cancellation preserves the remaining seat and price', async () => {
@@ -319,7 +353,7 @@ describe('Ticketing integration audit', () => {
       const other = await h.user(UserRole.ORGANIZER);
       const b = await confirm(await h.book(f));
       const [ticket] = await h.tickets.getTicketsByBooking(b._id.toString());
-      await h.http().post('/api/v1/tickets/scan').set('Authorization', auth(other)).send({ qrData: ticket.qrData }).expect(403);
+      await h.http().post('/api/v1/tickets/scan').set('Authorization', auth(other)).send({ qrData: ticket.qrData, section: 'main' }).expect(403);
     });
 
     test('AUTH-05 standard user cannot edit theater', async () => {
@@ -449,7 +483,7 @@ describe('Ticketing integration audit', () => {
     test('STATE-12 cancel-all preserves an already scanned seat', async () => {
       const b = await confirm(await h.book(f, [seat(1), seat(2)]));
       const [ticket] = await h.tickets.getTicketsByBooking(b._id.toString());
-      await h.tickets.scanTicket(ticket.qrData, f.scanner._id.toString(), f.eventId);
+      await h.tickets.scanTicket(ticket.qrData, f.scanner._id.toString(), f.eventId, 'main');
       await h.bookings.requestCancellation(b._id.toString(), f.buyer._id.toString(), [], true, '');
       await h.bookings.approveCancellation(b._id.toString(), f.owner);
       expect(await h.model('Ticket').countDocuments({ _id: ticket._id, isScanned: true })).toBe(1);
@@ -488,7 +522,7 @@ describe('Ticketing integration audit', () => {
 
     test('STATE-18 pending bookings and holds are not counted as earned revenue', async () => {
       await h.book(f, [seat(2)]);
-      await h.bookings.holdSeats(f.eventId, [seat(1)], f.buyer._id.toString());
+      await h.bookings.holdSeats(f.eventId, [seat(1)], f.stranger._id.toString());
       expect((await h.app.get(EventsService).getOrganizerAnalytics(f.owner._id.toString())).totalRevenue).toBe(0);
     });
 
@@ -524,8 +558,16 @@ describe('Ticketing integration audit', () => {
   describe('Concurrency, retry and failure injection', () => {
     test('RACE-01 two requests cannot consume the same hold twice', async () => {
       const hold = await h.bookings.holdSeats(f.eventId, [seat()], f.buyer._id.toString());
-      synchronizeReads(h.model('SeatHold'), 'findById', 2);
       const results = await Promise.allSettled([h.book(f, [seat()], { holdId: hold.holdId }), h.book(f, [seat()], { holdId: hold.holdId })]);
+      expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(1);
+      await h.assertIntegrity(f.eventId);
+    });
+
+    test('RACE-01B a hold and booking by one user cannot cross the unpaid-booking check', async () => {
+      const results = await Promise.allSettled([
+        h.book(f, [seat(1)]),
+        h.bookings.holdSeats(f.eventId, [seat(2)], f.buyer._id.toString()),
+      ]);
       expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(1);
       await h.assertIntegrity(f.eventId);
     });
@@ -541,7 +583,7 @@ describe('Ticketing integration audit', () => {
       const b = await confirm(await h.book(f));
       const [ticket] = await h.tickets.getTicketsByBooking(b._id.toString());
       synchronizeReads(h.model('Ticket'), 'findOne', 2);
-      const scans = await Promise.all([h.tickets.scanTicket(ticket.qrData, f.scanner._id.toString(), f.eventId), h.tickets.scanTicket(ticket.qrData, f.scanner._id.toString(), f.eventId)]);
+      const scans = await Promise.all([h.tickets.scanTicket(ticket.qrData, f.scanner._id.toString(), f.eventId, 'main'), h.tickets.scanTicket(ticket.qrData, f.owner._id.toString(), f.eventId, 'main')]);
       expect(scans.filter(s => s.isFree)).toHaveLength(1);
     });
 

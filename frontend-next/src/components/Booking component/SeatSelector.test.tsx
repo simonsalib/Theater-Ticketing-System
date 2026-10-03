@@ -82,6 +82,19 @@ describe('SeatSelector integration', () => {
         expect(screen.getByText('Gallery Right')).toBeInTheDocument();
     });
 
+    it('shows a check on a yellow seat after the payment receipt is uploaded', () => {
+        const { container } = render(
+            <SeatSelector eventId="event-1" initialSeatsData={{
+                theater,
+                seatPricing: [{ seatType: 'standard', price: 100 }],
+                seats: [{ ...availableSeat, isBooked: true, isPending: true, isPaymentSubmitted: true }],
+            }} />,
+        );
+        const pendingSeat = container.querySelector<HTMLButtonElement>('.seat-btn.pending');
+        expect(pendingSeat).toBeDisabled();
+        expect(pendingSeat?.querySelector('[aria-label="Receipt uploaded"]')).toBeInTheDocument();
+    });
+
     it('uses BALC-prefixed fallback rows when balcony row labels are empty', async () => {
         const user = userEvent.setup();
         const fallbackTheater = {

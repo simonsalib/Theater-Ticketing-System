@@ -7,6 +7,7 @@ import { SeatHold, SeatHoldSchema } from './schemas/seat-hold.schema';
 import { Event, EventSchema } from '../events/schemas/event.schema';
 import { Theater, TheaterSchema } from '../theaters/schemas/theater.schema';
 import { TicketsModule } from '../tickets/tickets.module';
+import { User, UserSchema } from '../users/schemas/user.schema';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { TicketsModule } from '../tickets/tickets.module';
       { name: SeatHold.name, schema: SeatHoldSchema },
       { name: Event.name, schema: EventSchema },
       { name: Theater.name, schema: TheaterSchema },
+      { name: User.name, schema: UserSchema },
     ]),
     TicketsModule,
   ],

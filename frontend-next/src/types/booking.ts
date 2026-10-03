@@ -12,6 +12,7 @@ export interface Seat extends SelectedSeat {
     price: number;
     isBooked: boolean;
     isPending?: boolean;
+    isPaymentSubmitted?: boolean;
     isActive: boolean;
     seatLabel?: string;
 }

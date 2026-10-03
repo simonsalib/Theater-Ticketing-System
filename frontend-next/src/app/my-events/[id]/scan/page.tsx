@@ -46,6 +46,7 @@ const QRScannerPage = () => {
     const eventId = params.id as string;
     const router = useRouter();
     const [isScanning, setIsScanning] = useState(false);
+    const [scanSection, setScanSection] = useState<'main' | 'balcony'>('main');
     const [scanResult, setScanResult] = useState<ScanResult | null>(null);
     const [scanError, setScanError] = useState<string | null>(null);
     const [stats, setStats] = useState<ScanStats | null>(null);
@@ -161,7 +162,7 @@ const QRScannerPage = () => {
 
     const handleScan = async (qrData: string) => {
         try {
-            const res = await api.post('/tickets/scan', { qrData, eventId });
+            const res = await api.post('/tickets/scan', { qrData, eventId, section: scanSection });
             const result: ScanResult = res.data;
             setScanResult(result);
             setScanHistory(prev => [result, ...prev.slice(0, 19)]); // Keep last 20
@@ -262,6 +263,10 @@ const QRScannerPage = () => {
                         )}
                     </div>
 
+                    <div className="scan-section-picker" role="group" aria-label="Scanning entrance">
+                        <button type="button" aria-pressed={scanSection === 'main'} disabled={isScanning} onClick={() => { setScanSection('main'); resetScan(); }}>Main Floor</button>
+                        <button type="button" aria-pressed={scanSection === 'balcony'} disabled={isScanning} onClick={() => { setScanSection('balcony'); resetScan(); }}>Balcony</button>
+                    </div>
                     <div className="scanner-body">
                         {/* Scanner Area */}
                         <div className="scanner-area">

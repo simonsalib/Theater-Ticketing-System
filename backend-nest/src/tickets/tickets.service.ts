@@ -197,6 +197,7 @@ export class TicketsService {
     qrData: string,
     scannedByUserId: string,
     expectedEventId?: string,
+    expectedSection?: 'main' | 'balcony',
     requestingUser?: any,
   ): Promise<{
     ticket: TicketDocument;
@@ -220,6 +221,9 @@ export class TicketsService {
     startTime: string;
     endTime: string;
   }> {
+    if (expectedSection !== 'main' && expectedSection !== 'balcony') {
+      throw new BadRequestException('Choose Main Floor or Balcony before scanning.');
+    }
     const ticket = await this.ticketModel
       .findOne({ qrData })
       .populate('userId', 'name email phone')
@@ -245,6 +249,12 @@ export class TicketsService {
       }
     }
 
+    // General-admission tickets use the main entrance; a section mismatch must not consume a QR.
+    const ticketSection = ticket.section === 'general' ? 'main' : ticket.section;
+    if (ticketSection !== expectedSection) {
+      throw new BadRequestException(`This ticket is for ${ticketSection === 'balcony' ? 'Balcony' : 'Main Floor'}, not ${expectedSection === 'balcony' ? 'Balcony' : 'Main Floor'}. It was not scanned.`);
+    }
+
     // Check if event is expired
     if (eventData && eventData.date) {
       const eventDate = new Date(eventData.date);
@@ -259,7 +269,7 @@ export class TicketsService {
     const booking = ticket.bookingId as any;
     if (!booking || booking.status !== 'confirmed') {
       throw new BadRequestException(
-        `This ticket belongs to a ${booking.status} booking`,
+        `This ticket belongs to a ${booking?.status || 'missing'} booking`,
       );
     }
 

@@ -345,7 +345,9 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                     ) : isConfirmedBooked ? (
                         <FiX style={{ color: '#ef4444', fontSize: '1rem' }} />
                     ) : isPending ? (
-                        <FiLoader style={{ color: '#fbbf24', fontSize: '0.85rem' }} />
+                        seat.isPaymentSubmitted
+                            ? <FiCheck aria-label="Receipt uploaded" style={{ color: '#fbbf24', fontSize: '0.85rem' }} />
+                            : <FiLoader aria-label="Awaiting payment" style={{ color: '#fbbf24', fontSize: '0.85rem' }} />
                     ) : (
                         <span className="seat-num">{seat.seatNumber}</span>
                     )}
@@ -459,7 +461,13 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                     <div className="legend-color" style={{ background: '#78650d', borderColor: '#fbbf24', border: '2px solid #fbbf24', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <FiLoader style={{ color: '#fbbf24', fontSize: '9px' }} />
                     </div>
-                    <span>Pending</span>
+                    <span>Awaiting payment</span>
+                </div>
+                <div className="legend-item">
+                    <div className="legend-color" style={{ background: '#78650d', borderColor: '#fbbf24', border: '2px solid #fbbf24', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <FiCheck style={{ color: '#fbbf24', fontSize: '9px' }} />
+                    </div>
+                    <span>Receipt sent</span>
                 </div>
                 {highlightedSeats.length > 0 && (
                     <div className="legend-item">

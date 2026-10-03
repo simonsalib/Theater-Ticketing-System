@@ -90,6 +90,17 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
     }, []);
 
     useEffect(() => {
+        if (loading || isPrevious) return;
+        const paymentId = new URLSearchParams(window.location.search).get('payment');
+        if (!paymentId) return;
+        const target = document.getElementById(`pending-payment-${paymentId}`);
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            target.focus({ preventScroll: true });
+        }
+    }, [loading, bookings, isPrevious]);
+
+    useEffect(() => {
         const updateTimers = () => {
             const newTimers: Record<string, string> = {};
             const now = new Date().getTime();
@@ -419,7 +430,8 @@ const UserBookingsPage: React.FC<UserBookingsPageProps> = ({ isPrevious = false 
                             const instapayLink = getSafeExternalUrl(event?.organizerId?.instapayLink);
 
                             return (
-                                <div key={booking._id} style={{
+                                <div key={booking._id} id={`pending-payment-${booking._id}`} tabIndex={-1} style={{
+                                    scrollMarginTop: '90px',
                                     padding: '20px', borderRadius: '16px', marginBottom: '14px',
                                     background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.08)'
                                 }}>

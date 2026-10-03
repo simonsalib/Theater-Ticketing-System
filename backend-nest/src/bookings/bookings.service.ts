@@ -2,6 +2,7 @@ import {
     Injectable,
     NotFoundException,
     BadRequestException,
+    ConflictException,
     ForbiddenException,
     OnModuleInit,
     OnModuleDestroy,
@@ -14,7 +15,7 @@ import { SeatHold, SeatHoldDocument } from './schemas/seat-hold.schema';
 import { Event, EventDocument } from '../events/schemas/event.schema';
 import { Theater, TheaterDocument } from '../theaters/schemas/theater.schema';
 import { TicketsService } from '../tickets/tickets.service';
-import { UserRole } from '../users/schemas/user.schema';
+import { User, UserDocument, UserRole } from '../users/schemas/user.schema';
 
 const DEFAULT_PAYMENT_DEADLINE_MINUTES = 30;
 const DEFAULT_SEAT_HOLD_DEADLINE_MINUTES = 3;
@@ -29,6 +30,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
         @InjectModel(SeatHold.name) private seatHoldModel: Model<SeatHoldDocument>,
         @InjectModel(Event.name) private eventModel: Model<EventDocument>,
         @InjectModel(Theater.name) private theaterModel: Model<TheaterDocument>,
+        @InjectModel(User.name) private userModel: Model<UserDocument>,
         private readonly ticketsService: TicketsService,
     ) { }
 
@@ -302,6 +304,17 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
         seats: { row: string; seatNumber: number; section: string }[],
         userId: string,
     ): Promise<{ holdId: string; expiresAt: Date; seats: any[] }> {
+        return this.withUserBookingLock(userId, async () => {
+            await this.assertNoUnpaidBooking(userId);
+            return this.holdSeatsUnlocked(eventId, seats, userId);
+        });
+    }
+
+    private async holdSeatsUnlocked(
+        eventId: string,
+        seats: { row: string; seatNumber: number; section: string }[],
+        userId: string,
+    ): Promise<{ holdId: string; expiresAt: Date; seats: any[] }> {
         const event = await this.eventModel.findById(eventId).exec();
         if (!event) {
             throw new NotFoundException('Event not found');
@@ -450,7 +463,52 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     }
 
 
+    async findUnpaidBooking(userId: string) {
+        return this.bookingModel.findOne({
+            StandardId: userId,
+            status: 'pending',
+            isReceiptUploaded: { $ne: true },
+            pendingExpiresAt: { $gt: new Date() },
+        } as any).select('_id eventId pendingExpiresAt numberOfTickets').lean().exec();
+    }
+
+    private async assertNoUnpaidBooking(userId: string): Promise<void> {
+        if (await this.findUnpaidBooking(userId)) {
+            throw new ConflictException('Finish payment and upload the receipt for your pending booking before booking more seats.');
+        }
+    }
+
+    private async withUserBookingLock<T>(userId: string, action: () => Promise<T>): Promise<T> {
+        const lockToken = new Types.ObjectId().toString();
+        const now = new Date();
+        const lockedUser = await this.userModel.findOneAndUpdate(
+            { _id: userId, $or: [
+                { bookingCreationLockUntil: { $exists: false } },
+                { bookingCreationLockUntil: { $lte: now } },
+            ] },
+            { $set: { bookingCreationLockUntil: new Date(now.getTime() + 5 * 60_000), bookingCreationLockToken: lockToken } },
+        ).exec();
+        if (!lockedUser) {
+            throw new ConflictException('Another booking is being processed. Please try again in a moment.');
+        }
+        try {
+            return await action();
+        } finally {
+            await this.userModel.updateOne(
+                { _id: userId, bookingCreationLockToken: lockToken },
+                { $unset: { bookingCreationLockUntil: 1, bookingCreationLockToken: 1 } },
+            ).exec();
+        }
+    }
+
     async create(createDto: any, userId: string): Promise<BookingDocument> {
+        return this.withUserBookingLock(userId, async () => {
+            await this.assertNoUnpaidBooking(userId);
+            return this.createUnlocked(createDto, userId);
+        });
+    }
+
+    private async createUnlocked(createDto: any, userId: string): Promise<BookingDocument> {
         let { eventId, numberOfTickets, status, selectedSeats, holdId } = createDto;
 
         const event = await this.eventModel.findById(eventId).exec();
@@ -1061,7 +1119,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
             this.bookingModel.find({
                 eventId,
                 status: 'pending',
-            } as any).select('selectedSeats').lean().exec(),
+            } as any).select('selectedSeats isReceiptUploaded').lean().exec(),
             this.seatHoldModel.find({
                 eventId,
                 expiresAt: { $gt: new Date() },
@@ -1069,10 +1127,13 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
         ]);
 
         const pendingSeatsSet = new Set<string>();
+        const paymentSubmittedSeatsSet = new Set<string>();
         for (const pb of pendingBookings) {
             if ((pb as any).selectedSeats) {
                 for (const s of (pb as any).selectedSeats) {
-                    pendingSeatsSet.add(`${s.section}-${s.row}-${s.seatNumber}`);
+                    const key = `${s.section}-${s.row}-${s.seatNumber}`;
+                    pendingSeatsSet.add(key);
+                    if ((pb as any).isReceiptUploaded) paymentSubmittedSeatsSet.add(key);
                 }
             }
         }
@@ -1161,6 +1222,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
                     isActive,
                     isBooked: bookedSeatsSet.has(seatKey),
                     isPending: pendingSeatsSet.has(seatKey) || heldSeatsSet.has(seatKey),
+                    isPaymentSubmitted: paymentSubmittedSeatsSet.has(seatKey),
                     price: pricingRecord ? pricingRecord.price : (event.ticketPrice || 0),
                     // Preserve any custom label from the theater config, otherwise enrich with side info
                     seatLabel: seatConfig?.seatLabel || `${rowLabel}${s} - ${side}`,
@@ -1202,6 +1264,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
                         isActive,
                         isBooked: bookedSeatsSet.has(seatKey),
                         isPending: pendingSeatsSet.has(seatKey) || heldSeatsSet.has(seatKey),
+                        isPaymentSubmitted: paymentSubmittedSeatsSet.has(seatKey),
                         price: pricingRecord ? pricingRecord.price : (event.ticketPrice || 0),
                         seatLabel: seatConfig?.seatLabel || `${rowLabel}${s} - ${side}`,
                         side,
