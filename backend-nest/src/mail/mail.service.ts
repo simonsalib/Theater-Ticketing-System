@@ -2,6 +2,8 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { google, gmail_v1 } from 'googleapis';
 
+const MAIL_BRAND = 'Taralally_Theater_Team';
+
 @Injectable()
 export class MailService {
   private emailUser: string;
@@ -36,7 +38,7 @@ export class MailService {
   }
 
   async sendVerificationOTP(to: string, otp: string): Promise<void> {
-    const subject = 'Your EventTix Verification Code: ' + otp;
+    const subject = `Your ${MAIL_BRAND} Verification Code: ${otp}`;
     const otpDigits = otp.split('').map(d =>
       `<td style="padding:0 6px;"><div style="width:52px;height:64px;line-height:64px;background:#f0f2ff;border:2px solid #667eea;border-radius:12px;font-size:32px;font-weight:800;color:#667eea;text-align:center;font-family:'Segoe UI',Arial,sans-serif;">${d}</div></td>`
     ).join('');
@@ -52,7 +54,7 @@ export class MailService {
         <!-- Header -->
         <tr><td style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:16px 16px 0 0;padding:36px 40px;text-align:center;">
           <div style="font-size:13px;font-weight:600;letter-spacing:4px;color:rgba(255,255,255,0.75);text-transform:uppercase;margin-bottom:8px;">Welcome to</div>
-          <div style="font-size:36px;font-weight:800;color:#ffffff;letter-spacing:2px;">EventTix</div>
+          <div style="font-size:24px;line-height:1.25;font-weight:800;color:#ffffff;word-break:break-all;">${MAIL_BRAND}</div>
           <div style="width:48px;height:3px;background:rgba(255,255,255,0.5);margin:14px auto 0;border-radius:2px;"></div>
         </td></tr>
 
@@ -83,7 +85,7 @@ export class MailService {
             <tr>
               <td style="width:36px;vertical-align:top;padding-top:2px;font-size:20px;">🔒</td>
               <td style="font-size:13px;color:#9ca3af;line-height:1.7;">
-                <strong style="color:#6b7280;">Never share this code.</strong> EventTix staff will never ask for your OTP.
+                <strong style="color:#6b7280;">Never share this code.</strong> Our team will never ask for your OTP.
                 If you didn't create an account, you can safely ignore this email.
               </td>
             </tr>
@@ -93,7 +95,7 @@ export class MailService {
         <!-- Footer -->
         <tr><td style="background:#f9fafb;border-radius:0 0 16px 16px;border-top:1px solid #f0f0f0;padding:20px 40px;text-align:center;">
           <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.8;">
-            © ${new Date().getFullYear()} EventTix. All rights reserved.<br>
+            © ${new Date().getFullYear()} ${MAIL_BRAND}. All rights reserved.<br>
             This is an automated message — please do not reply.
           </p>
         </td></tr>
@@ -104,13 +106,13 @@ export class MailService {
 </body>
 </html>
     `;
-    const text = `EventTix - Account Verification\n\nYour verification code is: ${otp}\n\nThis code expires in 10 minutes. Do not share it with anyone.\n\nIf you did not create an account, you can safely ignore this email.`;
+    const text = `${MAIL_BRAND} - Account Verification\n\nYour verification code is: ${otp}\n\nThis code expires in 10 minutes. Do not share it with anyone.\n\nIf you did not create an account, you can safely ignore this email.`;
 
     await this.sendMail(to, subject, html, text);
   }
 
   async sendPasswordResetOTP(to: string, otp: string): Promise<void> {
-    const subject = 'Your EventTix Password Reset Code: ' + otp;
+    const subject = `Your ${MAIL_BRAND} Password Reset Code: ${otp}`;
     const otpDigits = otp.split('').map(d =>
       `<td style="padding:0 6px;"><div style="width:52px;height:64px;line-height:64px;background:#fff0f3;border:2px solid #f5576c;border-radius:12px;font-size:32px;font-weight:800;color:#f5576c;text-align:center;font-family:'Segoe UI',Arial,sans-serif;">${d}</div></td>`
     ).join('');
@@ -126,7 +128,7 @@ export class MailService {
         <!-- Header -->
         <tr><td style="background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%);border-radius:16px 16px 0 0;padding:36px 40px;text-align:center;">
           <div style="font-size:13px;font-weight:600;letter-spacing:4px;color:rgba(255,255,255,0.75);text-transform:uppercase;margin-bottom:8px;">Security alert from</div>
-          <div style="font-size:36px;font-weight:800;color:#ffffff;letter-spacing:2px;">EventTix</div>
+          <div style="font-size:24px;line-height:1.25;font-weight:800;color:#ffffff;word-break:break-all;">${MAIL_BRAND}</div>
           <div style="width:48px;height:3px;background:rgba(255,255,255,0.5);margin:14px auto 0;border-radius:2px;"></div>
         </td></tr>
 
@@ -157,7 +159,7 @@ export class MailService {
             <tr>
               <td style="width:36px;vertical-align:top;padding-top:2px;font-size:20px;">⚠️</td>
               <td style="font-size:13px;color:#9ca3af;line-height:1.7;">
-                <strong style="color:#6b7280;">Never share this code.</strong> EventTix staff will never ask for your OTP.
+                <strong style="color:#6b7280;">Never share this code.</strong> Our team will never ask for your OTP.
                 If you did not request a password reset, please secure your account immediately.
               </td>
             </tr>
@@ -167,7 +169,7 @@ export class MailService {
         <!-- Footer -->
         <tr><td style="background:#f9fafb;border-radius:0 0 16px 16px;border-top:1px solid #f0f0f0;padding:20px 40px;text-align:center;">
           <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.8;">
-            © ${new Date().getFullYear()} EventTix. All rights reserved.<br>
+            © ${new Date().getFullYear()} ${MAIL_BRAND}. All rights reserved.<br>
             This is an automated message — please do not reply.
           </p>
         </td></tr>
@@ -178,7 +180,7 @@ export class MailService {
 </body>
 </html>
     `;
-    const text = `EventTix - Password Reset\n\nYour password reset code is: ${otp}\n\nThis code expires in 10 minutes. Do not share it with anyone.\n\nIf you did not request a password reset, you can safely ignore this email.`;
+    const text = `${MAIL_BRAND} - Password Reset\n\nYour password reset code is: ${otp}\n\nThis code expires in 10 minutes. Do not share it with anyone.\n\nIf you did not request a password reset, you can safely ignore this email.`;
 
     await this.sendMail(to, subject, html, text);
   }
@@ -197,9 +199,9 @@ export class MailService {
       ...report.issues.slice(0, 100).map(issue => `- ${issue.code}${issue.seat ? ` | ${issue.seat}` : ''}${issue.reference ? ` | ref=${issue.reference}` : ''}`),
       '',
     ]);
-    const text = `EventTix seat integrity alert\nChecked: ${new Date().toISOString()}\nIssues: ${total}\n\n${lines.join('\n')}`;
-    const html = `<div style="font-family:Arial,sans-serif;color:#111827"><h2>EventTix seat integrity alert</h2><p><strong>${total}</strong> persistent issue(s) found.</p><pre style="white-space:pre-wrap;background:#f3f4f6;padding:16px;border-radius:6px">${escape(lines.join('\n'))}</pre><p>No attendee details or QR payloads are included in this alert.</p></div>`;
-    await this.sendMail(to, `[EventTix] ${total} seat integrity issue(s)`, html, text);
+    const text = `${MAIL_BRAND} seat integrity alert\nChecked: ${new Date().toISOString()}\nIssues: ${total}\n\n${lines.join('\n')}`;
+    const html = `<div style="font-family:Arial,sans-serif;color:#111827"><h2>${MAIL_BRAND} seat integrity alert</h2><p><strong>${total}</strong> persistent issue(s) found.</p><pre style="white-space:pre-wrap;background:#f3f4f6;padding:16px;border-radius:6px">${escape(lines.join('\n'))}</pre><p>No attendee details or QR payloads are included in this alert.</p></div>`;
+    await this.sendMail(to, `[${MAIL_BRAND}] ${total} seat integrity issue(s)`, html, text);
   }
 
   private async sendMail(to: string, subject: string, html: string, text: string): Promise<void> {
@@ -219,7 +221,7 @@ export class MailService {
       // Build RFC 2822 multipart/alternative message (plain text + HTML)
       // Multipart format prevents spam filters from flagging HTML-only emails
       const messageParts = [
-        `From: EventTix <${this.emailUser}>`,
+        `From: "${MAIL_BRAND}" <${this.emailUser}>`,
         `To: ${to}`,
         `Subject: ${subject}`,
         `Date: ${date}`,
