@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { google, gmail_v1 } from 'googleapis';
+import nodemailer from 'nodemailer';
 
 const MAIL_BRAND = 'Taralally_Theater_Team';
 
@@ -9,6 +10,11 @@ export class MailService {
   private emailUser: string;
   private isConfigured: boolean = false;
   private gmail: gmail_v1.Gmail;
+  private readonly mimeComposer = nodemailer.createTransport({
+    streamTransport: true,
+    buffer: true,
+    newline: 'windows',
+  });
 
   constructor(private configService: ConfigService) {
     const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID')?.trim();
@@ -211,47 +217,17 @@ export class MailService {
       throw new InternalServerErrorException(errorMsg);
     }
 
-    console.log(`📧 Attempting to send email to ${to}: ${subject}`);
+    console.log('📧 Attempting to send email');
 
     try {
-      const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      const messageId = `<${Date.now()}.${Math.random().toString(36).slice(2)}@eventtix.app>`;
-      const date = new Date().toUTCString();
-
-      // Build RFC 2822 multipart/alternative message (plain text + HTML)
-      // Multipart format prevents spam filters from flagging HTML-only emails
-      const messageParts = [
-        `From: "${MAIL_BRAND}" <${this.emailUser}>`,
-        `To: ${to}`,
-        `Subject: ${subject}`,
-        `Date: ${date}`,
-        `Message-ID: ${messageId}`,
-        `Reply-To: no-reply@eventtix.app`,
-        'MIME-Version: 1.0',
-        `Content-Type: multipart/alternative; boundary="${boundary}"`,
-        '',
-        `--${boundary}`,
-        'Content-Type: text/plain; charset=utf-8',
-        'Content-Transfer-Encoding: quoted-printable',
-        '',
+      const { message } = await this.mimeComposer.sendMail({
+        from: { name: MAIL_BRAND, address: this.emailUser },
+        to,
+        subject,
         text,
-        '',
-        `--${boundary}`,
-        'Content-Type: text/html; charset=utf-8',
-        'Content-Transfer-Encoding: quoted-printable',
-        '',
         html,
-        '',
-        `--${boundary}--`,
-      ];
-      const message = messageParts.join('\r\n');
-
-      // Base64url encode the message
-      const encodedMessage = Buffer.from(message)
-        .toString('base64')
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
+      });
+      const encodedMessage = (message as Buffer).toString('base64url');
 
       console.log('✉️ Sending via Gmail API...');
       const result = await this.gmail.users.messages.send({

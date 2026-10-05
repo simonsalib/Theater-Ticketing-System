@@ -27,17 +27,24 @@ describe('MailService', () => {
   });
 
   it('uses the requested sender and branding for both OTP emails', async () => {
-    for (const [method, subject] of [
-      ['sendVerificationOTP', 'Your Taralally_Theater_Team Verification Code: 123456'],
-      ['sendPasswordResetOTP', 'Your Taralally_Theater_Team Password Reset Code: 123456'],
+    for (const [method, subject, bodySnippet] of [
+      ['sendVerificationOTP', 'Your Taralally_Theater_Team Verification Code: 123456', 'Your verification code is: 123456'],
+      ['sendPasswordResetOTP', 'Your Taralally_Theater_Team Password Reset Code: 123456', 'Your password reset code is: 123456'],
     ] as const) {
       await service[method]('recipient@example.com', '123456');
       const raw = send.mock.lastCall?.[0].requestBody.raw as string;
       const message = Buffer.from(raw, 'base64url').toString('utf8');
 
-      expect(message).toContain('From: "Taralally_Theater_Team" <Youthmeeting@gmail.com>');
+      expect(message).toMatch(/^From: .*Taralally_Theater_Team.*<Youthmeeting@gmail\.com>/m);
       expect(message).toContain(`Subject: ${subject}`);
       expect(message).not.toContain('EventTix');
+      expect(message).not.toMatch(/^Reply-To:/m);
+      expect(message).toMatch(/^Message-ID: <[^>\r\n]+>/m);
+      expect(message).not.toContain('@eventtix.app');
+      expect(message).toMatch(/^Content-Type: multipart\/alternative;/m);
+      expect(message).toMatch(/^Content-Type: text\/plain;/m);
+      expect(message).toMatch(/^Content-Type: text\/html;/m);
+      expect(message).toContain(bodySnippet);
     }
     expect(send).toHaveBeenCalledTimes(2);
   });
