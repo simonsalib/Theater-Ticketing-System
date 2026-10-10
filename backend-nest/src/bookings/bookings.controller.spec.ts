@@ -4,14 +4,14 @@ import { BookingsService } from './bookings.service';
 
 describe('BookingsController', () => {
   let controller: BookingsController;
-  const findMySeatHistory = jest.fn();
+  const findMyConfirmedEventSeats = jest.fn();
 
   beforeEach(async () => {
     jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
       controllers: [BookingsController],
       providers: [
-        { provide: BookingsService, useValue: { findMySeatHistory } },
+        { provide: BookingsService, useValue: { findMyConfirmedEventSeats } },
       ],
     }).compile();
 
@@ -23,15 +23,12 @@ describe('BookingsController', () => {
   });
 
   it('uses the authenticated user to fetch their seats', async () => {
-    const seats = {
-      currentSeats: [{ row: 'K', seatNumber: 2, section: 'balcony' }],
-      previousSeats: [{ row: 'G', seatNumber: 9, section: 'main' }],
-    };
-    findMySeatHistory.mockResolvedValue(seats);
+    const seats = { currentSeats: [{ row: 'K', seatNumber: 2, section: 'balcony' }] };
+    findMyConfirmedEventSeats.mockResolvedValue(seats);
 
-    await expect(controller.getMySeatHistory('event-1', {
+    await expect(controller.getMyConfirmedEventSeats('event-1', {
       user: { _id: 'user-1' },
     })).resolves.toEqual({ success: true, data: seats });
-    expect(findMySeatHistory).toHaveBeenCalledWith('event-1', 'user-1');
+    expect(findMyConfirmedEventSeats).toHaveBeenCalledWith('event-1', 'user-1');
   });
 });

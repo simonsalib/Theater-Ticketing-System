@@ -43,9 +43,7 @@ const BookTicketPage = () => {
     const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
     const [seatTotalPrice, setSeatTotalPrice] = useState(0);
     const [initialSeatsData, setInitialSeatsData] = useState<any>(null);
-    const [seatHistory, setSeatHistory] = useState<{ currentSeats: SelectedSeat[]; previousSeats: SelectedSeat[] }>({
-        currentSeats: [], previousSeats: [],
-    });
+    const [myConfirmedSeats, setMyConfirmedSeats] = useState<SelectedSeat[]>([]);
 
     // Attendee form state
     const [showAttendeeForm, setShowAttendeeForm] = useState(false);
@@ -120,7 +118,7 @@ const BookTicketPage = () => {
         if (!eventId) return;
         const fetchAllData = async () => {
             setIsEventLoading(true);
-            setSeatHistory({ currentSeats: [], previousSeats: [] });
+            setMyConfirmedSeats([]);
             try {
                 // Fetch event details
                 const eventPromise = api.get<any>(`/event/${eventId}`);
@@ -145,7 +143,7 @@ const BookTicketPage = () => {
                 const holdPromise = token ? api.get(`/booking/active-hold/${eventId}`).catch(e => null) : Promise.resolve(null);
 
                 const mySeatsPromise = token
-                    ? api.get<{ success: boolean; data: { currentSeats: SelectedSeat[]; previousSeats: SelectedSeat[] } }>(`/booking/event/${eventId}/my-seats`).catch(() => null)
+                    ? api.get<{ success: boolean; data: { currentSeats: SelectedSeat[] } }>(`/booking/event/${eventId}/my-seats`).catch(() => null)
                     : Promise.resolve(null);
 
                 // Wait for all
@@ -167,11 +165,8 @@ const BookTicketPage = () => {
                     setInitialSeatsData(seatsResponse.data.data);
                 }
                 if (mySeatsResponse?.data?.success) {
-                    const history = mySeatsResponse.data.data;
-                    setSeatHistory({
-                        currentSeats: Array.isArray(history?.currentSeats) ? history.currentSeats : [],
-                        previousSeats: Array.isArray(history?.previousSeats) ? history.previousSeats : [],
-                    });
+                    const ownedSeats = mySeatsResponse.data.data?.currentSeats;
+                    setMyConfirmedSeats(Array.isArray(ownedSeats) ? ownedSeats : []);
                 }
 
                 // Check for active hold to recover session
@@ -881,7 +876,7 @@ const BookTicketPage = () => {
                                     animate={{ opacity: 1, x: 0 }}
                                     exit={{ opacity: 0, x: -20 }}
                                 >
-                                    <SeatSelector eventId={event._id} onSeatsSelected={handleSeatsSelected} maxSeats={10} initialSeatsData={initialSeatsData} highlightedSeats={seatHistory.currentSeats} previousSeats={seatHistory.previousSeats} isRTL={isRTL} />
+                                    <SeatSelector eventId={event._id} onSeatsSelected={handleSeatsSelected} maxSeats={10} initialSeatsData={initialSeatsData} highlightedSeats={myConfirmedSeats} isRTL={isRTL} />
                                 </motion.div>
                             ) : (
                                 <motion.div

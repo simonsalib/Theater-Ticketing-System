@@ -25,7 +25,6 @@ interface SeatSelectorProps {
     maxSeats?: number;
     readOnly?: boolean;
     highlightedSeats?: { row: string; seatNumber: number; section: string }[];
-    previousSeats?: { row: string; seatNumber: number; section: string }[];
     isRTL?: boolean;
     initialSeatsData?: any;
 }
@@ -36,7 +35,6 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
     maxSeats = 10,
     readOnly = false,
     highlightedSeats = [],
-    previousSeats = [],
     isRTL = false,
     initialSeatsData
 }) => {
@@ -309,12 +307,6 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                 s.seatNumber === seat.seatNumber &&
                 s.section === seat.section
         );
-        const isPrevious = !isHighlighted && previousSeats.some(
-            s => s.row === seat.row &&
-                s.seatNumber === seat.seatNumber &&
-                s.section === seat.section
-        );
-
         const typeColors = SEAT_TYPE_COLORS[seat.seatType] || SEAT_TYPE_COLORS.standard;
         // isPending takes priority over isBooked (backend marks pending seats as booked too)
         const isPending = seat.isPending && !isHighlighted;
@@ -338,16 +330,12 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
         const isSeatDisabled = isConfirmedBooked || isPending || !seat.isActive || readOnly || isHighlighted;
         const seatTitle = isHighlighted
             ? (isRTL ? `مقعدك في هذا العرض ${seat.row} ${seat.seatNumber}` : `Your seat in this event ${seat.row} ${seat.seatNumber}`)
-            : isPrevious
-                ? (isRTL
-                    ? `مقعدك في حجز سابق ${seat.row} ${seat.seatNumber}${isSeatDisabled ? '، غير متاح الآن' : '، متاح للحجز'}`
-                    : `Your seat in a previous booking ${seat.row} ${seat.seatNumber}, ${isSeatDisabled ? 'unavailable now' : 'available now'}`)
-                : undefined;
+            : undefined;
 
         return (
             <React.Fragment key={seatKey}>
                 <button
-                    className={`seat-btn ${seat.seatType} ${isSelected ? 'selected' : ''} ${isHighlighted ? 'highlighted' : ''} ${isPrevious ? 'previous-seat' : ''} ${isConfirmedBooked ? 'booked' : ''} ${isPending ? 'pending' : ''} ${!seat.isActive ? 'disabled' : ''}`}
+                    className={`seat-btn ${seat.seatType} ${isSelected ? 'selected' : ''} ${isHighlighted ? 'highlighted' : ''} ${isConfirmedBooked ? 'booked' : ''} ${isPending ? 'pending' : ''} ${!seat.isActive ? 'disabled' : ''}`}
                     aria-label={seatTitle}
                     title={seatTitle}
                     style={{
@@ -493,12 +481,6 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                         <span>{isRTL ? 'مقاعدك في هذا العرض' : 'Your seats in this event'}</span>
                     </div>
                 )}
-                {previousSeats.length > 0 && !readOnly && (
-                    <div className="legend-item">
-                        <div className="legend-color previous-seat" />
-                        <span>{isRTL ? 'مقاعدك في عرض آخر' : 'Seats in another performance'}</span>
-                    </div>
-                )}
                 {!readOnly && (
                     <div className="legend-item">
                         <div className="legend-color selected-legend" />
@@ -506,13 +488,6 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                     </div>
                 )}
             </div>
-
-            {previousSeats.length > 0 && !readOnly && (
-                <div className="previous-booking-seats" dir={isRTL ? 'rtl' : 'ltr'}>
-                    <span>{isRTL ? 'عرض آخر:' : 'Another performance:'}</span>
-                    <strong>{previousSeats.map(seat => `${seat.section === 'balcony' ? (isRTL ? 'بالكون' : 'Balcony') : (isRTL ? 'صالة' : 'Main')} ${seat.row}${seat.seatNumber}`).join(', ')}</strong>
-                </div>
-            )}
 
             <div className="theater-frame">
                 <div className="theater-canvas-container" ref={containerRef}>

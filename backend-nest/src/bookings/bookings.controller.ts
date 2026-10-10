@@ -108,8 +108,8 @@ export class BookingsController {
 
     @Get('event/:eventId/my-seats')
     @UseGuards(JwtAuthGuard)
-    async getMySeatHistory(@Param('eventId') eventId: string, @Req() req: any) {
-        const data = await this.bookingsService.findMySeatHistory(eventId, req.user._id);
+    async getMyConfirmedEventSeats(@Param('eventId') eventId: string, @Req() req: any) {
+        const data = await this.bookingsService.findMyConfirmedEventSeats(eventId, req.user._id);
         return { success: true, data };
     }
 

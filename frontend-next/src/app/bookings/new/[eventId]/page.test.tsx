@@ -22,12 +22,12 @@ vi.mock('@/contexts/LanguageContext', () => ({
     useLanguage: () => ({ t: (key: string) => key, isRTL: false }),
 }));
 vi.mock('@/components/Booking component/SeatSelector', () => ({
-    default: ({ onSeatsSelected, highlightedSeats = [], previousSeats = [] }: {
+    default: ({ onSeatsSelected, highlightedSeats = [], ...otherProps }: {
         onSeatsSelected?: (seats: unknown[], total: number) => void;
         highlightedSeats?: { row: string; seatNumber: number; section: string }[];
         previousSeats?: { row: string; seatNumber: number; section: string }[];
     }) => (
-        <div data-testid="highlighted-seats" data-seats={JSON.stringify(highlightedSeats)} data-previous={JSON.stringify(previousSeats)}>
+        <div data-testid="highlighted-seats" data-seats={JSON.stringify(highlightedSeats)} data-previous-prop={String('previousSeats' in otherProps)}>
         <button
             data-testid="seat-selector"
             onClick={() => onSeatsSelected?.([{
@@ -108,7 +108,7 @@ describe('new booking page integration', () => {
         expect(mocks.replace).not.toHaveBeenCalled();
     });
 
-    it('shows current seats and seats from the last booking in this theater in Book Now', async () => {
+    it('shows only seats for the open event even if an older API returns seat history', async () => {
         localStorage.setItem('token', 'test-token');
         mocks.event = { ...mocks.event, hasTheaterSeating: true };
         const mySeats = [
@@ -134,11 +134,11 @@ describe('new booking page integration', () => {
         await waitFor(() => expect(screen.getByTestId('highlighted-seats'))
             .toHaveAttribute('data-seats', JSON.stringify(mySeats)));
         expect(screen.getByTestId('highlighted-seats'))
-            .toHaveAttribute('data-previous', JSON.stringify(previousSeats));
+            .toHaveAttribute('data-previous-prop', 'false');
         expect(mocks.get).toHaveBeenCalledWith('/booking/event/event-1/my-seats');
     });
 
-    it('keeps the booking page usable if seat history is temporarily unavailable', async () => {
+    it('keeps the booking page usable if owned seats are temporarily unavailable', async () => {
         localStorage.setItem('token', 'test-token');
         mocks.event = { ...mocks.event, hasTheaterSeating: true };
         mocks.get.mockImplementation((url: string) => {
@@ -154,7 +154,7 @@ describe('new booking page integration', () => {
         render(<BookTicketPage />);
 
         await waitFor(() => expect(screen.getByTestId('highlighted-seats'))
-            .toHaveAttribute('data-previous', '[]'));
+            .toHaveAttribute('data-seats', '[]'));
         expect(await screen.findByText('Instant General Admission')).toBeInTheDocument();
     });
 
