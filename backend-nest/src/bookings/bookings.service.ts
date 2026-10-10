@@ -925,6 +925,56 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
         return bookings;
     }
 
+    async findMySeatHistory(eventId: string, userId: string): Promise<{
+        currentSeats: Array<{ row: string; seatNumber: number; section: string }>;
+        previousSeats: Array<{ row: string; seatNumber: number; section: string }>;
+    }> {
+        if (!Types.ObjectId.isValid(eventId)) {
+            throw new BadRequestException('Invalid event ID');
+        }
+
+        const event = await this.eventModel.findById(eventId).select('theater hasTheaterSeating').lean().exec();
+        if (!event) {
+            throw new NotFoundException('Event not found');
+        }
+        if (!event.hasTheaterSeating || !event.theater) {
+            return { currentSeats: [], previousSeats: [] };
+        }
+
+        const bookings = await this.bookingModel
+            .find({ StandardId: userId, status: 'confirmed', hasTheaterSeating: true } as any)
+            .select('eventId selectedSeats createdAt')
+            .sort({ createdAt: -1 })
+            .populate({ path: 'eventId', select: 'theater hasTheaterSeating' })
+            .lean()
+            .exec();
+
+        const currentSeats = new Map<string, { row: string; seatNumber: number; section: string }>();
+        let previousSeats: Array<{ row: string; seatNumber: number; section: string }> = [];
+        const theaterId = event.theater.toString();
+        for (const booking of bookings) {
+            const bookedEvent = booking.eventId as unknown as {
+                _id: Types.ObjectId;
+                theater?: Types.ObjectId;
+            } | null;
+            if (!bookedEvent || bookedEvent.theater?.toString() !== theaterId) continue;
+
+            const seats = new Map<string, { row: string; seatNumber: number; section: string }>();
+            for (const seat of booking.selectedSeats || []) {
+                const section = seat.section || 'main';
+                const key = `${section}-${seat.row}-${seat.seatNumber}`;
+                seats.set(key, { row: seat.row, seatNumber: seat.seatNumber, section });
+            }
+
+            if (bookedEvent._id.toString() === eventId) {
+                for (const [key, seat] of seats) currentSeats.set(key, seat);
+            } else if (previousSeats.length === 0 && seats.size > 0) {
+                previousSeats = [...seats.values()];
+            }
+        }
+        return { currentSeats: [...currentSeats.values()], previousSeats };
+    }
+
     async findAllForSpecificUser(targetUserId: string, requestingUser: any): Promise<BookingDocument[]> {
         // Enforce admin check
         if (requestingUser.role !== 'System Admin') {

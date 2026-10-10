@@ -12,7 +12,7 @@ import { getImageUrl } from '@/utils/imageHelper';
 import SeatSelector from '@/components/Booking component/SeatSelector';
 import { ProtectedRoute } from '@/auth/ProtectedRoute';
 import { Event } from '@/types/event';
-import { Seat } from '@/types/booking';
+import { Seat, SelectedSeat } from '@/types/booking';
 import CancelSeatsModal from '@/components/Booking component/CancelSeatsModal';
 import { toast } from 'react-toastify';
 import { API_BASE_URL } from '../../../../config';
@@ -43,6 +43,9 @@ const BookTicketPage = () => {
     const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
     const [seatTotalPrice, setSeatTotalPrice] = useState(0);
     const [initialSeatsData, setInitialSeatsData] = useState<any>(null);
+    const [seatHistory, setSeatHistory] = useState<{ currentSeats: SelectedSeat[]; previousSeats: SelectedSeat[] }>({
+        currentSeats: [], previousSeats: [],
+    });
 
     // Attendee form state
     const [showAttendeeForm, setShowAttendeeForm] = useState(false);
@@ -117,6 +120,7 @@ const BookTicketPage = () => {
         if (!eventId) return;
         const fetchAllData = async () => {
             setIsEventLoading(true);
+            setSeatHistory({ currentSeats: [], previousSeats: [] });
             try {
                 // Fetch event details
                 const eventPromise = api.get<any>(`/event/${eventId}`);
@@ -140,9 +144,13 @@ const BookTicketPage = () => {
                 // Fetch active hold if logged in
                 const holdPromise = token ? api.get(`/booking/active-hold/${eventId}`).catch(e => null) : Promise.resolve(null);
 
+                const mySeatsPromise = token
+                    ? api.get<{ success: boolean; data: { currentSeats: SelectedSeat[]; previousSeats: SelectedSeat[] } }>(`/booking/event/${eventId}/my-seats`).catch(() => null)
+                    : Promise.resolve(null);
+
                 // Wait for all
-                const [eventResponse, seatsResponse, holdResponse] = await Promise.all([
-                    eventPromise, seatsPromise, holdPromise
+                const [eventResponse, seatsResponse, holdResponse, mySeatsResponse] = await Promise.all([
+                    eventPromise, seatsPromise, holdPromise, mySeatsPromise
                 ]);
 
                 // Process event
@@ -157,6 +165,13 @@ const BookTicketPage = () => {
                 // Process eager seats data
                 if (seatsResponse?.data?.success) {
                     setInitialSeatsData(seatsResponse.data.data);
+                }
+                if (mySeatsResponse?.data?.success) {
+                    const history = mySeatsResponse.data.data;
+                    setSeatHistory({
+                        currentSeats: Array.isArray(history?.currentSeats) ? history.currentSeats : [],
+                        previousSeats: Array.isArray(history?.previousSeats) ? history.previousSeats : [],
+                    });
                 }
 
                 // Check for active hold to recover session
@@ -866,7 +881,7 @@ const BookTicketPage = () => {
                                     animate={{ opacity: 1, x: 0 }}
                                     exit={{ opacity: 0, x: -20 }}
                                 >
-                                    <SeatSelector eventId={event._id} onSeatsSelected={handleSeatsSelected} maxSeats={10} initialSeatsData={initialSeatsData} />
+                                    <SeatSelector eventId={event._id} onSeatsSelected={handleSeatsSelected} maxSeats={10} initialSeatsData={initialSeatsData} highlightedSeats={seatHistory.currentSeats} previousSeats={seatHistory.previousSeats} isRTL={isRTL} />
                                 </motion.div>
                             ) : (
                                 <motion.div

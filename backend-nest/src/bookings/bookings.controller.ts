@@ -106,6 +106,13 @@ export class BookingsController {
         return { success: true, data };
     }
 
+    @Get('event/:eventId/my-seats')
+    @UseGuards(JwtAuthGuard)
+    async getMySeatHistory(@Param('eventId') eventId: string, @Req() req: any) {
+        const data = await this.bookingsService.findMySeatHistory(eventId, req.user._id);
+        return { success: true, data };
+    }
+
     // User: upload receipt for a pending booking
     @Post(':id/receipt')
     @UseGuards(JwtAuthGuard)

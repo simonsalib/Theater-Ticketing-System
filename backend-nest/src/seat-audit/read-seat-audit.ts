@@ -1,6 +1,7 @@
 import { Connection, Types } from 'mongoose';
 import {
   AuditSnapshot,
+  AuditTheaterLayout,
   auditId,
   auditSeats,
   SeatAuditReport,
@@ -29,11 +30,20 @@ export async function readSeatAudit(
               remainingTickets: 1,
               bookedSeats: 1,
               hasTheaterSeating: 1,
+              theater: 1,
             },
           },
         );
         if (!event?.hasTheaterSeating)
           throw new Error('Seated event not found');
+        const theater = Types.ObjectId.isValid(String(event.theater || ''))
+          ? await db
+              .collection('theaters')
+              .findOne(
+                { _id: new Types.ObjectId(String(event.theater)) },
+                { ...options, projection: { layout: 1 } },
+              )
+          : null;
         const bookings = await db
           .collection('bookings')
           .find(
@@ -67,20 +77,34 @@ export async function readSeatAudit(
           .collection('tickets')
           .aggregate(
             [
-              { $match: { eventId: _id } },
+              {
+                $match: {
+                  $or: [
+                    { eventId: _id },
+                    { bookingId: { $in: bookings.map((b) => b._id) } },
+                  ],
+                },
+              },
               {
                 $project: {
                   bookingId: 1,
+                  eventId: 1,
                   userId: 1,
                   seatRow: 1,
                   seatNumber: 1,
                   section: 1,
                   qrData: 1,
                   hasQrImage: {
-                    $gt: [
-                      { $strLenBytes: { $ifNull: ['$qrCodeImage', ''] } },
-                      0,
-                    ],
+                    $regexMatch: {
+                      input: {
+                        $cond: [
+                          { $eq: [{ $type: '$qrCodeImage' }, 'string'] },
+                          '$qrCodeImage',
+                          '',
+                        ],
+                      },
+                      regex: '^data:image/png;base64,iVBORw0KGgo',
+                    },
                   },
                 },
               },
@@ -110,6 +134,8 @@ export async function readSeatAudit(
             holds,
             tickets,
             userIds: users.map((u) => auditId(u._id)),
+            theaterLayout: (theater?.layout ??
+              null) as AuditTheaterLayout | null,
           } as unknown as AuditSnapshot,
           new Date(),
           expiryGraceMs,

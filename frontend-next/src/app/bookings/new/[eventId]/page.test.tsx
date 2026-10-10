@@ -22,7 +22,12 @@ vi.mock('@/contexts/LanguageContext', () => ({
     useLanguage: () => ({ t: (key: string) => key, isRTL: false }),
 }));
 vi.mock('@/components/Booking component/SeatSelector', () => ({
-    default: ({ onSeatsSelected }: { onSeatsSelected?: (seats: unknown[], total: number) => void }) => (
+    default: ({ onSeatsSelected, highlightedSeats = [], previousSeats = [] }: {
+        onSeatsSelected?: (seats: unknown[], total: number) => void;
+        highlightedSeats?: { row: string; seatNumber: number; section: string }[];
+        previousSeats?: { row: string; seatNumber: number; section: string }[];
+    }) => (
+        <div data-testid="highlighted-seats" data-seats={JSON.stringify(highlightedSeats)} data-previous={JSON.stringify(previousSeats)}>
         <button
             data-testid="seat-selector"
             onClick={() => onSeatsSelected?.([{
@@ -32,6 +37,7 @@ vi.mock('@/components/Booking component/SeatSelector', () => ({
         >
             Select A1
         </button>
+        </div>
     ),
 }));
 vi.mock('@/components/Booking component/CancelSeatsModal', () => ({ default: () => null }));
@@ -100,6 +106,56 @@ describe('new booking page integration', () => {
 
         expect(await screen.findByText('Instant General Admission')).toBeInTheDocument();
         expect(mocks.replace).not.toHaveBeenCalled();
+    });
+
+    it('shows current seats and seats from the last booking in this theater in Book Now', async () => {
+        localStorage.setItem('token', 'test-token');
+        mocks.event = { ...mocks.event, hasTheaterSeating: true };
+        const mySeats = [
+            { row: 'A', seatNumber: 5, section: 'main' },
+            { row: 'K', seatNumber: 2, section: 'balcony' },
+        ];
+        const previousSeats = [{ row: 'G', seatNumber: 9, section: 'main' }];
+        mocks.get.mockImplementation((url: string) => {
+            if (url === '/event/event-1') {
+                return Promise.resolve({ data: { success: true, data: mocks.event } });
+            }
+            if (url === '/booking/my-bookings?unpaidOnly=true') {
+                return Promise.resolve({ data: { success: true, data: [] } });
+            }
+            if (url === '/booking/event/event-1/my-seats') {
+                return Promise.resolve({ data: { success: true, data: { currentSeats: mySeats, previousSeats } } });
+            }
+            return Promise.resolve({ data: { success: true, data: { seats: [] } } });
+        });
+
+        render(<BookTicketPage />);
+
+        await waitFor(() => expect(screen.getByTestId('highlighted-seats'))
+            .toHaveAttribute('data-seats', JSON.stringify(mySeats)));
+        expect(screen.getByTestId('highlighted-seats'))
+            .toHaveAttribute('data-previous', JSON.stringify(previousSeats));
+        expect(mocks.get).toHaveBeenCalledWith('/booking/event/event-1/my-seats');
+    });
+
+    it('keeps the booking page usable if seat history is temporarily unavailable', async () => {
+        localStorage.setItem('token', 'test-token');
+        mocks.event = { ...mocks.event, hasTheaterSeating: true };
+        mocks.get.mockImplementation((url: string) => {
+            if (url === '/booking/event/event-1/my-seats') {
+                return Promise.reject(new Error('Not deployed yet'));
+            }
+            if (url === '/booking/my-bookings?unpaidOnly=true') {
+                return Promise.resolve({ data: { success: true, data: [] } });
+            }
+            return Promise.resolve({ data: { success: true, data: mocks.event } });
+        });
+
+        render(<BookTicketPage />);
+
+        await waitFor(() => expect(screen.getByTestId('highlighted-seats'))
+            .toHaveAttribute('data-previous', '[]'));
+        expect(await screen.findByText('Instant General Admission')).toBeInTheDocument();
     });
 
     it('opens QR tickets after an instant general-admission booking', async () => {

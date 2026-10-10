@@ -95,6 +95,109 @@ describe('SeatSelector integration', () => {
         expect(pendingSeat?.querySelector('[aria-label="Receipt uploaded"]')).toBeInTheDocument();
     });
 
+    it('marks an owned booked seat green without blocking selection of a nearby chair', async () => {
+        const user = userEvent.setup();
+        const twoSeatTheater = {
+            ...theater,
+            layout: {
+                ...theater.layout,
+                mainFloor: { rows: 1, seatsPerRow: 2, rowLabels: ['Orchestra'] },
+            },
+        };
+        const onSeatsSelected = vi.fn();
+        const { container } = render(
+            <SeatSelector
+                eventId="event-1"
+                onSeatsSelected={onSeatsSelected}
+                highlightedSeats={[{ row: 'Orchestra', seatNumber: 1, section: 'main' }]}
+                initialSeatsData={{
+                    theater: twoSeatTheater,
+                    seatPricing: [{ seatType: 'standard', price: 100 }],
+                    seats: [
+                        { ...availableSeat, isBooked: true },
+                        { ...availableSeat, _id: 'seat-2', seatNumber: 2 },
+                    ],
+                }}
+            />,
+        );
+
+        const ownedSeat = container.querySelector<HTMLButtonElement>('.seat-btn.highlighted');
+        const nearbySeat = container.querySelector<HTMLButtonElement>('.seat-btn:not(.highlighted)');
+        expect(ownedSeat).toBeDisabled();
+        expect(ownedSeat?.querySelector('.check-icon')).toBeInTheDocument();
+        expect(screen.getByText('Your seats in this event')).toBeInTheDocument();
+        expect(nearbySeat).not.toBeDisabled();
+
+        await user.click(nearbySeat!);
+        expect(nearbySeat).toHaveClass('selected');
+        expect(onSeatsSelected).toHaveBeenLastCalledWith(
+            [expect.objectContaining({ row: 'Orchestra', seatNumber: 2, section: 'main' })],
+            100,
+        );
+    });
+
+    it('marks an available previously booked seat but still lets it be selected', async () => {
+        const user = userEvent.setup();
+        const onSeatsSelected = vi.fn();
+        const { container } = render(
+            <SeatSelector
+                eventId="event-1"
+                onSeatsSelected={onSeatsSelected}
+                previousSeats={[{ row: 'Orchestra', seatNumber: 1, section: 'main' }]}
+                initialSeatsData={{ theater, seatPricing: [{ seatType: 'standard', price: 100 }], seats: [availableSeat] }}
+            />,
+        );
+
+        const previousSeat = container.querySelector<HTMLButtonElement>('.seat-btn.previous-seat');
+        expect(previousSeat).not.toBeDisabled();
+        expect(previousSeat?.querySelector('.check-icon')).toBeInTheDocument();
+        expect(screen.getByText('Seats from your last booking here')).toBeInTheDocument();
+        expect(screen.getByText('Main Orchestra1')).toBeInTheDocument();
+
+        await user.click(previousSeat!);
+        expect(previousSeat).toHaveClass('selected');
+        expect(onSeatsSelected).toHaveBeenLastCalledWith(
+            [expect.objectContaining({ row: 'Orchestra', seatNumber: 1, section: 'main' })], 100,
+        );
+    });
+
+    it('keeps a previously booked seat unavailable when someone owns it in this event', () => {
+        const { container } = render(
+            <SeatSelector
+                eventId="event-1"
+                previousSeats={[{ row: 'Orchestra', seatNumber: 1, section: 'main' }]}
+                initialSeatsData={{
+                    theater,
+                    seatPricing: [{ seatType: 'standard', price: 100 }],
+                    seats: [{ ...availableSeat, isBooked: true }],
+                }}
+            />,
+        );
+
+        const previousSeat = container.querySelector<HTMLButtonElement>('.seat-btn.previous-seat.booked');
+        expect(previousSeat).toBeDisabled();
+        expect(previousSeat?.querySelector('.check-icon')).not.toBeInTheDocument();
+        expect(previousSeat?.getAttribute('aria-label')).toContain('unavailable now');
+    });
+
+    it('marks a previously booked balcony seat in the balcony layout', async () => {
+        const user = userEvent.setup();
+        const { container } = render(
+            <SeatSelector
+                eventId="event-1"
+                previousSeats={[{ row: 'Gallery', seatNumber: 1, section: 'balcony' }]}
+                initialSeatsData={{
+                    theater,
+                    seatPricing: [{ seatType: 'standard', price: 100 }],
+                    seats: [{ ...availableSeat, section: 'balcony', row: 'Gallery' }],
+                }}
+            />,
+        );
+
+        await user.click(screen.getByRole('button', { name: /balcony/i }));
+        expect(container.querySelector('.balcony-section .seat-btn.previous-seat')).toBeInTheDocument();
+    });
+
     it('uses BALC-prefixed fallback rows when balcony row labels are empty', async () => {
         const user = userEvent.setup();
         const fallbackTheater = {

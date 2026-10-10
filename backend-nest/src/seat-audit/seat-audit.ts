@@ -27,6 +27,7 @@ export interface AuditHold {
 export interface AuditTicket extends AuditSeat {
   _id: unknown;
   bookingId: unknown;
+  eventId?: unknown;
   userId: unknown;
   qrData?: string;
   hasQrImage: boolean;
@@ -43,6 +44,15 @@ export interface AuditSnapshot {
   holds: AuditHold[];
   tickets: AuditTicket[];
   userIds: string[];
+  theaterLayout?: AuditTheaterLayout | null;
+}
+
+export interface AuditTheaterLayout {
+  mainFloor: { rows: number; seatsPerRow: number; rowLabels?: string[] };
+  hasBalcony: boolean;
+  balcony?: { rows: number; seatsPerRow: number; rowLabels?: string[] } | null;
+  removedSeats?: string[];
+  disabledSeats?: string[];
 }
 
 export interface SeatAuditIssue {
@@ -64,6 +74,18 @@ export interface SeatAuditReport {
     heldSeats: number;
     tickets: number;
   };
+  sections: Record<
+    'main' | 'balcony',
+    {
+      occupied: number;
+      organizerBlocked: number;
+      confirmedSeats: number;
+      pendingSeats: number;
+      heldSeats: number;
+      tickets: number;
+    }
+  >;
+  organizerBlockedSeats: string[];
   issues: SeatAuditIssue[];
 }
 
@@ -112,20 +134,54 @@ export function auditSeats(
   const ticketsByBookingSeat = new Map<string, AuditTicket[]>();
   const active = (booking: AuditBooking) =>
     ['pending', 'confirmed'].includes(booking.status);
+  const validLayoutSeat = (seat: AuditSeat): boolean => {
+    const layout = snapshot.theaterLayout;
+    if (!layout) return true;
+    const section = seat.section || 'main';
+    if (section !== 'main' && section !== 'balcony') return false;
+    if (section === 'balcony' && !layout.hasBalcony) return false;
+    const floor = section === 'main' ? layout.mainFloor : layout.balcony;
+    if (!floor) return false;
+    const rows = floor.rowLabels?.length
+      ? floor.rowLabels
+      : Array.from(
+          { length: Number(floor.rows) || 0 },
+          (_, index) =>
+            `${section === 'balcony' ? 'BALC-' : ''}${String.fromCharCode(65 + index)}`,
+        );
+    const key = auditSeatKey(seat);
+    return (
+      rows.includes(String(seat.row ?? seat.seatRow)) &&
+      Number.isInteger(seat.seatNumber) &&
+      seat.seatNumber >= 1 &&
+      seat.seatNumber <= Number(floor.seatsPerRow) &&
+      !layout.removedSeats?.includes(key) &&
+      !layout.disabledSeats?.includes(key)
+    );
+  };
+  const checkLayoutSeat = (seat: AuditSeat, reference?: unknown) => {
+    if (!validLayoutSeat(seat))
+      add('UNAVAILABLE_OR_UNKNOWN_SEAT', auditSeatKey(seat), reference);
+  };
   const claim = (s: AuditSeat, owner: string) => {
     const key = auditSeatKey(s);
     claims.set(key, [...(claims.get(key) || []), owner]);
   };
 
+  if (snapshot.theaterLayout === null) add('THEATER_NOT_FOUND');
+
   for (const t of tickets) {
     const key = auditSeatKey(t);
+    checkLayoutSeat(t, t._id);
+    if (t.eventId && auditId(t.eventId) !== auditId(event._id))
+      add('TICKET_EVENT_MISMATCH', key, t._id);
     ticketsBySeat.set(key, [...(ticketsBySeat.get(key) || []), t]);
     const ownerKey = `${auditId(t.bookingId)}/${key}`;
     ticketsByBookingSeat.set(ownerKey, [
       ...(ticketsByBookingSeat.get(ownerKey) || []),
       t,
     ]);
-    if (t.qrData)
+    if (t.qrData?.trim())
       qrOwners.set(t.qrData, [...(qrOwners.get(t.qrData) || []), t]);
     else add('MISSING_QR_DATA', key, t._id);
     if (!t.hasQrImage) add('MISSING_QR_IMAGE', key, t._id);
@@ -143,6 +199,7 @@ export function auditSeats(
 
   for (const s of event.bookedSeats) {
     const key = auditSeatKey(s);
+    checkLayoutSeat(s);
     occupied.set(key, [...(occupied.get(key) || []), s]);
     if (s.bookingId && s.holdId) add('AMBIGUOUS_SEAT_OWNER', key);
     if (s.bookingId) {
@@ -180,6 +237,7 @@ export function auditSeats(
       add('EXPIRED_PENDING_BOOKING', undefined, b._id);
     for (const s of seats) {
       const key = auditSeatKey(s);
+      checkLayoutSeat(s, b._id);
       claim(s, `booking:${auditId(b._id)}`);
       const matches = (occupied.get(key) || []).filter(
         (x) => auditId(x.bookingId) === auditId(b._id),
@@ -204,6 +262,7 @@ export function auditSeats(
     }
     for (const s of h.seats) {
       const key = auditSeatKey(s);
+      checkLayoutSeat(s, h._id);
       claim(s, `hold:${auditId(h._id)}`);
       if (
         (occupied.get(key) || []).filter(
@@ -229,6 +288,38 @@ export function auditSeats(
   )
     add('REMAINING_TICKETS_MISMATCH');
 
+  const sections = Object.fromEntries(
+    (['main', 'balcony'] as const).map((section) => {
+      const inSection = (seat: AuditSeat) =>
+        (seat.section || 'main') === section;
+      return [
+        section,
+        {
+          occupied: event.bookedSeats.filter(inSection).length,
+          organizerBlocked: event.bookedSeats.filter(
+            (seat) => inSection(seat) && !seat.bookingId && !seat.holdId,
+          ).length,
+          confirmedSeats: bookings
+            .filter((b) => b.status === 'confirmed')
+            .reduce(
+              (n, b) => n + (b.selectedSeats || []).filter(inSection).length,
+              0,
+            ),
+          pendingSeats: bookings
+            .filter((b) => b.status === 'pending')
+            .reduce(
+              (n, b) => n + (b.selectedSeats || []).filter(inSection).length,
+              0,
+            ),
+          heldSeats: holds
+            .filter((h) => new Date(h.expiresAt) > now)
+            .reduce((n, h) => n + h.seats.filter(inSection).length, 0),
+          tickets: tickets.filter(inSection).length,
+        },
+      ];
+    }),
+  ) as SeatAuditReport['sections'];
+
   return {
     eventId: auditId(event._id),
     checkedAt: now.toISOString(),
@@ -250,6 +341,11 @@ export function auditSeats(
         .reduce((n, h) => n + h.seats.length, 0),
       tickets: tickets.length,
     },
+    sections,
+    organizerBlockedSeats: event.bookedSeats
+      .filter((seat) => !seat.bookingId && !seat.holdId)
+      .map(auditSeatKey)
+      .sort(),
     issues: [...new Map(issues.map((i) => [issueKey(i), i])).values()],
   };
 }
