@@ -358,7 +358,7 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                     onClick={() => handleSeatClick(seat)}
                     disabled={isSeatDisabled}
                 >
-                    {(isSelected || isHighlighted || (isPrevious && !isSeatDisabled)) ? (
+                    {(isSelected || isHighlighted) ? (
                         <FiCheck className="check-icon" />
                     ) : isConfirmedBooked ? (
                         <FiX style={{ color: '#ef4444', fontSize: '1rem' }} />
@@ -495,8 +495,8 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
                 )}
                 {previousSeats.length > 0 && !readOnly && (
                     <div className="legend-item">
-                        <div className="legend-color previous-seat"><FiCheck /></div>
-                        <span>{isRTL ? 'مقاعد آخر حجز هنا' : 'Seats from your last booking here'}</span>
+                        <div className="legend-color previous-seat" />
+                        <span>{isRTL ? 'مقاعدك في عرض آخر' : 'Seats in another performance'}</span>
                     </div>
                 )}
                 {!readOnly && (
@@ -509,7 +509,7 @@ const SeatSelector: React.FC<SeatSelectorProps> = ({
 
             {previousSeats.length > 0 && !readOnly && (
                 <div className="previous-booking-seats" dir={isRTL ? 'rtl' : 'ltr'}>
-                    <span>{isRTL ? 'آخر حجز:' : 'Last booking:'}</span>
+                    <span>{isRTL ? 'عرض آخر:' : 'Another performance:'}</span>
                     <strong>{previousSeats.map(seat => `${seat.section === 'balcony' ? (isRTL ? 'بالكون' : 'Balcony') : (isRTL ? 'صالة' : 'Main')} ${seat.row}${seat.seatNumber}`).join(', ')}</strong>
                 </div>
             )}
