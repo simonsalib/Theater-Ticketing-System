@@ -91,6 +91,7 @@ const UserDetailsPage = () => {
 
     // Image Modal State
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const [loadingReceiptId, setLoadingReceiptId] = useState<string | null>(null);
 
     useEffect(() => {
         if (!userId) return;
@@ -195,6 +196,23 @@ const UserDetailsPage = () => {
             case 'rejected':
             case 'cancelled': return <FiXCircle className="status-icon cancelled" />;
             default: return null;
+        }
+    };
+
+    const viewReceipt = async (bookingId: string) => {
+        try {
+            setLoadingReceiptId(bookingId);
+            const response = await api.get(`/booking/${bookingId}/receipt`);
+            const receipt = response.data?.success ? response.data.data : response.data;
+            if (!receipt) {
+                toast.error('Payment receipt is not available');
+                return;
+            }
+            setSelectedImage(receipt);
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || 'Failed to load payment receipt');
+        } finally {
+            setLoadingReceiptId(null);
         }
     };
 
@@ -326,13 +344,14 @@ const UserDetailsPage = () => {
                                             </div>
                                         )}
 
-                                        {booking.isReceiptUploaded && booking.instapayReceipt && (
+                                        {booking.isReceiptUploaded && (
                                             <div className="receipt-action">
                                                 <button
                                                     className="view-receipt-btn"
-                                                    onClick={() => setSelectedImage(booking.instapayReceipt!)}
+                                                    onClick={() => viewReceipt(booking._id)}
+                                                    disabled={loadingReceiptId === booking._id}
                                                 >
-                                                    <FiCreditCard /> View Payment Receipt
+                                                    <FiCreditCard /> {loadingReceiptId === booking._id ? 'Loading Receipt...' : 'View Payment Receipt'}
                                                 </button>
                                             </div>
                                         )}

@@ -12,11 +12,13 @@ describe('BookingsService', () => {
   let service: BookingsService;
   const bookingExec = jest.fn();
   const eventExec = jest.fn();
-  const find = jest.fn().mockReturnValue({
-    select: jest.fn().mockReturnValue({
-      lean: jest.fn().mockReturnValue({ exec: bookingExec }),
-    }),
-  });
+  const bookingQuery: any = {};
+  bookingQuery.select = jest.fn().mockReturnValue(bookingQuery);
+  bookingQuery.populate = jest.fn().mockReturnValue(bookingQuery);
+  bookingQuery.sort = jest.fn().mockReturnValue(bookingQuery);
+  bookingQuery.lean = jest.fn().mockReturnValue(bookingQuery);
+  bookingQuery.exec = bookingExec;
+  const find = jest.fn().mockReturnValue(bookingQuery);
   const findById = jest.fn().mockReturnValue({
     select: jest.fn().mockReturnValue({
       lean: jest.fn().mockReturnValue({ exec: eventExec }),
@@ -44,6 +46,46 @@ describe('BookingsService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  it('keeps receipt images and heavy event seating data out of booking lists', async () => {
+    bookingExec.mockResolvedValue([]);
+
+    await service.findAllForUser('user-1');
+
+    expect(bookingQuery.select).toHaveBeenCalledWith(
+      expect.not.stringContaining('instapayReceipt'),
+    );
+    expect(bookingQuery.populate).toHaveBeenCalledWith(expect.objectContaining({
+      path: 'eventId',
+      select: expect.not.stringContaining('bookedSeats'),
+    }));
+  });
+
+  it('includes the organizer payment QR only for bookings still awaiting payment', async () => {
+    bookingExec.mockResolvedValue([
+      {
+        toObject: () => ({
+          _id: 'unpaid',
+          status: 'pending',
+          isReceiptUploaded: false,
+          eventId: { organizerId: { instapayQR: 'qr-data' } },
+        }),
+      },
+      {
+        toObject: () => ({
+          _id: 'confirmed',
+          status: 'confirmed',
+          isReceiptUploaded: true,
+          eventId: { organizerId: { instapayQR: 'qr-data' } },
+        }),
+      },
+    ]);
+
+    const result = await service.findAllForUser('user-1');
+
+    expect(result[0].eventId.organizerId.instapayQR).toBe('qr-data');
+    expect(result[1].eventId.organizerId.instapayQR).toBeUndefined();
   });
 
   it('returns only distinct confirmed seats for the requested event and user', async () => {

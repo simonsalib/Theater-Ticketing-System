@@ -908,11 +908,18 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
         return booking.instapayReceipt;
     }
 
-    async findAllForUser(userId: string): Promise<BookingDocument[]> {
+    async findAllForUser(userId: string): Promise<any[]> {
         const bookings = await this.bookingModel
             .find({ StandardId: userId } as any)
+            .select(
+                'StandardId eventId numberOfTickets totalPrice status hasTheaterSeating ' +
+                'pendingExpiresAt selectedSeats isReceiptUploaded cancellationRequest createdAt updatedAt',
+            )
             .populate({
                 path: 'eventId',
+                select:
+                    'title date location ticketPrice cancellationDeadline startTime endTime ' +
+                    'organizerId hasTheaterSeating',
                 populate: {
                     path: 'organizerId',
                     select: 'name instapayNumber instapayQR instapayLink'
@@ -921,8 +928,17 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
             .sort({ createdAt: -1 })
             .exec();
 
-
-        return bookings;
+        return bookings.map((booking) => {
+            const item = typeof (booking as any).toObject === 'function'
+                ? (booking as any).toObject()
+                : booking;
+            const organizer = item.eventId?.organizerId;
+            const needsPaymentDetails = item.status === 'pending' && !item.isReceiptUploaded;
+            if (!needsPaymentDetails && organizer && typeof organizer === 'object') {
+                delete organizer.instapayQR;
+            }
+            return item;
+        });
     }
 
     async findMyConfirmedEventSeats(eventId: string, userId: string): Promise<{
@@ -965,11 +981,18 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
 
         return this.bookingModel
             .find({ StandardId: targetUserId } as any)
+            .select(
+                'StandardId eventId numberOfTickets totalPrice status hasTheaterSeating ' +
+                'pendingExpiresAt selectedSeats isReceiptUploaded cancellationRequest createdAt updatedAt',
+            )
             .populate({
                 path: 'eventId',
+                select:
+                    'title date location ticketPrice cancellationDeadline startTime endTime ' +
+                    'organizerId hasTheaterSeating',
                 populate: {
                     path: 'organizerId',
-                    select: 'name instapayNumber instapayQR instapayLink'
+                    select: 'name instapayNumber instapayLink'
                 }
             })
             .sort({ createdAt: -1 })
