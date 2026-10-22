@@ -48,6 +48,30 @@ describe('BookingsService', () => {
     expect(service).toBeDefined();
   });
 
+  it('allows booking on the event date before its Cairo start time', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-10-22T14:00:00.000Z'));
+
+    expect(() => (service as any).assertBookableEvent({
+      status: 'approved',
+      date: new Date('2026-10-22T00:00:00.000Z'),
+      startTime: '18:00',
+    })).not.toThrow();
+
+    jest.useRealTimers();
+  });
+
+  it('rejects booking after the event start time in Cairo', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-10-22T15:01:00.000Z'));
+
+    expect(() => (service as any).assertBookableEvent({
+      status: 'approved',
+      date: new Date('2026-10-22T00:00:00.000Z'),
+      startTime: '18:00',
+    })).toThrow('This event is no longer available for booking');
+
+    jest.useRealTimers();
+  });
+
   it('keeps receipt images and heavy event seating data out of booking lists', async () => {
     bookingExec.mockResolvedValue([]);
 

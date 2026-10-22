@@ -19,6 +19,46 @@ import { User, UserDocument, UserRole } from '../users/schemas/user.schema';
 
 const DEFAULT_PAYMENT_DEADLINE_MINUTES = 30;
 const DEFAULT_SEAT_HOLD_DEADLINE_MINUTES = 3;
+const EVENT_TIME_ZONE = 'Africa/Cairo';
+
+function zonedDateTimeToTimestamp(
+    year: number,
+    month: number,
+    day: number,
+    hour: number,
+    minute: number,
+    second: number,
+): number {
+    const requestedWallTime = Date.UTC(year, month - 1, day, hour, minute, second);
+    let candidate = requestedWallTime;
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: EVENT_TIME_ZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23',
+    });
+
+    // Two passes account for daylight-saving transitions at the target date.
+    for (let pass = 0; pass < 2; pass += 1) {
+        const parts = Object.fromEntries(
+            formatter.formatToParts(new Date(candidate)).map(({ type, value }) => [type, value]),
+        );
+        const renderedWallTime = Date.UTC(
+            Number(parts.year),
+            Number(parts.month) - 1,
+            Number(parts.day),
+            Number(parts.hour),
+            Number(parts.minute),
+            Number(parts.second),
+        );
+        candidate += requestedWallTime - renderedWallTime;
+    }
+    return candidate;
+}
 
 @Injectable()
 export class BookingsService implements OnModuleInit, OnModuleDestroy {
@@ -251,7 +291,27 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
         if (event.status !== 'approved') {
             throw new BadRequestException('Only approved events can be booked');
         }
-        if (new Date(event.date).getTime() <= Date.now()) {
+
+        const date = new Date(event.date);
+        if (!Number.isFinite(date.getTime())) {
+            throw new BadRequestException('This event is no longer available for booking');
+        }
+        const parsedStartTime = /^(\d{1,2}):(\d{2})$/.exec(String(event.startTime || ''));
+        const hour = parsedStartTime ? Number(parsedStartTime[1]) : 23;
+        const minute = parsedStartTime ? Number(parsedStartTime[2]) : 59;
+        const hasValidStartTime = Boolean(
+            parsedStartTime && hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59,
+        );
+        const cutoff = zonedDateTimeToTimestamp(
+            date.getUTCFullYear(),
+            date.getUTCMonth() + 1,
+            date.getUTCDate(),
+            hasValidStartTime ? hour : 23,
+            hasValidStartTime ? minute : 59,
+            hasValidStartTime ? 0 : 59,
+        );
+
+        if (cutoff <= Date.now()) {
             throw new BadRequestException('This event is no longer available for booking');
         }
     }
